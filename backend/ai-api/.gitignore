@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+
+storage/chroma/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment variables
+.env
+.env.*
+
+# Local vector database
+storage/chroma/
+
+# Local backup files
+*.backup.json
+
+# Logs
+*.log
