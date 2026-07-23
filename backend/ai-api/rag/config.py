@@ -20,6 +20,8 @@ CLASSIFICATION_PATH = DATA_DIR / "case_classification.json"
 DOCUMENTS_PATH = DATA_DIR / "documents.json"
 MOCK_DOCUMENTS_PATH = DATA_DIR / "documents.mock.json"
 EVALUATION_QUERIES_PATH = DATA_DIR / "evaluation_queries.json"
+TEMPLATE_MANIFEST_PATH = DATA_DIR / "template_manifest.json"
+PARSED_TEMPLATES_PATH = DATA_DIR / "parsed_templates.json"
 
 # 검색 설정
 DEFAULT_TOP_K = 3

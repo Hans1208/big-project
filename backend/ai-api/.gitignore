@@ -23,4 +23,4 @@ storage/chroma/
 *.backup.json
 
 # Logs
-*.log
+*.lograg/data/parsed_templates.json
