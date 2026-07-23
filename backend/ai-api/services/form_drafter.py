@@ -29,7 +29,12 @@ HWPX_ROOT = ROOT / "서식_hwpx"
 OUTPUT = ROOT / "output"
 OUTPUT.mkdir(exist_ok=True)
 
-PLACEHOLDER_RE = re.compile(r"○\s*○|□\s*□|◎\s*◎|20○○|19○○|△\s*△")
+# 서식마다 이름 자리표시자로 쓰는 특수문자가 다르다(○○이 기본이지만
+# ◇◇·◉◉ 같은 반복 기호나, "①○"처럼 원문자+○ 조합으로 쓰는 서식도 있음).
+PLACEHOLDER_RE = re.compile(
+    r"○\s*○|□\s*□|◎\s*◎|◇\s*◇|◉\s*◉|●\s*●|▲\s*▲|"
+    r"20○○|19○○|△\s*△|[①②③④⑤⑥⑦⑧⑨]\s*○|○\s*[①②③④⑤⑥⑦⑧⑨]"
+)
 
 
 # ══════════════════════════════════════
@@ -50,6 +55,15 @@ FIELD_PROMPT = """너는 법률 서식의 자리표시자를 실제 값으로 �
    청구인 자리에 상대방 값을 넣는 것은 최악의 오류다.
 5. 같은 사람 이름이 당사자란과 서명란("위 신청인")에 각각 나오면
    각각 별도 항목으로 만든다 (각 위치의 주변 라벨을 before에 포함).
+6. 서명란 바로 위의 작성일자("20○○년   ○월   ○일" 형태로 "위 신청인/원고 (인)"
+   바로 앞에 있는 날짜)는 절대 채우지 않는다. 이건 사건 사실의 날짜가 아니라
+   상담원이 실제 제출하는 날 직접 적는 칸이다. 임의로 오늘 날짜 비슷한 값을
+   지어내 채우는 것은 명백한 오류이며, 다른 어떤 규칙보다 우선한다.
+7. 자리표시자가 요구하는 정밀도(연/월/일)까지 extracted에 정확히 다 있을 때만
+   채운다. extracted에 "2026-01"처럼 연-월까지만 있는데 자리표시자가
+   "20○○. ○. ○."처럼 일(day)까지 요구하면, 없는 일자를 지어내 채우지 말고
+   통째로 unfilled로 남긴다. 부분적으로 아는 값의 나머지를 추측하는 것도
+   지어내는 것과 같은 오류다.
 
 출력 JSON:
 {"replacements": [{"before": "...", "after": "...", "role": "청구인"}],
@@ -57,17 +71,24 @@ FIELD_PROMPT = """너는 법률 서식의 자리표시자를 실제 값으로 �
 
 
 def _generate_fields(markdown: str, extracted: dict, summary: str) -> dict:
+    """정형 치환 목록 생성. 서식이 크면 GPT 응답이 중간에 잘려 JSON 파싱이
+    깨지는 경우가 있다 — 이 경우 정형 치환만 건너뛰고(예시문단 재서술은
+    별개로 계속 진행), 원인을 error로 남겨 draft()가 보고할 수 있게 한다."""
     user_msg = (f"[서식 마크다운]\n{markdown}\n\n"
                 f"[사건 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
-    resp = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "system", "content": FIELD_PROMPT},
-                  {"role": "user", "content": user_msg}],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    return json.loads(resp.choices[0].message.content)
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": FIELD_PROMPT},
+                      {"role": "user", "content": user_msg}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        return json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        return {"replacements": [], "unfilled": [],
+                "error": f"{type(e).__name__}: {e}"}
 
 
 # ══════════════════════════════════════
@@ -226,15 +247,20 @@ def _rewrite_examples(example_texts: list, extracted: dict, summary: str) -> lis
                 f"[상담 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}\n\n"
                 f"위 사실만으로 문단 {n}개를 작성하라. 사실이 부족하면 뒤 문단은 \"\".")
-    resp = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "system", "content": REWRITE_PROMPT},
-                  {"role": "user", "content": user_msg}],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    out = json.loads(resp.choices[0].message.content)
-    paras = out.get("paragraphs", [])
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": REWRITE_PROMPT},
+                      {"role": "user", "content": user_msg}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        out = json.loads(resp.choices[0].message.content)
+        paras = out.get("paragraphs", [])
+    except Exception:
+        # 응답이 깨지면 근거 없이 채우느니 전부 미기재 처리 — 원본은 그대로
+        # 남고 draft()가 "서술문단(근거부족·상담원작성)"으로 unfilled에 기록한다.
+        paras = []
     if len(paras) < n:
         paras = paras + [""] * (n - len(paras))
     return paras[:n]
@@ -274,15 +300,18 @@ def _selfcheck_and_revise(paragraphs: list, extracted: dict, summary: str) -> li
     user_msg = (f"[작성된 문단]\n{numbered}\n\n"
                 f"[상담 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
-    resp = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "system", "content": REVISE_PROMPT},
-                  {"role": "user", "content": user_msg}],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    out = json.loads(resp.choices[0].message.content)
-    revised = out.get("paragraphs", [])
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": REVISE_PROMPT},
+                      {"role": "user", "content": user_msg}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        out = json.loads(resp.choices[0].message.content)
+        revised = out.get("paragraphs", [])
+    except Exception:
+        return paragraphs  # 검수 호출 자체가 깨지면 1차 결과 유지 (팩트검증에서 재확인)
     if len(revised) != len(paragraphs):
         return paragraphs  # 형식이 깨지면 안전하게 1차 결과 유지 (팩트검증에서 재확인)
     return revised
@@ -318,6 +347,28 @@ def _set_paragraph_text(p, text: str):
     for r in runs[1:]:
         r.text = ""
     return True
+
+
+EXAMPLE_TAG = "[서식 예시—실제 값으로 교체 필요] "
+
+
+def _mark_unresolved_examples(doc) -> int:
+    """A·B 단계 처리 후에도 자리표시자가 남은 '내용 있는' 문단(40자 이상 —
+    단순 빈칸이 아니라 서식 예시일 가능성)에 눈에 띄는 표시를 붙인다.
+    계산식처럼 서술체가 아니라 B단계 탐지를 못 통과하는 원본 예시(예: 유류분
+    계산 내역의 가짜 원고·금액)를 완벽히 감지하려 하기보다, 남아있는
+    자리표시자 자체를 최후 신호로 삼아 상담원이 놓치지 않게 하는 안전장치."""
+    marked = 0
+    for sec in doc.sections:
+        for p in sec.paragraphs:
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(r, "text", "") or "" for r in runs)
+            if len(text) >= 40 and PLACEHOLDER_RE.search(text) and not text.startswith(EXAMPLE_TAG):
+                runs[0].text = EXAMPLE_TAG + runs[0].text
+                marked += 1
+    return marked
 
 
 # ══════════════════════════════════════
@@ -450,6 +501,13 @@ def draft(form_name, extracted, summary=""):
             if _set_paragraph_text(para, new_text):
                 rewritten_count += 1
 
+    # ── C. 최후 안전장치: 처리 후에도 자리표시자가 남은 '내용 있는' 문단 표시 ──
+    # 계산식처럼 서술체가 아니라서 B단계가 못 잡는 원본 예시(예: 유류분 계산
+    # 내역의 가짜 원고·금액)가 있을 수 있다. 완벽 감지 대신, 40자 이상인데도
+    # 자리표시자가 남아있으면(단순 빈칸이 아니라 내용이 있는 문단) 무조건
+    # 눈에 띄게 표시해 상담원이 놓치지 않게 한다.
+    marked_examples = _mark_unresolved_examples(doc)
+
     out = OUTPUT / f"{src.stem}_초안.hwpx"
     try:
         doc.save_to_path(str(out))
@@ -460,7 +518,8 @@ def draft(form_name, extracted, summary=""):
     return {"file": str(out), "error": None,
             "applied": applied, "missed": missed, "unfilled": unfilled,
             "rewritten_count": rewritten_count, "rewrite_rejected": rewrite_rejected,
-            "gpt_count": len(reps)}
+            "gpt_count": len(reps), "field_generation_error": gpt.get("error"),
+            "marked_examples": marked_examples}
 
 
 if __name__ == "__main__":
