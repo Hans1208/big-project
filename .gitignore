@@ -38,3 +38,4 @@ backend/ai-api/서식/
 변환결과.json
 *.txt
 
+backend/ai-api/rag/data/parsed_templates.json
