@@ -303,15 +303,21 @@ def main():
                 row["rewrite_rejected"] = len(d["rewrite_rejected"])
                 row["field_generation_error"] = d.get("field_generation_error")
                 row["marked_examples"] = d.get("marked_examples")
+                row["llm_hallucination"] = d.get("llm_hallucination")
+                row["llm_role_swap"] = d.get("llm_role_swap")
                 rep = verify(path, d["file"], mock["extracted"])
                 row["grade"] = rep["grade"]
                 row["hallucinated_dates"] = rep["hallucinated_dates"]
                 row["hallucinated_money"] = rep["hallucinated_money"]
                 row["example_residue"] = len(rep["example_residue"])
                 fld_note = " ⚠️정형치환실패(예시문단만 처리됨)" if d.get("field_generation_error") else ""
+                judge_note = ""
+                if d.get("llm_hallucination") or d.get("llm_role_swap"):
+                    judge_note = (f" ⚠️인명/지명 환각의심:{d.get('llm_hallucination')} "
+                                   f"역할바뀜:{d.get('llm_role_swap')}")
                 print(f"   ✅ {rep['grade']} (재서술 {d['rewritten_count']}건, "
                       f"환각의심 날짜{len(rep['hallucinated_dates'])}/금액{len(rep['hallucinated_money'])}, "
-                      f"예시잔존 {len(rep['example_residue'])}, 안전장치표시 {d.get('marked_examples')}){fld_note}")
+                      f"예시잔존 {len(rep['example_residue'])}, 안전장치표시 {d.get('marked_examples')}){fld_note}{judge_note}")
         except Exception as e:
             row["status"] = "exception"
             row["error"] = f"{type(e).__name__}: {e}"
