@@ -55,10 +55,6 @@ def _paragraphs(path) -> list:
     return paras
 
 
-def _full_text(path) -> str:
-    return "".join(_paragraphs(path))
-
-
 def _flatten_values(extracted: dict) -> list:
     out = []
     def walk(o):
@@ -159,29 +155,42 @@ def verify(original_path, draft_path, extracted: dict) -> dict:
 
 
 def llm_judge(draft_path, extracted: dict, summary: str = "") -> dict:
+    """초안 전체를 GPT에게 다시 보여주고 인명·지명·기관 등 추출정보/요약에
+    없는 사실이 새로 등장했는지, 당사자 역할이 뒤바뀌지 않았는지 최종
+    점검한다. verify()의 날짜/금액 정규식 검사와 달리 이건 정규식으로
+    못 잡는 '문맥적' 환각(엉뚱한 사람 이름·지명 등)을 잡기 위한 것."""
     import json, os
     from openai import OpenAI
     from dotenv import load_dotenv
     load_dotenv()
     client = OpenAI()
-    text = _full_text(draft_path)
+    # 문단 구분 없이 다 이어붙이면("...전화국적: 중화민국등록기준지...") GPT가
+    # 개별 필드를 못 알아보고 놓친다 — 줄바꿈으로 구분해서 문단 단위로 보여준다.
+    text = "\n".join(_paragraphs(draft_path))
     prompt = (
         "법률 서식 초안과 그 근거 상담정보다. 아래만 찾아 JSON으로:\n"
-        "1) hallucination: 추출정보/요약에 없는 사실(인명·지명·기관·사건)이 "
-        "초안에 등장하는 것. 서식 자체의 안내문구·법률용어는 제외.\n"
+        "1) hallucination: 추출정보/요약에 없는 사실(인명·지명·기관·국적·직업·"
+        "사건 등)이 초안에 등장하는 것. 긴 서술 문단뿐 아니라 \"국적 : 중화민국\", "
+        "\"직업 : 회사원\"처럼 \"라벨 : 값\" 형태로 된 짧은 필드에 들어간 값도 "
+        "반드시 같은 기준으로 검사한다 — 짧다고, 필드처럼 생겼다고 건너뛰지 마라.\n"
+        "   서식 자체의 안내문구·법률용어(예: 관할법원 안내, 제출서류 설명)만 제외한다.\n"
         "2) role_swap: 당사자가 뒤바뀐 곳(청구인 자리에 상대방 값 등).\n"
         "없으면 빈 배열.\n\n"
         f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False)}\n\n"
         f"[요약]\n{summary}\n\n[초안]\n{text[:6000]}\n\n"
         '출력: {"hallucination": [], "role_swap": []}'
     )
-    resp = client.chat.completions.create(
-        model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
-    return json.loads(resp.choices[0].message.content)
+    try:
+        resp = client.chat.completions.create(
+            model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        return json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        return {"hallucination": [], "role_swap": [],
+                "error": f"{type(e).__name__}: {e}"}
 
 
 if __name__ == "__main__":
