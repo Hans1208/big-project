@@ -8,7 +8,10 @@ agents/missing_data/graph.py
   원본 텍스트를 다시 훑어 그 외 누락도 함께 찾는다.
 - validation           : 각 후보를 원본 텍스트와 재대조하여 confidence(0~1)를 매긴다
   (할루시네이션/오탐 체크). 최종 채택 여부는 config.CONFIDENCE_THRESHOLD로 코드에서 결정.
-- 두 단계 모두 확정적 법률판단을 내리지 않으며, 결과는 참고자료임을 전제로 한다 (HITL 원칙).
+- document_mapping     : threshold를 통과한 각 누락 항목에 대해, 한국 내에서 실제로
+  확인/발급 가능한 서류(ReferenceDocument)를 1~3개씩 매핑한다. 서류명·발급기관은
+  실존하는 것만 쓰도록 프롬프트에서 강제 (할루시네이션 방지).
+- 세 단계 모두 확정적 법률판단을 내리지 않으며, 결과는 참고자료임을 전제로 한다 (HITL 원칙).
 
 main.py에서는 이 모듈의 `missing_data_graph`만 가져다 쓰면 된다:
     from app.agents.missing_data.graph import missing_data_graph
@@ -27,6 +30,7 @@ from .modal import (
     CandidateList,
     ValidatedList,
     MissingItemValidated,
+    DocumentMappedList,
 )
 
 
@@ -38,6 +42,7 @@ llm = ChatOpenAI(model=config.MODEL_NAME, temperature=0)
 
 candidate_llm = llm.with_structured_output(CandidateList, method=config.STRUCTURED_METHOD)
 validation_llm = llm.with_structured_output(ValidatedList, method=config.STRUCTURED_METHOD)
+document_mapping_llm = llm.with_structured_output(DocumentMappedList, method=config.STRUCTURED_METHOD)
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +98,27 @@ VALIDATION_PROMPT = COMMON_PRINCIPLE + """
 {candidates}
 """
 
+DOCUMENT_MAPPING_PROMPT = COMMON_PRINCIPLE + """
+[매핑 목적]
+아래는 검증을 통과한 "누락 항목" 목록입니다. 각 항목에 대해, 대한민국에서
+실제로 발급/확인 가능한 서류를 1~3개씩 찾아 reference_documents로 제시하세요.
+
+[매핑 규칙]
+- doc_name / issuing_authority는 실존하는 서류명·기관명만 사용하세요.
+  존재를 확신할 수 없는 서류는 만들어내지 말고, 확실한 것만 제시하세요 (할루시네이션 금지).
+- acquisition_type을 반드시 아래 세 가지 중 하나로 분류하세요.
+  - "본인발급": 당사자가 정부24/홈택스 등에서 스스로 즉시 발급 가능
+  - "제3자발급": 상대방·기관이 보유/신고한 내역을 당사자가 열람·요청해야 함
+  - "절차확보": 진정/소송 등 공식 절차(법원 조회명령, 근로감독관 조사 등)를 거쳐야만 확보됨
+- online_issuance/online_issuance_channel은 실제 온라인 발급 가능 여부에 맞게 정확히 표기하세요.
+  (모르면 online_issuance=false, channel=null)
+- 이 서류 목록은 상담원/변호사가 다음 행동을 정하는 데 참고하는 자료이며,
+  "반드시 이 서류가 있어야 한다"는 단정적 표현은 피하세요 (참고용 안내).
+
+[검증 통과 누락 항목 목록]
+{validated_items}
+"""
+
 
 # ---------------------------------------------------------------------------
 # 3. 헬퍼
@@ -140,6 +166,32 @@ async def validation_node(state: MissingDataState) -> dict:
         for v in result.validated
         if v.confidence >= config.CONFIDENCE_THRESHOLD
     ]
+    return {"validated_missing_items": final_items}
+
+
+async def document_mapping_node(state: MissingDataState) -> dict:
+    validated_items = state.get("validated_missing_items", [])
+
+    # threshold 통과 항목이 없으면 LLM 호출 없이 빈 리스트로 종료 (불필요한 API 호출 방지)
+    if not validated_items:
+        return {"missing_items": []}
+
+    prompt = DOCUMENT_MAPPING_PROMPT.format(validated_items=validated_items)
+    result: DocumentMappedList = await document_mapping_llm.ainvoke(
+        [SystemMessage(content=prompt), HumanMessage(content=str(validated_items))]
+    )
+
+    # LLM이 순서를 바꾸거나 일부를 누락시킬 가능성에 대비해 item명 기준으로 매핑,
+    # 매핑 실패 항목은 reference_documents=[] 상태로 원본 검증 결과를 그대로 보존.
+    mapped_by_item = {m.item: m for m in result.items}
+    final_items: List[dict] = []
+    for validated in validated_items:
+        mapped = mapped_by_item.get(validated.get("item"))
+        if mapped is not None:
+            final_items.append(mapped.model_dump())
+        else:
+            final_items.append({**validated, "reference_documents": []})
+
     return {"missing_items": final_items}
 
 
@@ -151,9 +203,11 @@ _graph_builder = StateGraph(MissingDataState)
 
 _graph_builder.add_node("candidate_generation", candidate_generation_node)
 _graph_builder.add_node("validation", validation_node)
+_graph_builder.add_node("document_mapping", document_mapping_node)
 
 _graph_builder.add_edge(START, "candidate_generation")
 _graph_builder.add_edge("candidate_generation", "validation")
-_graph_builder.add_edge("validation", END)
+_graph_builder.add_edge("validation", "document_mapping")
+_graph_builder.add_edge("document_mapping", END)
 
 missing_data_graph = _graph_builder.compile()
