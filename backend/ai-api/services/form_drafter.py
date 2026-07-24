@@ -20,6 +20,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from hwpx import HwpxDocument
 
+from services.form_verifier import llm_judge
+
 load_dotenv()
 MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 client = OpenAI()
@@ -92,6 +94,235 @@ def _generate_fields(markdown: str, extracted: dict, summary: str) -> dict:
 
 
 # ══════════════════════════════════════
+# E. 표 셀 채우기
+# ══════════════════════════════════════
+# python-hwpx는 표를 doc.sections→paragraphs→runs 순회로는 전혀 보여주지
+# 않는다(표 안 문단은 별도 구조). 291개 서식 중 96%가 표를 포함하고, 그
+# 표 안에 원본 예시 인물이나 실제 채워야 할 서술란이 들어있는 경우가
+# 있어(예: 가족관계등록 창설신청서의 당사자 표, 한정후견개시의 청구
+# 동기란) 별도로 다뤄야 한다. get_table_map()으로 읽고 set_cell_text()로
+# 쓴다 — 둘 다 저장→재오픈 라운드트립으로 반영 확인됨.
+TABLE_FIELD_PROMPT = """너는 법률 서식의 표 안 자리표시자를 실제 값으로 바꾸는 치환목록을 만든다.
+
+표는 (표번호, 행, 열, 현재텍스트) 형태로 주어진다. 보통 "라벨 셀"(예: 성명,
+출생연월일, 주민등록번호, 관계)의 바로 옆이나 아래 칸이 "값을 채워야 할 셀"이며,
+그 자리에 자리표시자(○○○, 빈칸, "   년   월   일" 같은 빈 날짜 칸 등)가 있거나,
+서식 제작자가 넣은 가상의 예시 값(예: "김본인", "김일남")이 이미 인쇄돼 있다.
+
+규칙:
+1. extracted에 명시된 값만 사용한다. 없으면 건드리지 않는다.
+2. 라벨 셀 자체(예: "성명", "구분")는 절대 바꾸지 않는다 — 그 라벨에 대응하는
+   값 셀만 바꾼다.
+3. 서식에 이미 뭔가 채워진 것처럼 보여도(가상의 예시 인물 이름 등), 그건 서식
+   제작자가 넣은 남의 사연이지 우리 사건이 아니다. extracted에 해당 항목이
+   있으면 그 값으로 교체한다.
+4. 날짜·금액·주소·주민번호는 정확한 값이 없으면 절대 채우지 않는다. 부분적으로만
+   아는 값(예: 연-월만 있는데 일자까지 요구)의 나머지를 추측하지 않는다.
+5. "관련법규", "제출법원", "비용", "제출부수", "해설", 체크박스(□)로 된 선택
+   항목 안내처럼 이 사건과 무관하게 항상 고정인 안내/법조문 셀은 건드리지 않는다.
+6. 확신이 없으면 건드리지 않는다 — 틀린 칸에 잘못 채우는 것보다 안 채우는 게 낫다.
+
+출력 JSON:
+{"cell_replacements": [
+  {"table_index": 0, "row": 1, "col": 1, "value": "..."}
+]}"""
+
+
+def _collect_tables(doc) -> list:
+    """문서 안의 모든 표 객체를 문서 순서대로 수집한다.
+    get_table_map()의 table_index와 같은 순서여야 (읽기용 메타데이터와
+    쓰기용 객체를 인덱스로 짝지을 수 있음)."""
+    tables = []
+    for sec in doc.sections:
+        for p in sec.paragraphs:
+            for t in (getattr(p, "tables", None) or []):
+                tables.append(t)
+    return tables
+
+
+def _describe_tables(tables_meta: list) -> str:
+    lines = []
+    for table in tables_meta:
+        idx = table.get("table_index")
+        for cell in table.get("cells", []):
+            text = cell.get("text", "").strip()
+            lines.append(f"[표{idx} 행{cell['row']} 열{cell['col']}] {text}")
+    return "\n".join(lines)
+
+
+def _generate_table_fields(tables_meta: list, extracted: dict, summary: str) -> dict:
+    if not tables_meta:
+        return {"cell_replacements": []}
+    desc = _describe_tables(tables_meta)
+    user_msg = (f"[표 셀 목록]\n{desc}\n\n"
+                f"[사건 요약]\n{summary}\n\n"
+                f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": TABLE_FIELD_PROMPT},
+                      {"role": "user", "content": user_msg}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        return json.loads(resp.choices[0].message.content)
+    except Exception as e:
+        return {"cell_replacements": [], "error": f"{type(e).__name__}: {e}"}
+
+
+def _apply_table_fields(table_objs: list, replacements: list) -> tuple:
+    """GPT가 제안한 셀 치환을 실제로 적용. 범위를 벗어나거나 실패하면
+    조용히 건너뛴다(표 하나 잘못됐다고 전체가 죽으면 안 됨).
+    반환: (적용건수, 실패목록, 이번에 채운 (table_index,row,col) 집합)."""
+    applied, missed, filled_keys = 0, [], set()
+    for r in replacements:
+        idx, row, col, value = r.get("table_index"), r.get("row"), r.get("col"), r.get("value")
+        if idx is None or row is None or col is None or not value:
+            continue
+        if not (0 <= idx < len(table_objs)):
+            missed.append(r)
+            continue
+        try:
+            table_objs[idx].set_cell_text(row, col, str(value))
+            applied += 1
+            filled_keys.add((idx, row, col))
+        except Exception:
+            missed.append(r)
+    return applied, missed, filled_keys
+
+
+TABLE_EXAMPLE_TAG = "[예시:확인필요] "
+
+# 이런 라벨(보통 0열)이 붙은 행/셀은 이 사건과 무관하게 항상 고정인 안내문·
+# 법조문·참조 문구다 — 자리표시자가 있어도 "채워야 할 빈칸"이 아니므로
+# 안전장치 대상에서 제외한다 (FIELD_PROMPT 규칙 5와 같은 취지).
+TABLE_NONFILLABLE_LABELS = (
+    "관련법규", "비용", "제출법원", "제출부수", "해설", "불복절차",
+    "청구권자", "결격사유", "관할", "인지", "송달료",
+)
+
+
+TABLE_CLASSIFY_PROMPT = """너는 법률 서식의 표 안에서, 서식 제작자가 넣은 가상의
+예시 행(사람 이름·날짜·주소 등 이미 채워진 것처럼 보이는 구체적 데이터)인데
+아직 실제 값으로 안 바뀐 행을 가려내는 분류기다.
+
+각 항목은 "(라벨) 값1 | 값2 | ..." 형태로, 표의 한 행 전체를 보여준다.
+라벨은 그 행이 무슨 항목인지 알려준다(예: "부", "모", "배우자", "본인").
+
+핵심 신호: **행 안의 일부 값(주로 이름)만 구체적으로 채워져 있고 나머지
+값들은 비어있거나 자리표시자·미기재 상태**라면, 이건 서식 제작자가 이름 등
+일부만 예시로 인쇄해둔 가상의 사람일 가능성이 매우 높다 — 진짜 우리 사건
+정보라면 상담원이 아는 만큼 자연스럽게 채웠을 것이지, 이름만 정확히 알고
+나머지(생년월일·주민번호 등)를 전부 모를 이유가 없기 때문이다.
+
+[추출정보]/[사건 요약]과도 대조하라: 그 라벨에 해당하는 사람/항목이
+[추출정보]에 아예 없는데 행에 구체적 값이 있으면 예시일 가능성이 높다.
+
+각 행이 "예시 행"(true)인지 "정상"(false)인지 판단하라. 애매하면 false.
+
+## 출력 JSON (입력 개수·순서와 같은 배열)
+{"is_example": [true/false, ...]}"""
+
+
+def _classify_table_rows_batch(row_descs: list, extracted: dict, summary: str) -> list:
+    """row_descs: 사람이 읽을 수 있는 행 설명 문자열 리스트."""
+    if not row_descs:
+        return []
+    numbered = "\n".join(f"[{i}] {d}" for i, d in enumerate(row_descs))
+    user_msg = (f"[행 목록]\n{numbered}\n\n"
+                f"[사건 요약]\n{summary}\n\n"
+                f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": TABLE_CLASSIFY_PROMPT},
+                      {"role": "user", "content": user_msg}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        out = json.loads(resp.choices[0].message.content)
+        flags = out.get("is_example", [])
+    except Exception:
+        return [False] * len(row_descs)
+    if len(flags) != len(row_descs):
+        return [False] * len(row_descs)
+    return [bool(f) for f in flags]
+
+
+def _mark_unresolved_table_cells(table_objs: list, tables_meta: list, filled_keys: set,
+                                  extracted: dict, summary: str) -> int:
+    """방금 채운 셀은 제외하고, 남아있는 셀 중:
+    1) 자리표시자가 있으면 바로 표시 — 단, 관련법규·비용·제출법원처럼 항상
+       고정인 안내문 행은 제외(TABLE_NONFILLABLE_LABELS)
+    2) 자리표시자는 없지만 '이미 채워진 것처럼' 보이는 값(예: 원본 예시 인물
+       이름)은 GPT로 배치 분류해서 표시.
+
+    셀 하나하나를 떼어 보여주면 "김일남" 같은 값이 다른 정상 필드값과
+    섞여 GPT가 예시인지 판단할 신호가 약해진다(실측: 개별 셀 분류로는
+    31개 후보 중 진짜 예시 인물도 전부 놓침) — 그래서 행 전체를 한 단위로
+    보여준다. "이름만 채워지고 나머지는 다 빈칸"이라는 패턴 자체가
+    예시 인물임을 보여주는 핵심 신호이기 때문이다.
+
+    표는 칸 너비가 고정이라 문단용 긴 태그를 쓰면 레이아웃이 깨질 수 있어
+    짧은 태그(TABLE_EXAMPLE_TAG)를 쓴다."""
+    marked = 0
+
+    for table in tables_meta:
+        idx = table.get("table_index")
+        if not (0 <= idx < len(table_objs)):
+            continue
+
+        rows = {}
+        for cell in table.get("cells", []):
+            rows.setdefault(cell["row"], []).append((cell["col"], cell.get("text", "")))
+
+        row_batch = []  # [(idx, row, [(col,text) to mark]), ...] — 이번 표의 후보 행
+        for row, cells in rows.items():
+            if row == 0:
+                continue  # 0행은 열 제목
+            label = next((t.strip() for c, t in cells if c == 0), "")
+            if any(nf in label for nf in TABLE_NONFILLABLE_LABELS):
+                continue
+            value_cells = [(c, t) for c, t in sorted(cells)
+                           if c != 0 and (idx, row, c) not in filled_keys
+                           and t.strip() and not t.startswith(TABLE_EXAMPLE_TAG)
+                           and "☞" not in t and "참조" not in t]
+            if not value_cells:
+                continue
+
+            placeholder_cells = [(c, t) for c, t in value_cells if PLACEHOLDER_RE.search(t)]
+            plain_cells = [(c, t) for c, t in value_cells if not PLACEHOLDER_RE.search(t)]
+
+            for c, t in placeholder_cells:
+                try:
+                    table_objs[idx].set_cell_text(row, c, TABLE_EXAMPLE_TAG + t)
+                    marked += 1
+                except Exception:
+                    pass
+
+            # 너무 긴 행(해설·법조문 등 boilerplate)은 분류 대상에서 제외
+            total_len = sum(len(t) for _, t in plain_cells)
+            if plain_cells and total_len <= 150:
+                row_batch.append((idx, row, label, plain_cells))
+
+        if row_batch:
+            descs = [f"(라벨: {label or '?'}) " + " | ".join(t for _, t in cells)
+                     for (_, _, label, cells) in row_batch]
+            flags = _classify_table_rows_batch(descs, extracted, summary)
+            for (i2, row, _label, cells), is_example in zip(row_batch, flags):
+                if not is_example:
+                    continue
+                for c, t in cells:
+                    try:
+                        table_objs[i2].set_cell_text(row, c, TABLE_EXAMPLE_TAG + t)
+                        marked += 1
+                    except Exception:
+                        pass
+
+    return marked
+
+
+# ══════════════════════════════════════
 # B. 예시문단 재서술
 # ══════════════════════════════════════
 NARRATIVE_END_RE = re.compile(r"(습니다|하였|였다|입니다|되었|하고|근무|생활)")
@@ -135,6 +366,47 @@ def _classify_is_example(texts: list) -> bool:
         return bool(out.get("is_example"))
     except Exception:
         return False
+
+
+CLASSIFY_BATCH_PROMPT = """너는 법률 서식 원문에서 '서식 제작자가 넣은 가상의 예시 사연'을
+가려내는 분류기다.
+
+법률 서식에는 보통 두 종류의 긴 문단이 있다:
+1. 예시 사연: 실제 있음직한 가상의 인물·사건으로 채워진 완결된 이야기
+   (구체적 날짜·금액·직업·장소·인명 등이 이미 다 채워져 있음). 이 사건과
+   무관한 남의 얘기이며, 상담원이 실제 사건 내용으로 통째로 바꿔써야 한다.
+2. 안내문/법조문/정형 문구: 관할법원 안내, 신청취지의 정형 문구, 제출 서류
+   설명 등 이 사건과 무관하게 항상 그대로 유지되는 문구.
+
+아래 [문단들]은 서로 무관한 개별 문단들이다(하나의 흐름이 아니다). 각 문단을
+독립적으로 1번(예시 사연)인지 2번(안내문 등)인지 판단하라. 조금이라도
+애매하면 2번(false)으로 판단한다.
+
+## 출력 JSON (입력 문단 개수와 순서가 같은 배열)
+{"is_example": [true/false, ...]}"""
+
+
+def _classify_examples_batch(texts: list) -> list:
+    """문단마다 개별 호출하면 문단이 많은 서식에서 GPT 호출이 과도하게
+    쌓인다 — 한 번의 호출로 여러 문단을 동시에 판정한다."""
+    if not texts:
+        return []
+    numbered = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": CLASSIFY_BATCH_PROMPT},
+                      {"role": "user", "content": f"[문단들]\n{numbered}"}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        out = json.loads(resp.choices[0].message.content)
+        flags = out.get("is_example", [])
+    except Exception:
+        return [False] * len(texts)
+    if len(flags) != len(texts):
+        return [False] * len(texts)
+    return [bool(f) for f in flags]
 
 
 def _find_example_paragraphs(doc) -> list:
@@ -352,22 +624,52 @@ def _set_paragraph_text(p, text: str):
 EXAMPLE_TAG = "[서식 예시—실제 값으로 교체 필요] "
 
 
-def _mark_unresolved_examples(doc) -> int:
-    """A·B 단계 처리 후에도 자리표시자가 남은 '내용 있는' 문단(40자 이상 —
-    단순 빈칸이 아니라 서식 예시일 가능성)에 눈에 띄는 표시를 붙인다.
-    계산식처럼 서술체가 아니라 B단계 탐지를 못 통과하는 원본 예시(예: 유류분
-    계산 내역의 가짜 원고·금액)를 완벽히 감지하려 하기보다, 남아있는
-    자리표시자 자체를 최후 신호로 삼아 상담원이 놓치지 않게 하는 안전장치."""
+def _mark_unresolved_examples(doc, rewritten_texts: set) -> int:
+    """A·B 단계 처리 후에도 남아있는 원본 예시를 표시한다. 두 가지 신호를 쓴다:
+
+    1) 자리표시자가 남은 '내용 있는' 문단(40자 이상) — 계산식처럼 서술체가
+       아니라 B단계 탐지를 못 통과하는 원본 예시(유류분 계산 내역 등)에 대응.
+    2) 자리표시자가 아예 없이 '이미 다 채워진 것처럼' 완결된 긴 문단인데
+       우리가 방금 재서술해 넣은 문단이 아닌 것 — "청구인은 중화민국 국적의
+       화교인 상대방과 198○. ○. ○. 혼인하여..." 같은, 서식 자체에 인쇄된
+       남의 사연이 자리표시자 표기법이 특이해서(198○, 단독 □ 등) 안 걸린
+       경우. 이런 문단은 정규식으로 특정할 수 없어 GPT 분류기
+       (_classify_is_example)로 "우리 사건과 무관한 예시 사연처럼 보이는가"를
+       판단시킨다.
+
+    rewritten_texts: draft()가 방금 _set_paragraph_text로 써넣은 문단 텍스트
+    집합 — 이건 재분류 대상에서 제외한다. (주의: 문단 객체의 id()는 hwpx
+    라이브러리가 .paragraphs 접근마다 새 래퍼를 만들어 재사용 불가하므로,
+    텍스트 값 자체로 판별한다.)
+
+    2)번 판정은 문단마다 개별 호출하면 문단이 많은 서식에서 GPT 호출이
+    과도하게 쌓여 느려지므로, 후보를 모았다가 문서당 한 번에 배치 분류한다."""
     marked = 0
+    llm_candidates = []  # [(runs, text), ...] — 배치 분류 대상
+
     for sec in doc.sections:
         for p in sec.paragraphs:
             runs = getattr(p, "runs", [])
             if not runs:
                 continue
             text = "".join(getattr(r, "text", "") or "" for r in runs)
-            if len(text) >= 40 and PLACEHOLDER_RE.search(text) and not text.startswith(EXAMPLE_TAG):
+            if len(text) < 40 or text.startswith(EXAMPLE_TAG):
+                continue
+            if PLACEHOLDER_RE.search(text):
                 runs[0].text = EXAMPLE_TAG + runs[0].text
                 marked += 1
+                continue
+            if text in rewritten_texts:
+                continue
+            llm_candidates.append((runs, text))
+
+    if llm_candidates:
+        flags = _classify_examples_batch([t for (_, t) in llm_candidates])
+        for (runs, _text), is_example in zip(llm_candidates, flags):
+            if is_example:
+                runs[0].text = EXAMPLE_TAG + runs[0].text
+                marked += 1
+
     return marked
 
 
@@ -480,10 +782,26 @@ def draft(form_name, extracted, summary=""):
     unfilled = gpt.get("unfilled", [])
     applied, missed = _apply_fields(doc, reps)
 
+    # ── E. 표 셀 채우기 ──
+    # 표 안 문단은 A/B/C/D 어느 단계도 못 본다(별도 구조) — 문서 순서로
+    # 표 객체를 수집해 읽기(get_table_map)/쓰기(set_cell_text) 인덱스를 맞춘다.
+    table_objs = _collect_tables(doc)
+    tables_meta = doc.get_table_map().get("tables", []) if table_objs else []
+    table_gpt = _generate_table_fields(tables_meta, extracted, summary)
+    table_applied, table_missed, table_filled_keys = _apply_table_fields(
+        table_objs, table_gpt.get("cell_replacements", []))
+    # 채운 뒤에도 남은 표 셀(자리표시자·원본 예시 인물 등) 표시.
+    # tables_meta는 채우기 전 스냅샷이라 안전장치는 여기서 최신 상태를
+    # 다시 읽어 판단해야 하지만, set_cell_text로 바뀐 셀은 filled_keys로
+    # 이미 제외되므로 기존 tables_meta 그대로 써도 무방하다.
+    table_marked = _mark_unresolved_table_cells(
+        table_objs, tables_meta, table_filled_keys, extracted, summary)
+
     # ── B. 예시문단 재서술 ──
     examples = _find_example_paragraphs(doc)   # [(para, text), ...]
     rewritten_count = 0
     rewrite_rejected = []
+    rewritten_texts = set()
     if examples:
         texts = [t for (_, t) in examples]
         new_texts = _rewrite_examples(texts, extracted, summary)
@@ -500,13 +818,10 @@ def draft(form_name, extracted, summary=""):
                 continue
             if _set_paragraph_text(para, new_text):
                 rewritten_count += 1
+                rewritten_texts.add(new_text)
 
-    # ── C. 최후 안전장치: 처리 후에도 자리표시자가 남은 '내용 있는' 문단 표시 ──
-    # 계산식처럼 서술체가 아니라서 B단계가 못 잡는 원본 예시(예: 유류분 계산
-    # 내역의 가짜 원고·금액)가 있을 수 있다. 완벽 감지 대신, 40자 이상인데도
-    # 자리표시자가 남아있으면(단순 빈칸이 아니라 내용이 있는 문단) 무조건
-    # 눈에 띄게 표시해 상담원이 놓치지 않게 한다.
-    marked_examples = _mark_unresolved_examples(doc)
+    # ── C. 최후 안전장치: 처리 후에도 남아있는 원본 예시 표시 ──
+    marked_examples = _mark_unresolved_examples(doc, rewritten_texts)
 
     out = OUTPUT / f"{src.stem}_초안.hwpx"
     try:
@@ -515,11 +830,22 @@ def draft(form_name, extracted, summary=""):
         out = OUTPUT / f"{src.stem}_초안_{time.strftime('%H%M%S')}.hwpx"
         doc.save_to_path(str(out))
 
+    # ── D. 인명·지명 환각 최종 점검 ──
+    # 지금까지의 검증은 날짜·금액(정규식)과 예시 사연 잔존(자리표시자/GPT분류)만
+    # 다뤘다 — 사람 이름·지명·기관명이 새로 지어지는 건 사각지대였다.
+    # 초안 전체를 GPT에게 다시 보여줘 문맥적으로 한 번 더 점검한다.
+    judge = llm_judge(str(out), extracted, summary)
+
     return {"file": str(out), "error": None,
             "applied": applied, "missed": missed, "unfilled": unfilled,
             "rewritten_count": rewritten_count, "rewrite_rejected": rewrite_rejected,
             "gpt_count": len(reps), "field_generation_error": gpt.get("error"),
-            "marked_examples": marked_examples}
+            "marked_examples": marked_examples,
+            "llm_hallucination": judge.get("hallucination", []),
+            "llm_role_swap": judge.get("role_swap", []),
+            "table_count": len(table_objs), "table_applied": table_applied,
+            "table_missed": table_missed, "table_marked": table_marked,
+            "table_generation_error": table_gpt.get("error")}
 
 
 if __name__ == "__main__":
