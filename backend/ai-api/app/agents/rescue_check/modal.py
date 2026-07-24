@@ -173,8 +173,8 @@ class ConsultState(TypedDict, total=False):
     summary: str
     details: str
     extracted_content: str
-    case_type: str
-    case_type_reason: str
+    case_list: List[dict]  # [{"case_ratio": float, "case_type": str, "case_type_reason": str}, ...]
+                            # case_ratio 내림차순 정렬 가정 (case_analysis 파이프라인 출력 그대로)
     case_emergency_ratio: float
     case_emergency_level: str
 
@@ -212,12 +212,18 @@ class ExtractedContentDetail(BaseModel):
     error: Optional[str] = None
 
 
+class CaseTypeItemPayload(BaseModel):
+    """어제 case_analysis 파이프라인이 만들어내는 case_list 항목 하나를 그대로 재수신하는 스키마."""
+    case_ratio: float = Field(ge=0.0, le=1.0)
+    case_type: str
+    case_type_reason: str
+
+
 class CaseAnalysisPayload(BaseModel):
     """어제 case_analysis 파이프라인(run_case_analysis)이 만들어내는 case_analysis 블록 그대로."""
     extracted_content: List[str] = Field(default_factory=list)
     extracted_content_detail: List[ExtractedContentDetail] = Field(default_factory=list)
-    case_type: str
-    case_type_reason: Optional[str] = None
+    case_list: List[CaseTypeItemPayload] = Field(default_factory=list)
     case_emergency_ratio: Optional[float] = None
     case_emergency_level: Optional[str] = None
     case_emergency_reason: Optional[str] = None
@@ -234,6 +240,10 @@ class EligibilityCheckRequest(BaseModel):
         extracted_content는 파일별 추출 결과 리스트라서 [0]만 쓰면 안 됨
         (STT 실패로 "내용없음"이 앞쪽에 오면 실제 문서 내용이 통째로 빠짐).
         "내용없음"/빈 문자열은 건너뛰고 나머지를 이어붙임.
+
+        case_type 단일값 대신 case_list(비율이 매겨진 후보 목록) 전체를 그대로 넘긴다 —
+        어느 항목이 "대표"인지는 이 함수가 정하지 않고, 이후 단계(예: 소멸시효 기본기간 조회)에서
+        필요할 때 case_ratio가 가장 높은 항목을 그때그때 골라 쓴다.
         """
         usable_texts = [
             t for t in self.case_analysis.extracted_content
@@ -243,7 +253,7 @@ class EligibilityCheckRequest(BaseModel):
             "summary": self.raw_input.content.summary,
             "details": self.raw_input.content.details,
             "extracted_content": "\n\n".join(usable_texts),
-            "case_type": self.case_analysis.case_type or "",
+            "case_list": [item.model_dump() for item in self.case_analysis.case_list],
         }
 
 

@@ -25,15 +25,33 @@ from .multimodal import (
 # ---------------------------------------------------------------------------
 
 
-class CaseTypeResult(BaseModel):
-    """사건 유형 분류 결과 (참고용 — 최종 확정은 담당자 검토 필요)"""
+class CaseTypeItem(BaseModel):
+    """사건 유형 분류 결과 중 하나의 후보 (참고용 — 최종 확정은 담당자 검토 필요)"""
 
     case_type: Literal["임금체불", "개인회생", "개인파산", "불법사금융피해", "기타"] = Field(
-        description="상담 요약/상세 내용/추출 콘텐츠에 기반한 사건 유형 분류 결과"
+        description="상담 요약/상세 내용/추출 콘텐츠에 기반한 사건 유형 후보"
     )
-    reason: str = Field(
+    case_ratio: float = Field(
+        ge=0.0, le=1.0, description="해당 유형에 해당할 것으로 추정되는 비율(0.0~1.0). "
+        "case_list 내 모든 case_ratio의 합은 1.0에 근접해야 함"
+    )
+    case_type_reason: str = Field(
         description="분류 근거를 1~2문장으로 요약. 단정적 표현('~이다', '~에 해당한다') 대신 "
         "'~로 판단됨', '~로 보임' 등 참고용 표현 사용"
+    )
+
+
+class CaseTypeListResult(BaseModel):
+    """사건 유형 분류 결과 목록 (참고용 — 최종 확정은 담당자 검토 필요).
+
+    이미지 UI(유형 분석 결과)처럼 하나의 결론만 내지 않고, 가능성이 있는
+    유형들을 비율(%)과 함께 여러 개 제시한다. case_ratio 내림차순으로 정렬해서 반환할 것.
+    """
+
+    case_list: List[CaseTypeItem] = Field(
+        min_length=1,
+        description="가능성이 높은 순서(case_ratio 내림차순)로 정렬된 사건 유형 후보 목록. "
+        "가장 유력한 유형 1개만 있는 경우에도 리스트 형태(길이 1)로 반환",
     )
 
 
@@ -58,13 +76,13 @@ class EmergencyResult(BaseModel):
 class ConsultState(TypedDict, total=False):
     """
     주의(중복 이슈 관련): 아래 필드들은 LangGraph 노드 간에 값을 주고받기 위한
-    "그래프 내부용" 필드다. summary/details/extracted_content/case_type/
+    "그래프 내부용" 필드다. summary/details/extracted_content/case_list/
     case_emergency_* 는 각 노드가 다음 노드에 값을 넘기려고 State에 쌓아두는 것일 뿐,
     최종적으로 API가 응답하는 값은 아니다.
 
     combine_output_node가 이 필드들을 case_analysis 하나로 모으고,
     run_case_analysis()는 최종 응답으로 raw_input + case_analysis만 반환한다.
-    (state 전체를 그대로 반환하면 case_type 등이 최상위와 case_analysis 양쪽에
+    (state 전체를 그대로 반환하면 case_list 등이 최상위와 case_analysis 양쪽에
     중복 노출되는 문제가 있었음 — ToBe에서 수정)
     """
 
@@ -78,8 +96,7 @@ class ConsultState(TypedDict, total=False):
     extracted_content: List[str]  # 파일별 추출 텍스트 배열. extracted_content_detail과 동일 인덱스로 매칭됨
     extracted_content_detail: list
 
-    case_type: str
-    case_type_reason: str
+    case_list: list  # [{"case_ratio": float, "case_type": str, "case_type_reason": str}, ...]
 
     case_emergency_ratio: float
     case_emergency_level: str
@@ -93,7 +110,7 @@ class ConsultState(TypedDict, total=False):
 # ---------------------------------------------------------------------------
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-case_type_llm = llm.with_structured_output(CaseTypeResult)
+case_type_llm = llm.with_structured_output(CaseTypeListResult)
 emergency_llm = llm.with_structured_output(EmergencyResult)
 
 
@@ -111,6 +128,11 @@ CASE_TYPE_SYSTEM_PROMPT = """당신은 대한법률구조공단 내부 상담 �
   "~로 보임", "~가능성이 있음" 등 참고용 표현을 사용하세요.
 - 상담 요약/상세 내용뿐 아니라, 첨부파일(녹취록/문서 등)에서 추출된 내용이 함께 제공될 수 있으니
   두 내용을 종합해서 판단하세요.
+- 실제 상담 내용은 여러 유형에 걸쳐 있거나 모호한 경우가 많으므로, 하나의 유형으로만 단정하지 말고
+  가능성이 있는 유형들을 case_ratio(비율)와 함께 여러 개 제시하세요. 가장 유력한 유형이 명확한
+  경우에도 최소 1개 이상의 후보를 case_list 형태로 반환하고, 근거가 약한 유형까지 억지로 채우지는
+  마세요(보통 1~3개 정도가 적당).
+- case_list의 모든 case_ratio 합은 1.0에 근접해야 하며, case_ratio가 큰 순서대로 정렬해서 반환하세요.
 
 [분류 대상 및 기준]
 1. 임금체불: 임금, 급여, 퇴직금, 수당 등을 정당한 사유 없이 지급받지 못한 사례
@@ -123,7 +145,7 @@ CASE_TYPE_SYSTEM_PROMPT = """당신은 대한법률구조공단 내부 상담 �
    예) "미등록 사채업자에게 연 200% 이자를 요구받고 폭언과 협박을 당하고 있습니다" → 불법사금융피해
 5. 기타: 위 4개 항목에 명확히 해당하지 않는 경우
 
-위 5개 중 하나로만 분류하세요."""
+각 후보는 위 5개 유형 중 하나여야 합니다."""
 
 
 EMERGENCY_SYSTEM_PROMPT = """당신은 대한법률구조공단 내부 상담 지원 도구로서, 상담 내용의 긴급도를
@@ -143,8 +165,8 @@ EMERGENCY_SYSTEM_PROMPT = """당신은 대한법률구조공단 내부 상담 �
 - 하 (0.0~0.3 미만): 특별한 시한 압박이 없고 정보 제공 목적에 가까운 경우
   예) "제도가 궁금해서 문의드립니다" → 하, ratio 0.1 내외
 
-사건 유형(case_type)과 상담 요약/상세 내용/추출 콘텐츠를 함께 고려하여 case_emergency_ratio(0.0~1.0)와
-case_emergency_level(상/중/하)을 산출하세요."""
+사건 유형 후보 목록(case_list)과 상담 요약/상세 내용/추출 콘텐츠를 함께 고려하여
+case_emergency_ratio(0.0~1.0)와 case_emergency_level(상/중/하)을 산출하세요."""
 
 
 # ---------------------------------------------------------------------------
@@ -252,14 +274,26 @@ def _build_context_text(state: ConsultState) -> str:
 
 def classify_case_type_node(state: ConsultState) -> dict:
     user_msg = f"[상담일] {state.get('consult_day', '')}\n\n" + _build_context_text(state)
-    result: CaseTypeResult = case_type_llm.invoke(
+    result: CaseTypeListResult = case_type_llm.invoke(
         [SystemMessage(content=CASE_TYPE_SYSTEM_PROMPT), HumanMessage(content=user_msg)]
     )
-    return {"case_type": result.case_type, "case_type_reason": result.reason}
+    case_list = [
+        {
+            "case_ratio": item.case_ratio,
+            "case_type": item.case_type,
+            "case_type_reason": item.case_type_reason,
+        }
+        for item in sorted(result.case_list, key=lambda x: x.case_ratio, reverse=True)
+    ]
+    return {"case_list": case_list}
 
 
 def classify_emergency_node(state: ConsultState) -> dict:
-    user_msg = f"[사건 유형(참고용 분류 결과)] {state.get('case_type', '')}\n\n" + _build_context_text(state)
+    case_list = state.get("case_list") or []
+    case_list_text = ", ".join(
+        f"{item['case_type']}({item['case_ratio']:.0%})" for item in case_list
+    )
+    user_msg = f"[사건 유형 후보(참고용 분류 결과)] {case_list_text}\n\n" + _build_context_text(state)
     result: EmergencyResult = emergency_llm.invoke(
         [SystemMessage(content=EMERGENCY_SYSTEM_PROMPT), HumanMessage(content=user_msg)]
     )
@@ -272,7 +306,7 @@ def classify_emergency_node(state: ConsultState) -> dict:
 
 def combine_output_node(state: ConsultState) -> dict:
     """최종 결과 결합 노드: State에 flat하게 흩어져 있던 필드들(extracted_content,
-    extracted_content_detail, case_type, case_type_reason, case_emergency_*)을
+    extracted_content_detail, case_list, case_emergency_*)을
     case_analysis 하나로 모두 모은다.
 
     주의: 이 노드가 반환하는 case_analysis가 "최종적으로 노출할 결과의 전부"가 되도록
@@ -283,8 +317,7 @@ def combine_output_node(state: ConsultState) -> dict:
     case_analysis = {
         "extracted_content": state.get("extracted_content", []),
         "extracted_content_detail": state.get("extracted_content_detail", []),
-        "case_type": state.get("case_type"),
-        "case_type_reason": state.get("case_type_reason"),
+        "case_list": state.get("case_list", []),
         "case_emergency_ratio": state.get("case_emergency_ratio"),
         "case_emergency_level": state.get("case_emergency_level"),
         "case_emergency_reason": state.get("case_emergency_reason"),
@@ -318,7 +351,7 @@ def run_case_analysis(input_data: dict) -> dict:
     """FastAPI 핸들러에서 호출하는 진입점 함수.
 
     내부 LangGraph State는 노드 간 데이터 전달을 위해 summary/details/extracted_content/
-    case_type/case_emergency_* 등을 flat 필드로 계속 들고 있지만, 그건 어디까지나 그래프
+    case_list/case_emergency_* 등을 flat 필드로 계속 들고 있지만, 그건 어디까지나 그래프
     내부 구현 디테일이다. 외부(FastAPI 응답 / 프론트/DB 저장)에 나가는 최종 결과는
     raw_input과 case_analysis 두 필드로만 구성해서, 같은 값이 최상위와 case_analysis
     양쪽에 중복 노출되지 않도록 한다. (ToBe 구조)
