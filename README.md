@@ -91,20 +91,42 @@ gradlew bootRun        # cmd
 
 ```
 services/form_recommender.py   분석 JSON → 추천 서식 목록 + 근거
-services/form_drafter.py       서식명 + 추출정보 → 초안 HWPX 생성
+services/form_embeddings.py    서식 임베딩 사전계산 + 쿼리 검색 (recommender 보강용)
+services/form_drafter.py       서식명 + 추출정보 → 초안 HWPX 생성 (문단 + 표)
+services/form_verifier.py      초안 인명·지명 환각 재검증(llm_judge)
+scripts/build_form_embeddings.py   MVP 서식 임베딩 사전계산 스크립트
 ```
 
-- 추천: case_subtype으로 서식 후보를 좁힌 뒤 GPT가 상담 내용 기반으로
-  우선순위와 근거를 제시
+- 추천: case_subtype으로 서식 후보를 좁힌 뒤(규칙 기반) + 임베딩 검색으로
+  의미적으로 유사한 서식도 후보에 합쳐서, GPT가 상담 내용 기반으로
+  우선순위와 근거를 제시. 분류 체계가 실제 서식 위치와 어긋나는 경우
+  (예: "한정승인"이 가사소송 하위로 분류된 경우) MVP 전체로 폭넓혀 재시도
 - 초안: 추출정보에 있는 값만 서식에 채우고(환각 차단), 없는 값은
-  missing_info로 반환하여 상담원이 추가 확인
+  missing_info로 반환하여 상담원이 추가 확인. 문단뿐 아니라 표 안 셀도
+  채우며, 원본 예시 인물(김일남 등)이 남아있으면 [예시:확인필요]로 표시
+- llm_judge: 초안 완성 후 인명·지명이 상담 내용에 없는데 등장하는지
+  별도로 재검증
 - 서식 선택은 상담원이 결정 (AI는 추천·초안 보조만 수행, HITL)
+
+**임베딩 검색 사용 전 1회 실행 필요** (`data/`는 용량 문제로 git 미포함):
+```
+cd backend/ai-api
+python scripts/build_form_embeddings.py
+```
+안 돌리면 임베딩 검색 없이 규칙 기반 후보로만 조용히 동작함(fail-open).
 
 테스트:
 ```
 cd backend/ai-api
-python test_flow.py    # 추천→초안 전체 흐름 (목업 3건)
+python test_flow.py    # 추천→초안 전체 흐름 빠른 확인 (목업 3건)
+python test_eval.py    # eval_testset.json 32케이스 → Top-1/Top-3 Accuracy, Field Accuracy, 문서생성 성공률
 ```
+- 최신 결과: Top-1 96.9%, Top-3 100%, 문서생성 성공률 100%, 평균 Field Accuracy 93~98%대
+- `eval_testset.json`은 법률 도메인 지식 없이도 라벨링 가능하도록 **정답 서식을
+  먼저 정하고 그에 맞춰 시나리오를 거꾸로 쓰는 방식**으로 Claude Code가 직접
+  작성함 (32건 전체). 작성자가 정답을 알고 쓰기 때문에 실제 상담보다 케이스가
+  깔끔한 편이라, 이 수치는 상한선에 가까움 — 실제 서비스 성능 검증을 위해서는
+  더 애매하고 태그 누락이 잦은 실전형 테스트셋 보강이 필요함
 
 ## 환경 변수
 `.env.example`을 복사해 `.env` 생성 후 값 입력 (ai-api용 — core-api는 `.env`를 안 읽음, 위 3번 참고)
