@@ -3,7 +3,7 @@ agents/missing_data/graph.py
 
 누락자료 / 추가조사 필요항목 감지 LangGraph 파이프라인.
 
-- candidate_generation : case_type과 무관하게 범용 프롬프트로 "누락 후보"를 자유롭게 생성.
+- candidate_generation : 사건유형 후보(case_list)와 무관하게 범용 프롬프트로 "누락 후보"를 자유롭게 생성.
   eligibility/analyze 결과(relief_review_checklist)를 최소 기준선(힌트)으로 삼되,
   원본 텍스트를 다시 훑어 그 외 누락도 함께 찾는다.
 - validation           : 각 후보를 원본 텍스트와 재대조하여 confidence(0~1)를 매긴다
@@ -52,7 +52,7 @@ document_mapping_llm = llm.with_structured_output(DocumentMappedList, method=con
 COMMON_PRINCIPLE = """
 [공통 원칙]
 - 당신은 대한법률구조공단 내부 상담 지원 도구의 정보 추출 보조 역할만 수행합니다.
-- 사건유형(case_type)과 무관하게 동일한 기준으로 판단하세요 (유형별 특칙 적용 금지).
+- 사건유형 후보(case_list)와 무관하게 동일한 기준으로 판단하세요 (유형별 특칙 적용 금지).
 - "~에 해당한다", "~이다" 같은 단정적 법률판단 표현을 쓰지 말고 참고용 표현만 사용하세요.
 - 이 결과는 참고자료이며, 최종 판단은 담당 변호사/공익법무관이 수행합니다 (HITL).
 """
@@ -68,8 +68,8 @@ CANDIDATE_PROMPT = COMMON_PRINCIPLE + """
   빠진 것도 찾으세요.
 - 각 후보에는 항목명(item), 종류(증빙/사실관계), 이유(reason)를 함께 답하세요.
 
-[사건유형]
-{case_type}
+[사건유형 후보 (참고용, case_analysis 결과 — 비율 순)]
+{case_list_text}
 
 [사건 자료 (요약 + 상세 + 추출된 첨부내용)]
 {consult_text}
@@ -133,6 +133,20 @@ def _consult_text(state: MissingDataState) -> str:
     return f"[요약]\n{summary}\n\n[상세]\n{details}\n\n[추출된 첨부내용]\n{extracted}"
 
 
+def _case_list_text(state: MissingDataState) -> str:
+    """case_list(비율이 매겨진 사건유형 후보 목록)를 프롬프트용 문자열로 펼친다.
+
+    rescue_check.graph._primary_case_type처럼 "대표 1개"를 고르는 게 아니라, 후보 전체를
+    참고자료로 그대로 보여주는 용도라 로직이 달라 별도로 둔다 (모듈 간 결합 회피 이유는
+    _consult_text와 동일)."""
+    case_list = state.get("case_list") or []
+    if not case_list:
+        return "(사건유형 후보 정보 없음)"
+    return ", ".join(
+        f"{c.get('case_type')}({c.get('case_ratio', 0):.0%})" for c in case_list
+    )
+
+
 # ---------------------------------------------------------------------------
 # 4. LangGraph 노드
 # ---------------------------------------------------------------------------
@@ -140,7 +154,7 @@ def _consult_text(state: MissingDataState) -> str:
 async def candidate_generation_node(state: MissingDataState) -> dict:
     text = _consult_text(state)
     prompt = CANDIDATE_PROMPT.format(
-        case_type=state.get("case_type", ""),
+        case_list_text=_case_list_text(state),
         consult_text=text,
         relief_review_checklist=state.get("relief_review_checklist", {}),
     )

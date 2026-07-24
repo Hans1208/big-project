@@ -4,7 +4,7 @@ agents/missing_data/modal.py
 누락자료/추가조사 필요항목 감지에 쓰이는 모든 pydantic 스키마, LangGraph State,
 FastAPI 요청/응답 모델을 모아둔 모듈.
 
-- 이 노드는 case_type에 상관없이 범용 로직으로 동작한다 (사건유형별 분기 없음).
+- 이 노드는 사건유형 후보(case_list)에 상관없이 범용 로직으로 동작한다 (사건유형별 분기 없음).
 - candidate_generation 단계는 자유 판단으로 후보를 뽑고, validation 단계가
   confidence 점수를 매겨 최종 채택 여부를 코드 레벨(threshold)에서 결정한다.
   -> 어느 쪽도 "~이다" 식 확정적 법률판단을 내리지 않음 (HITL 원칙 유지).

@@ -207,6 +207,20 @@ def _consult_text(state: ConsultState) -> str:
     return f"[요약]\n{summary}\n\n[상세]\n{details}\n\n[추출된 첨부내용]\n{extracted}"
 
 
+def _primary_case_type(state: ConsultState) -> Optional[str]:
+    """case_list(비율이 매겨진 사건유형 후보 목록)에서 case_ratio가 가장 높은 유형 1개를 고른다.
+
+    config.STATUTE_OF_LIMITATIONS_MAP처럼 "대표 사건유형 1개"가 필요한 코드 레벨 조회
+    전용 헬퍼이며, 이 선택 자체가 최종 법률판단은 아니다 (여전히 case_list 전체가 참고자료로
+    남아 있고, 실제 유형 확정은 변호사/공익법무관이 수행).
+    """
+    case_list = state.get("case_list") or []
+    if not case_list:
+        return None
+    top = max(case_list, key=lambda c: c.get("case_ratio", 0.0))
+    return top.get("case_type")
+
+
 async def extract_all_signals_node(state: ConsultState) -> dict:
     """5개 신호 추출 LLM 호출을 asyncio.gather로 동시에 실행 (지연시간 단축)."""
     text = _consult_text(state)
@@ -224,7 +238,7 @@ async def extract_all_signals_node(state: ConsultState) -> dict:
         appropriateness_llm.ainvoke([SystemMessage(content=APPROPRIATENESS_PROMPT), HumanMessage(content=text)]),
     )
 
-    winnability_signal = compute_statute_of_limitations(winnability_signal, state.get("case_type"))
+    winnability_signal = compute_statute_of_limitations(winnability_signal, _primary_case_type(state))
 
     return {
         "income_property_signal": income_signal.model_dump(),
