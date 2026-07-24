@@ -1,0 +1,4705 @@
+{
+  "form_name": "친권자(지정, 변경)신고서(시구읍면사무소 제출용)",
+  "main": "가족관계등록",
+  "sub": "신고",
+  "tmpltNo": "I001001183",
+  "source_file": "서식_hwpx\\가족관계등록\\신고\\친권자(지정, 변경)신고서(시구읍면사무소 제출용).hwpx",
+  "markdown": "<span style=\"color:#282828\">\\[양식 제13호\\]</span>\n\n<table>\n<tr>\n<th colspan=\"11\">**친권자(󰊱지정󰊲변경)신고서**<br>(        년      월      일)</th>\n<th colspan=\"14\">※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다.</th>\n</tr>\n<tr>\n<td colspan=\"2\" rowspan=\"9\">①<br>미<br>성<br>년<br>자<br>녀</td>\n<td colspan=\"2\">성 명</td>\n<td>한글</td>\n<td colspan=\"3\"><span style=\"color:#BBBBBB\">(성)    / (명)</span></td>\n<td colspan=\"2\">한자</td>\n<td colspan=\"6\"><span style=\"color:#BBBBBB\">(성)    / (명)</span></td>\n<td colspan=\"5\">주민등록번호</td>\n<td colspan=\"4\">-</td>\n</tr>\n<tr>\n<td colspan=\"2\"><span style=\"color:#282828\">등록기준지</span></td>\n<td colspan=\"12\"></td>\n<td colspan=\"5\">출생연월일</td>\n<td colspan=\"4\"></td>\n</tr>\n<tr>\n<td colspan=\"2\">주 소</td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"2\">성 명</td>\n<td>한글</td>\n<td colspan=\"3\"><span style=\"color:#BBBBBB\">(성)    / (명)</span></td>\n<td colspan=\"2\">한자</td>\n<td colspan=\"6\"><span style=\"color:#BBBBBB\">(성)    / (명)</span></td>\n<td colspan=\"5\">주민등록번호</td>\n<td colspan=\"4\">-</td>\n</tr>\n<tr>\n<td colspan=\"2\"><span style=\"color:#282828\">등록기준지</span></td>\n<td colspan=\"12\"></td>\n<td colspan=\"5\">출생연월일</td>\n<td colspan=\"4\"></td>\n</tr>\n<tr>\n<td colspan=\"2\">주 소</td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"2\">성 명</td>\n<td>한글</td>\n<td colspan=\"3\"><span style=\"color:#BBBBBB\">(성)    / (명)</span></td>\n<td colspan=\"2\">한자</td>\n<td colspan=\"6\"><span style=\"color:#BBBBBB\">(성)    / (명)</span></td>\n<td colspan=\"5\">주민등록번호</td>\n<td colspan=\"4\">-</td>\n</tr>\n<tr>\n<td colspan=\"2\"><span style=\"color:#282828\">등록기준지</span></td>\n<td colspan=\"12\"></td>\n<td colspan=\"5\">출생연월일</td>\n<td colspan=\"4\"></td>\n</tr>\n<tr>\n<td colspan=\"2\">주 소</td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"2\" rowspan=\"3\">②<br>부</td>\n<td colspan=\"2\">성 명</td>\n<td>한글</td>\n<td colspan=\"3\"><span style=\"color:#BBBBBB\">(성)    / (명)   </span></td>\n<td colspan=\"2\">한자</td>\n<td colspan=\"6\"><span style=\"color:#BBBBBB\">(성)    / (명)   </span></td>\n<td colspan=\"5\">주민등록번호</td>\n<td colspan=\"4\">-</td>\n</tr>\n<tr>\n<td colspan=\"2\"><span style=\"color:#282828\">등록기준지</span></td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"2\">주 소</td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"2\" rowspan=\"3\">③<br>모</td>\n<td colspan=\"2\">성 명</td>\n<td colspan=\"2\">한글</td>\n<td colspan=\"2\"><span style=\"color:#BBBBBB\">(성)    / (명)   </span></td>\n<td colspan=\"2\">한자</td>\n<td colspan=\"6\"><span style=\"color:#BBBBBB\">(성)    / (명)   </span></td>\n<td colspan=\"5\">주민등록번호</td>\n<td colspan=\"4\">-</td>\n</tr>\n<tr>\n<td colspan=\"2\"><span style=\"color:#282828\">등록기준지</span></td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"2\">주 소</td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"4\" rowspan=\"8\"><span style=\"color:#282828\">④친권자</span></td>\n<td colspan=\"10\">미성년자와의 관계</td>\n<td colspan=\"11\">󰊱부 󰊲 모 󰊳부모</td>\n</tr>\n<tr>\n<td colspan=\"3\">미성년자 성명</td>\n<td colspan=\"7\"></td>\n<td colspan=\"6\"></td>\n<td colspan=\"5\"></td>\n</tr>\n<tr>\n<td colspan=\"3\"><span style=\"color:#282828\">󰊱지정일자</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\">   년   월   일</span></td>\n<td colspan=\"4\"><span style=\"color:#282828\">󰊱지정원인</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\"> 󰊱 협의 </span><br><span style=\"color:#282828\"> 󰊲 (             )법원의 결정</span></td>\n</tr>\n<tr>\n<td colspan=\"3\"><span style=\"color:#282828\">󰊲변경일자</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\">  년   월   일</span></td>\n<td colspan=\"4\"><span style=\"color:#282828\">󰊲변경원인</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\">  (               )법원의 결정</span></td>\n</tr>\n<tr>\n<td colspan=\"10\">미성년자와의 관계</td>\n<td colspan=\"11\">󰊱부 󰊲 모<span style=\"color:#FF0000\"> </span>󰊳부모</td>\n</tr>\n<tr>\n<td colspan=\"3\">미성년자 성명</td>\n<td colspan=\"7\"></td>\n<td colspan=\"6\"></td>\n<td colspan=\"5\"></td>\n</tr>\n<tr>\n<td colspan=\"3\"><span style=\"color:#282828\">󰊱지정일자</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\">      년   월   일</span></td>\n<td colspan=\"4\"><span style=\"color:#282828\">󰊱지정원인</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\"> 󰊱 협의</span><br><span style=\"color:#282828\"> 󰊲 (             )법원의 결정</span></td>\n</tr>\n<tr>\n<td colspan=\"3\"><span style=\"color:#282828\">󰊲변경일자</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\">      년  </span></td>\n<td colspan=\"4\"><span style=\"color:#282828\">󰊲변경원인</span></td>\n<td colspan=\"7\"><span style=\"color:#282828\">(                )법원의 결정</span></td>\n</tr>\n<tr>\n<td colspan=\"4\">⑤기타사항</td>\n<td colspan=\"21\"></td>\n</tr>\n<tr>\n<td colspan=\"2\" rowspan=\"3\"><span style=\"color:#363636\">⑥임무대행자</span></td>\n<td colspan=\"2\"><span style=\"color:#363636\">성명</span></td>\n<td><span style=\"color:#363636\">한글</span></td>\n<td colspan=\"3\"><span style=\"color:#BBBBBB\">성)         / (명)</span><span style=\"color:#363636\">   </span></td>\n<td><span style=\"color:#363636\">한자</span></td>\n<td colspan=\"7\"><span style=\"color:#BBBBBB\">성)         / (명)</span><span style=\"color:#363636\">   </span></td>\n<td colspan=\"5\"><span style=\"color:#363636\">주민등록번호</span></td>\n<td colspan=\"4\"><span style=\"color:#363636\">-</span></td>\n</tr>\n<tr>\n<td colspan=\"2\"><span style=\"color:#363636\">등록기준지</span></td>\n<td colspan=\"9\"></td>\n<td colspan=\"4\"><span style=\"color:#363636\">주소</span></td>\n<td colspan=\"8\"></td>\n</tr>\n<tr>\n<td colspan=\"2\"><span style=\"color:#363636\">선임일자</span></td>\n<td colspan=\"9\"><span style=\"color:#363636\">  년    월    일</span></td>\n<td colspan=\"4\"><span style=\"color:#363636\">선임원인</span></td>\n<td colspan=\"8\"><span style=\"color:#363636\">  (               )법원의 결정</span></td>\n</tr>\n<tr>\n<td colspan=\"25\">협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     )</td>\n</tr>\n<tr>\n<td rowspan=\"6\">⑦<br>신<br>고<br>인</td>\n<td colspan=\"3\">성 명</td>\n<td colspan=\"5\">󰂙 또는 서명</td>\n<td colspan=\"5\">주민등록<br>번    호</td>\n<td colspan=\"9\">-</td>\n<td>자격</td>\n<td>󰊱부 󰊲모<br>󰊳임무대행자</td>\n</tr>\n<tr>\n<td colspan=\"3\" rowspan=\"2\">주 소</td>\n<td colspan=\"15\" rowspan=\"2\"></td>\n<td colspan=\"3\">전  화</td>\n<td colspan=\"3\"></td>\n</tr>\n<tr>\n<td colspan=\"3\">이메일</td>\n<td colspan=\"3\"></td>\n</tr>\n<tr>\n<td colspan=\"3\">성 명</td>\n<td colspan=\"5\">󰂙 또는 서명</td>\n<td colspan=\"6\">주민등록번    호</td>\n<td colspan=\"8\">-</td>\n<td>자격</td>\n<td>󰊱부 󰊲모</td>\n</tr>\n<tr>\n<td colspan=\"3\" rowspan=\"2\">주 소</td>\n<td colspan=\"15\" rowspan=\"2\"></td>\n<td colspan=\"3\">전  화</td>\n<td colspan=\"3\"></td>\n</tr>\n<tr>\n<td colspan=\"3\">이메일</td>\n<td colspan=\"3\"></td>\n</tr>\n<tr>\n<td colspan=\"4\">⑧신고인출석여부</td>\n<td colspan=\"21\">󰊱 부  󰊲 모  󰊳 임무대행자</td>\n</tr>\n<tr>\n<td colspan=\"3\">⑨제출인</td>\n<td>성 명</td>\n<td colspan=\"8\"></td>\n<td colspan=\"7\">주민등록번호</td>\n<td colspan=\"6\">-</td>\n</tr>\n</table>\n\n<span style=\"color:#282828\">※ 타인의 서명 또는 인장을 도용하여 허위의 신고서를 제출하거나, 허위신고를 하여 가족관계등록부에 부실의 사실을 기록하게 하는 경우에는 형법에 의하여 5년 이하의 징역 또는 1천만 원 이하의 벌금에 처해집니다.</span>\n\n<table>\n<tr>\n<th>**작  성  방  법**</th>\n<th colspan=\"2\"><span style=\"color:#0000FF\"> </span>이혼신고 시 친권자지정신고는 이혼신고서의 양식을 이용합니다.</th>\n</tr>\n<tr>\n<td colspan=\"3\"><span style=\"color:#282828\">※</span><br><span style=\"color:#282828\">※</span><br><span style=\"color:#282828\">①란</span><br><span style=\"color:#282828\">   </span><br><span style=\"color:#282828\">④란</span><br><span style=\"color:#282828\">⑤란</span><br>⑥란<br>⑨란이 작성한 신고서를 신고인이 아닌 사람이 제출할 경우만 기재)의        성명 및 주민등록번호를 기재합니다.\\[접수담당공무원은 신분증과 대조\\]</td>\n</tr>\n<tr>\n<td colspan=\"2\">**<span style=\"color:#282828\">첨  부  서  류</span>**</td>\n<td></td>\n</tr>\n<tr>\n<td colspan=\"3\">1. 법원이 친권자를 지정․변경한 경우<br>- 재판서등본 및 확정증명서 각 1부.<br>- 조정․화해 성립 : 조정(화해)조서등본 및 송달증명서 각 1부.<br>2. 법원이 친권자의 임무대행자를 선임한 경우<br>- 재판서등본 1부<br>3. 부모의 협의에 의하여 친권자를 지정한 경우<br>- 부모 중 한쪽이 신고할 경우: 협의사실을 증명하는 서류 1부.<br>- 부모가 함께 신고할 경우: 협의사실 증명하는 서류를 첨부할 필요가 없음.<br>**※ 아래 4항은 가족관계등록관서에서 전산으로 그 내용을 확인할 수 있는 경우 첨부를 생략합니다.**<br>4. 당사자의 가족관계등록부의 기본증명서, 가족관계증명서 각 1통.<br>5. 신분확인\\[가족관계등록예규 제443호에 의함\\]<br>① 재판에 의한 친권자 지정·변경, 임무대행자 선임<br>- 신고인이 출석한 경우 : 신분증명서<br>- 제출인이 출석한 경우 : 제출인의 신분증명서<br>- 우편제출의 경우 : 신고인의 신분증명서 사본<br>※ 신고인이 성년후견인인 경우에는 5항의 ① 서류 외에 성년후견인의 자격을 증명하는 서면도 함께 첨부해야 합니다.<br>② 협의에 의한 친권자 지정신고<br>- 신고인이 출석한 경우 : 신고인 모두의 신분증명서<br>- 신고인 불출석, 제출인 출석의 경우 : 제출인의 신분증명서 및 신고인 모두의 신분증명서 또는 서명공증 또는 인감증명서(신고인의 신분증명<span style=\"color:#282828\">서 없이 신고서에 신고인이 서명한 경우 서명공증, 신고서에 인감 날인한 경우 인감증명)</span><br><span style=\"color:#282828\">   - 우편제출의 경우 : 신고인 모두의 서명공증 또는 인감증명서(신고서에 서명한 경우 서명공증, 인감을 날인한 경우는 인감증명서)</span></td>\n</tr>\n</table>",
+  "tables": [
+    {
+      "table_index": 0,
+      "cells": [
+        {
+          "row": 0,
+          "col": 0,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 5,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 6,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 7,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 8,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 9,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 10,
+          "text": "친권자(󰊱지정󰊲변경)신고서\n(        년      월      일)"
+        },
+        {
+          "row": 0,
+          "col": 11,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 12,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 13,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 14,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 15,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 16,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 17,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 18,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 19,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 20,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 21,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 22,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 23,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 0,
+          "col": 24,
+          "text": "※ 신고서 작성 시 뒷면의 작성 방법을 참고하고, 선택항목에는 ‘영표(○)’로 표시하기 바랍니다."
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "text": "성 명"
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "text": "한글"
+        },
+        {
+          "row": 1,
+          "col": 5,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 6,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 7,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 8,
+          "text": "한자"
+        },
+        {
+          "row": 1,
+          "col": 9,
+          "text": "한자"
+        },
+        {
+          "row": 1,
+          "col": 10,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 11,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 12,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 13,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 14,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 15,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 1,
+          "col": 16,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 1,
+          "col": 17,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 1,
+          "col": 18,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 1,
+          "col": 19,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 1,
+          "col": 20,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 1,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 1,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 1,
+          "col": 23,
+          "text": "-"
+        },
+        {
+          "row": 1,
+          "col": 24,
+          "text": "-"
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "text": "등록기준지"
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "text": "등록기준지"
+        },
+        {
+          "row": 2,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 16,
+          "text": "출생연월일"
+        },
+        {
+          "row": 2,
+          "col": 17,
+          "text": "출생연월일"
+        },
+        {
+          "row": 2,
+          "col": 18,
+          "text": "출생연월일"
+        },
+        {
+          "row": 2,
+          "col": 19,
+          "text": "출생연월일"
+        },
+        {
+          "row": 2,
+          "col": 20,
+          "text": "출생연월일"
+        },
+        {
+          "row": 2,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 2,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 3,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 3,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 3,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 3,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 4,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 4,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 4,
+          "col": 2,
+          "text": "성 명"
+        },
+        {
+          "row": 4,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 4,
+          "col": 4,
+          "text": "한글"
+        },
+        {
+          "row": 4,
+          "col": 5,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 6,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 7,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 8,
+          "text": "한자"
+        },
+        {
+          "row": 4,
+          "col": 9,
+          "text": "한자"
+        },
+        {
+          "row": 4,
+          "col": 10,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 11,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 12,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 13,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 14,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 15,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 4,
+          "col": 16,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 4,
+          "col": 17,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 4,
+          "col": 18,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 4,
+          "col": 19,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 4,
+          "col": 20,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 4,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 4,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 4,
+          "col": 23,
+          "text": "-"
+        },
+        {
+          "row": 4,
+          "col": 24,
+          "text": "-"
+        },
+        {
+          "row": 5,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 5,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 5,
+          "col": 2,
+          "text": "등록기준지"
+        },
+        {
+          "row": 5,
+          "col": 3,
+          "text": "등록기준지"
+        },
+        {
+          "row": 5,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 16,
+          "text": "출생연월일"
+        },
+        {
+          "row": 5,
+          "col": 17,
+          "text": "출생연월일"
+        },
+        {
+          "row": 5,
+          "col": 18,
+          "text": "출생연월일"
+        },
+        {
+          "row": 5,
+          "col": 19,
+          "text": "출생연월일"
+        },
+        {
+          "row": 5,
+          "col": 20,
+          "text": "출생연월일"
+        },
+        {
+          "row": 5,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 5,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 6,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 6,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 6,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 6,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 6,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 7,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 7,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 7,
+          "col": 2,
+          "text": "성 명"
+        },
+        {
+          "row": 7,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 7,
+          "col": 4,
+          "text": "한글"
+        },
+        {
+          "row": 7,
+          "col": 5,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 6,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 7,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 8,
+          "text": "한자"
+        },
+        {
+          "row": 7,
+          "col": 9,
+          "text": "한자"
+        },
+        {
+          "row": 7,
+          "col": 10,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 11,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 12,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 13,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 14,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 15,
+          "text": "(성)    / (명)"
+        },
+        {
+          "row": 7,
+          "col": 16,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 7,
+          "col": 17,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 7,
+          "col": 18,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 7,
+          "col": 19,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 7,
+          "col": 20,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 7,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 7,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 7,
+          "col": 23,
+          "text": "-"
+        },
+        {
+          "row": 7,
+          "col": 24,
+          "text": "-"
+        },
+        {
+          "row": 8,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 8,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 8,
+          "col": 2,
+          "text": "등록기준지"
+        },
+        {
+          "row": 8,
+          "col": 3,
+          "text": "등록기준지"
+        },
+        {
+          "row": 8,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 16,
+          "text": "출생연월일"
+        },
+        {
+          "row": 8,
+          "col": 17,
+          "text": "출생연월일"
+        },
+        {
+          "row": 8,
+          "col": 18,
+          "text": "출생연월일"
+        },
+        {
+          "row": 8,
+          "col": 19,
+          "text": "출생연월일"
+        },
+        {
+          "row": 8,
+          "col": 20,
+          "text": "출생연월일"
+        },
+        {
+          "row": 8,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 8,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 0,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 9,
+          "col": 1,
+          "text": "①\n미\n성\n년\n\n자\n녀"
+        },
+        {
+          "row": 9,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 9,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 9,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 9,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 10,
+          "col": 0,
+          "text": "②\n부"
+        },
+        {
+          "row": 10,
+          "col": 1,
+          "text": "②\n부"
+        },
+        {
+          "row": 10,
+          "col": 2,
+          "text": "성 명"
+        },
+        {
+          "row": 10,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 10,
+          "col": 4,
+          "text": "한글"
+        },
+        {
+          "row": 10,
+          "col": 5,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 6,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 7,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 8,
+          "text": "한자"
+        },
+        {
+          "row": 10,
+          "col": 9,
+          "text": "한자"
+        },
+        {
+          "row": 10,
+          "col": 10,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 11,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 12,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 13,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 14,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 15,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 10,
+          "col": 16,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 10,
+          "col": 17,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 10,
+          "col": 18,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 10,
+          "col": 19,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 10,
+          "col": 20,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 10,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 10,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 10,
+          "col": 23,
+          "text": "-"
+        },
+        {
+          "row": 10,
+          "col": 24,
+          "text": "-"
+        },
+        {
+          "row": 11,
+          "col": 0,
+          "text": "②\n부"
+        },
+        {
+          "row": 11,
+          "col": 1,
+          "text": "②\n부"
+        },
+        {
+          "row": 11,
+          "col": 2,
+          "text": "등록기준지"
+        },
+        {
+          "row": 11,
+          "col": 3,
+          "text": "등록기준지"
+        },
+        {
+          "row": 11,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 11,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 0,
+          "text": "②\n부"
+        },
+        {
+          "row": 12,
+          "col": 1,
+          "text": "②\n부"
+        },
+        {
+          "row": 12,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 12,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 12,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 12,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 13,
+          "col": 0,
+          "text": "③\n모"
+        },
+        {
+          "row": 13,
+          "col": 1,
+          "text": "③\n모"
+        },
+        {
+          "row": 13,
+          "col": 2,
+          "text": "성 명"
+        },
+        {
+          "row": 13,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 13,
+          "col": 4,
+          "text": "한글"
+        },
+        {
+          "row": 13,
+          "col": 5,
+          "text": "한글"
+        },
+        {
+          "row": 13,
+          "col": 6,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 7,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 8,
+          "text": "한자"
+        },
+        {
+          "row": 13,
+          "col": 9,
+          "text": "한자"
+        },
+        {
+          "row": 13,
+          "col": 10,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 11,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 12,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 13,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 14,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 15,
+          "text": "(성)    / (명)   "
+        },
+        {
+          "row": 13,
+          "col": 16,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 13,
+          "col": 17,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 13,
+          "col": 18,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 13,
+          "col": 19,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 13,
+          "col": 20,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 13,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 13,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 13,
+          "col": 23,
+          "text": "-"
+        },
+        {
+          "row": 13,
+          "col": 24,
+          "text": "-"
+        },
+        {
+          "row": 14,
+          "col": 0,
+          "text": "③\n모"
+        },
+        {
+          "row": 14,
+          "col": 1,
+          "text": "③\n모"
+        },
+        {
+          "row": 14,
+          "col": 2,
+          "text": "등록기준지"
+        },
+        {
+          "row": 14,
+          "col": 3,
+          "text": "등록기준지"
+        },
+        {
+          "row": 14,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 14,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 0,
+          "text": "③\n모"
+        },
+        {
+          "row": 15,
+          "col": 1,
+          "text": "③\n모"
+        },
+        {
+          "row": 15,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 15,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 15,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 15,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 16,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 16,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 16,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 16,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 16,
+          "col": 4,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 5,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 6,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 7,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 8,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 9,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 10,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 11,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 12,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 13,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 16,
+          "col": 14,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 15,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 16,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 17,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 18,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 19,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 20,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 21,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 22,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 23,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 16,
+          "col": 24,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 17,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 17,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 17,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 17,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 17,
+          "col": 4,
+          "text": "미성년자 성명"
+        },
+        {
+          "row": 17,
+          "col": 5,
+          "text": "미성년자 성명"
+        },
+        {
+          "row": 17,
+          "col": 6,
+          "text": "미성년자 성명"
+        },
+        {
+          "row": 17,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 17,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 18,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 18,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 18,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 18,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 18,
+          "col": 4,
+          "text": "󰊱지정일자"
+        },
+        {
+          "row": 18,
+          "col": 5,
+          "text": "󰊱지정일자"
+        },
+        {
+          "row": 18,
+          "col": 6,
+          "text": "󰊱지정일자"
+        },
+        {
+          "row": 18,
+          "col": 7,
+          "text": "   년   월   일"
+        },
+        {
+          "row": 18,
+          "col": 8,
+          "text": "   년   월   일"
+        },
+        {
+          "row": 18,
+          "col": 9,
+          "text": "   년   월   일"
+        },
+        {
+          "row": 18,
+          "col": 10,
+          "text": "   년   월   일"
+        },
+        {
+          "row": 18,
+          "col": 11,
+          "text": "   년   월   일"
+        },
+        {
+          "row": 18,
+          "col": 12,
+          "text": "   년   월   일"
+        },
+        {
+          "row": 18,
+          "col": 13,
+          "text": "   년   월   일"
+        },
+        {
+          "row": 18,
+          "col": 14,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 18,
+          "col": 15,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 18,
+          "col": 16,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 18,
+          "col": 17,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 18,
+          "col": 18,
+          "text": " 󰊱 협의 \n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 18,
+          "col": 19,
+          "text": " 󰊱 협의 \n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 18,
+          "col": 20,
+          "text": " 󰊱 협의 \n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 18,
+          "col": 21,
+          "text": " 󰊱 협의 \n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 18,
+          "col": 22,
+          "text": " 󰊱 협의 \n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 18,
+          "col": 23,
+          "text": " 󰊱 협의 \n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 18,
+          "col": 24,
+          "text": " 󰊱 협의 \n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 19,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 19,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 19,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 19,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 19,
+          "col": 4,
+          "text": "󰊲변경일자"
+        },
+        {
+          "row": 19,
+          "col": 5,
+          "text": "󰊲변경일자"
+        },
+        {
+          "row": 19,
+          "col": 6,
+          "text": "󰊲변경일자"
+        },
+        {
+          "row": 19,
+          "col": 7,
+          "text": "  년   월   일"
+        },
+        {
+          "row": 19,
+          "col": 8,
+          "text": "  년   월   일"
+        },
+        {
+          "row": 19,
+          "col": 9,
+          "text": "  년   월   일"
+        },
+        {
+          "row": 19,
+          "col": 10,
+          "text": "  년   월   일"
+        },
+        {
+          "row": 19,
+          "col": 11,
+          "text": "  년   월   일"
+        },
+        {
+          "row": 19,
+          "col": 12,
+          "text": "  년   월   일"
+        },
+        {
+          "row": 19,
+          "col": 13,
+          "text": "  년   월   일"
+        },
+        {
+          "row": 19,
+          "col": 14,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 19,
+          "col": 15,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 19,
+          "col": 16,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 19,
+          "col": 17,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 19,
+          "col": 18,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 19,
+          "col": 19,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 19,
+          "col": 20,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 19,
+          "col": 21,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 19,
+          "col": 22,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 19,
+          "col": 23,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 19,
+          "col": 24,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 20,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 20,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 20,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 20,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 20,
+          "col": 4,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 5,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 6,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 7,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 8,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 9,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 10,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 11,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 12,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 13,
+          "text": "미성년자와의 관계"
+        },
+        {
+          "row": 20,
+          "col": 14,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 15,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 16,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 17,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 18,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 19,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 20,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 21,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 22,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 23,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 20,
+          "col": 24,
+          "text": "󰊱부 󰊲 모 󰊳부모"
+        },
+        {
+          "row": 21,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 21,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 21,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 21,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 21,
+          "col": 4,
+          "text": "미성년자 성명"
+        },
+        {
+          "row": 21,
+          "col": 5,
+          "text": "미성년자 성명"
+        },
+        {
+          "row": 21,
+          "col": 6,
+          "text": "미성년자 성명"
+        },
+        {
+          "row": 21,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 21,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 22,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 22,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 22,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 22,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 22,
+          "col": 4,
+          "text": "󰊱지정일자"
+        },
+        {
+          "row": 22,
+          "col": 5,
+          "text": "󰊱지정일자"
+        },
+        {
+          "row": 22,
+          "col": 6,
+          "text": "󰊱지정일자"
+        },
+        {
+          "row": 22,
+          "col": 7,
+          "text": "      년   월   일"
+        },
+        {
+          "row": 22,
+          "col": 8,
+          "text": "      년   월   일"
+        },
+        {
+          "row": 22,
+          "col": 9,
+          "text": "      년   월   일"
+        },
+        {
+          "row": 22,
+          "col": 10,
+          "text": "      년   월   일"
+        },
+        {
+          "row": 22,
+          "col": 11,
+          "text": "      년   월   일"
+        },
+        {
+          "row": 22,
+          "col": 12,
+          "text": "      년   월   일"
+        },
+        {
+          "row": 22,
+          "col": 13,
+          "text": "      년   월   일"
+        },
+        {
+          "row": 22,
+          "col": 14,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 22,
+          "col": 15,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 22,
+          "col": 16,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 22,
+          "col": 17,
+          "text": "󰊱지정원인"
+        },
+        {
+          "row": 22,
+          "col": 18,
+          "text": " 󰊱 협의\n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 22,
+          "col": 19,
+          "text": " 󰊱 협의\n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 22,
+          "col": 20,
+          "text": " 󰊱 협의\n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 22,
+          "col": 21,
+          "text": " 󰊱 협의\n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 22,
+          "col": 22,
+          "text": " 󰊱 협의\n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 22,
+          "col": 23,
+          "text": " 󰊱 협의\n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 22,
+          "col": 24,
+          "text": " 󰊱 협의\n 󰊲 (             )법원의 결정"
+        },
+        {
+          "row": 23,
+          "col": 0,
+          "text": "④친권자"
+        },
+        {
+          "row": 23,
+          "col": 1,
+          "text": "④친권자"
+        },
+        {
+          "row": 23,
+          "col": 2,
+          "text": "④친권자"
+        },
+        {
+          "row": 23,
+          "col": 3,
+          "text": "④친권자"
+        },
+        {
+          "row": 23,
+          "col": 4,
+          "text": "󰊲변경일자"
+        },
+        {
+          "row": 23,
+          "col": 5,
+          "text": "󰊲변경일자"
+        },
+        {
+          "row": 23,
+          "col": 6,
+          "text": "󰊲변경일자"
+        },
+        {
+          "row": 23,
+          "col": 7,
+          "text": "      년  "
+        },
+        {
+          "row": 23,
+          "col": 8,
+          "text": "      년  "
+        },
+        {
+          "row": 23,
+          "col": 9,
+          "text": "      년  "
+        },
+        {
+          "row": 23,
+          "col": 10,
+          "text": "      년  "
+        },
+        {
+          "row": 23,
+          "col": 11,
+          "text": "      년  "
+        },
+        {
+          "row": 23,
+          "col": 12,
+          "text": "      년  "
+        },
+        {
+          "row": 23,
+          "col": 13,
+          "text": "      년  "
+        },
+        {
+          "row": 23,
+          "col": 14,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 23,
+          "col": 15,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 23,
+          "col": 16,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 23,
+          "col": 17,
+          "text": "󰊲변경원인"
+        },
+        {
+          "row": 23,
+          "col": 18,
+          "text": "(                )법원의 결정"
+        },
+        {
+          "row": 23,
+          "col": 19,
+          "text": "(                )법원의 결정"
+        },
+        {
+          "row": 23,
+          "col": 20,
+          "text": "(                )법원의 결정"
+        },
+        {
+          "row": 23,
+          "col": 21,
+          "text": "(                )법원의 결정"
+        },
+        {
+          "row": 23,
+          "col": 22,
+          "text": "(                )법원의 결정"
+        },
+        {
+          "row": 23,
+          "col": 23,
+          "text": "(                )법원의 결정"
+        },
+        {
+          "row": 23,
+          "col": 24,
+          "text": "(                )법원의 결정"
+        },
+        {
+          "row": 24,
+          "col": 0,
+          "text": "⑤기타사항"
+        },
+        {
+          "row": 24,
+          "col": 1,
+          "text": "⑤기타사항"
+        },
+        {
+          "row": 24,
+          "col": 2,
+          "text": "⑤기타사항"
+        },
+        {
+          "row": 24,
+          "col": 3,
+          "text": "⑤기타사항"
+        },
+        {
+          "row": 24,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 24,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 25,
+          "col": 0,
+          "text": "⑥임무대행자"
+        },
+        {
+          "row": 25,
+          "col": 1,
+          "text": "⑥임무대행자"
+        },
+        {
+          "row": 25,
+          "col": 2,
+          "text": "성명"
+        },
+        {
+          "row": 25,
+          "col": 3,
+          "text": "성명"
+        },
+        {
+          "row": 25,
+          "col": 4,
+          "text": "한글"
+        },
+        {
+          "row": 25,
+          "col": 5,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 6,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 7,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 8,
+          "text": "한자"
+        },
+        {
+          "row": 25,
+          "col": 9,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 10,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 11,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 12,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 13,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 14,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 15,
+          "text": "성)         / (명)   "
+        },
+        {
+          "row": 25,
+          "col": 16,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 25,
+          "col": 17,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 25,
+          "col": 18,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 25,
+          "col": 19,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 25,
+          "col": 20,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 25,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 25,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 25,
+          "col": 23,
+          "text": "-"
+        },
+        {
+          "row": 25,
+          "col": 24,
+          "text": "-"
+        },
+        {
+          "row": 26,
+          "col": 0,
+          "text": "⑥임무대행자"
+        },
+        {
+          "row": 26,
+          "col": 1,
+          "text": "⑥임무대행자"
+        },
+        {
+          "row": 26,
+          "col": 2,
+          "text": "등록기준지"
+        },
+        {
+          "row": 26,
+          "col": 3,
+          "text": "등록기준지"
+        },
+        {
+          "row": 26,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 13,
+          "text": "주소"
+        },
+        {
+          "row": 26,
+          "col": 14,
+          "text": "주소"
+        },
+        {
+          "row": 26,
+          "col": 15,
+          "text": "주소"
+        },
+        {
+          "row": 26,
+          "col": 16,
+          "text": "주소"
+        },
+        {
+          "row": 26,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 19,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 20,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 21,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 26,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 27,
+          "col": 0,
+          "text": "⑥임무대행자"
+        },
+        {
+          "row": 27,
+          "col": 1,
+          "text": "⑥임무대행자"
+        },
+        {
+          "row": 27,
+          "col": 2,
+          "text": "선임일자"
+        },
+        {
+          "row": 27,
+          "col": 3,
+          "text": "선임일자"
+        },
+        {
+          "row": 27,
+          "col": 4,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 5,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 6,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 7,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 8,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 9,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 10,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 11,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 12,
+          "text": "  년    월    일"
+        },
+        {
+          "row": 27,
+          "col": 13,
+          "text": "선임원인"
+        },
+        {
+          "row": 27,
+          "col": 14,
+          "text": "선임원인"
+        },
+        {
+          "row": 27,
+          "col": 15,
+          "text": "선임원인"
+        },
+        {
+          "row": 27,
+          "col": 16,
+          "text": "선임원인"
+        },
+        {
+          "row": 27,
+          "col": 17,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 27,
+          "col": 18,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 27,
+          "col": 19,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 27,
+          "col": 20,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 27,
+          "col": 21,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 27,
+          "col": 22,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 27,
+          "col": 23,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 27,
+          "col": 24,
+          "text": "  (               )법원의 결정"
+        },
+        {
+          "row": 28,
+          "col": 0,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 1,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 2,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 3,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 4,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 5,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 6,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 7,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 8,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 9,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 10,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 11,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 12,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 13,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 14,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 15,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 16,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 17,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 18,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 19,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 20,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 21,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 22,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 23,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 28,
+          "col": 24,
+          "text": "협의의 친권자 지정 신고 시 신고인 쌍방이 모두 출석하였습니까?   예 (    )   아니오(     ) "
+        },
+        {
+          "row": 29,
+          "col": 0,
+          "text": "⑦\n신\n고\n인"
+        },
+        {
+          "row": 29,
+          "col": 1,
+          "text": "성 명"
+        },
+        {
+          "row": 29,
+          "col": 2,
+          "text": "성 명"
+        },
+        {
+          "row": 29,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 29,
+          "col": 4,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 29,
+          "col": 5,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 29,
+          "col": 6,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 29,
+          "col": 7,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 29,
+          "col": 8,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 29,
+          "col": 9,
+          "text": "주민등록\n번    호"
+        },
+        {
+          "row": 29,
+          "col": 10,
+          "text": "주민등록\n번    호"
+        },
+        {
+          "row": 29,
+          "col": 11,
+          "text": "주민등록\n번    호"
+        },
+        {
+          "row": 29,
+          "col": 12,
+          "text": "주민등록\n번    호"
+        },
+        {
+          "row": 29,
+          "col": 13,
+          "text": "주민등록\n번    호"
+        },
+        {
+          "row": 29,
+          "col": 14,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 15,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 16,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 17,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 18,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 19,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 20,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 29,
+          "col": 23,
+          "text": "자격"
+        },
+        {
+          "row": 29,
+          "col": 24,
+          "text": "󰊱부 󰊲모\n󰊳임무대행자"
+        },
+        {
+          "row": 30,
+          "col": 0,
+          "text": "⑦\n신\n고\n인"
+        },
+        {
+          "row": 30,
+          "col": 1,
+          "text": "주 소"
+        },
+        {
+          "row": 30,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 30,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 30,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 19,
+          "text": "전  화"
+        },
+        {
+          "row": 30,
+          "col": 20,
+          "text": "전  화"
+        },
+        {
+          "row": 30,
+          "col": 21,
+          "text": "전  화"
+        },
+        {
+          "row": 30,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 30,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 0,
+          "text": "⑦\n신\n고\n인"
+        },
+        {
+          "row": 31,
+          "col": 1,
+          "text": "주 소"
+        },
+        {
+          "row": 31,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 31,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 31,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 19,
+          "text": "이메일"
+        },
+        {
+          "row": 31,
+          "col": 20,
+          "text": "이메일"
+        },
+        {
+          "row": 31,
+          "col": 21,
+          "text": "이메일"
+        },
+        {
+          "row": 31,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 31,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 32,
+          "col": 0,
+          "text": "⑦\n신\n고\n인"
+        },
+        {
+          "row": 32,
+          "col": 1,
+          "text": "성 명"
+        },
+        {
+          "row": 32,
+          "col": 2,
+          "text": "성 명"
+        },
+        {
+          "row": 32,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 32,
+          "col": 4,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 32,
+          "col": 5,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 32,
+          "col": 6,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 32,
+          "col": 7,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 32,
+          "col": 8,
+          "text": "󰂙 또는 서명"
+        },
+        {
+          "row": 32,
+          "col": 9,
+          "text": "주민등록번    호"
+        },
+        {
+          "row": 32,
+          "col": 10,
+          "text": "주민등록번    호"
+        },
+        {
+          "row": 32,
+          "col": 11,
+          "text": "주민등록번    호"
+        },
+        {
+          "row": 32,
+          "col": 12,
+          "text": "주민등록번    호"
+        },
+        {
+          "row": 32,
+          "col": 13,
+          "text": "주민등록번    호"
+        },
+        {
+          "row": 32,
+          "col": 14,
+          "text": "주민등록번    호"
+        },
+        {
+          "row": 32,
+          "col": 15,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 16,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 17,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 18,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 19,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 20,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 32,
+          "col": 23,
+          "text": "자격"
+        },
+        {
+          "row": 32,
+          "col": 24,
+          "text": "󰊱부 󰊲모"
+        },
+        {
+          "row": 33,
+          "col": 0,
+          "text": "⑦\n신\n고\n인"
+        },
+        {
+          "row": 33,
+          "col": 1,
+          "text": "주 소"
+        },
+        {
+          "row": 33,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 33,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 33,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 19,
+          "text": "전  화"
+        },
+        {
+          "row": 33,
+          "col": 20,
+          "text": "전  화"
+        },
+        {
+          "row": 33,
+          "col": 21,
+          "text": "전  화"
+        },
+        {
+          "row": 33,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 33,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 0,
+          "text": "⑦\n신\n고\n인"
+        },
+        {
+          "row": 34,
+          "col": 1,
+          "text": "주 소"
+        },
+        {
+          "row": 34,
+          "col": 2,
+          "text": "주 소"
+        },
+        {
+          "row": 34,
+          "col": 3,
+          "text": "주 소"
+        },
+        {
+          "row": 34,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 12,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 13,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 14,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 15,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 16,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 17,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 18,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 19,
+          "text": "이메일"
+        },
+        {
+          "row": 34,
+          "col": 20,
+          "text": "이메일"
+        },
+        {
+          "row": 34,
+          "col": 21,
+          "text": "이메일"
+        },
+        {
+          "row": 34,
+          "col": 22,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 23,
+          "text": ""
+        },
+        {
+          "row": 34,
+          "col": 24,
+          "text": ""
+        },
+        {
+          "row": 35,
+          "col": 0,
+          "text": "⑧신고인출석여부"
+        },
+        {
+          "row": 35,
+          "col": 1,
+          "text": "⑧신고인출석여부"
+        },
+        {
+          "row": 35,
+          "col": 2,
+          "text": "⑧신고인출석여부"
+        },
+        {
+          "row": 35,
+          "col": 3,
+          "text": "⑧신고인출석여부"
+        },
+        {
+          "row": 35,
+          "col": 4,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 5,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 6,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 7,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 8,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 9,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 10,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 11,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 12,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 13,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 14,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 15,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 16,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 17,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 18,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 19,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 20,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 21,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 22,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 23,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 35,
+          "col": 24,
+          "text": "󰊱 부  󰊲 모  󰊳 임무대행자"
+        },
+        {
+          "row": 36,
+          "col": 0,
+          "text": "⑨제출인"
+        },
+        {
+          "row": 36,
+          "col": 1,
+          "text": "⑨제출인"
+        },
+        {
+          "row": 36,
+          "col": 2,
+          "text": "⑨제출인"
+        },
+        {
+          "row": 36,
+          "col": 3,
+          "text": "성 명"
+        },
+        {
+          "row": 36,
+          "col": 4,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 5,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 6,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 7,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 8,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 9,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 10,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 11,
+          "text": ""
+        },
+        {
+          "row": 36,
+          "col": 12,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 36,
+          "col": 13,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 36,
+          "col": 14,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 36,
+          "col": 15,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 36,
+          "col": 16,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 36,
+          "col": 17,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 36,
+          "col": 18,
+          "text": "주민등록번호"
+        },
+        {
+          "row": 36,
+          "col": 19,
+          "text": "-"
+        },
+        {
+          "row": 36,
+          "col": 20,
+          "text": "-"
+        },
+        {
+          "row": 36,
+          "col": 21,
+          "text": "-"
+        },
+        {
+          "row": 36,
+          "col": 22,
+          "text": "-"
+        },
+        {
+          "row": 36,
+          "col": 23,
+          "text": "-"
+        },
+        {
+          "row": 36,
+          "col": 24,
+          "text": "-"
+        }
+      ]
+    },
+    {
+      "table_index": 1,
+      "cells": [
+        {
+          "row": 0,
+          "col": 0,
+          "text": "작  성  방  법"
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "text": " 이혼신고 시 친권자지정신고는 이혼신고서의 양식을 이용합니다."
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "text": " 이혼신고 시 친권자지정신고는 이혼신고서의 양식을 이용합니다."
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "text": "※\n※\n①란\n   \n④란\n⑤란\n⑥란\n⑨란이 작성한 신고서를 신고인이 아닌 사람이 제출할 경우만 기재)의        성명 및 주민등록번호를 기재합니다.[접수담당공무원은 신분증과 대조]"
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "text": "※\n※\n①란\n   \n④란\n⑤란\n⑥란\n⑨란이 작성한 신고서를 신고인이 아닌 사람이 제출할 경우만 기재)의        성명 및 주민등록번호를 기재합니다.[접수담당공무원은 신분증과 대조]"
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "text": "※\n※\n①란\n   \n④란\n⑤란\n⑥란\n⑨란이 작성한 신고서를 신고인이 아닌 사람이 제출할 경우만 기재)의        성명 및 주민등록번호를 기재합니다.[접수담당공무원은 신분증과 대조]"
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "text": "첨  부  서  류"
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "text": "첨  부  서  류"
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "text": ""
+        },
+        {
+          "row": 3,
+          "col": 0,
+          "text": "1. 법원이 친권자를 지정․변경한 경우\n  - 재판서등본 및 확정증명서 각 1부.\n  - 조정․화해 성립 : 조정(화해)조서등본 및 송달증명서 각 1부.\n2. 법원이 친권자의 임무대행자를 선임한 경우\n  - 재판서등본 1부\n3. 부모의 협의에 의하여 친권자를 지정한 경우\n  - 부모 중 한쪽이 신고할 경우: 협의사실을 증명하는 서류 1부.\n  - 부모가 함께 신고할 경우: 협의사실 증명하는 서류를 첨부할 필요가 없음.\n※ 아래 4항은 가족관계등록관서에서 전산으로 그 내용을 확인할 수 있는 경우 첨부를 생략합니다.\n4. 당사자의 가족관계등록부의 기본증명서, 가족관계증명서 각 1통.\n5. 신분확인[가족관계등록예규 제443호에 의함]\n ① 재판에 의한 친권자 지정·변경, 임무대행자 선임\n   - 신고인이 출석한 경우 : 신분증명서\n   - 제출인이 출석한 경우 : 제출인의 신분증명서 \n   - 우편제출의 경우 : 신고인의 신분증명서 사본\n※ 신고인이 성년후견인인 경우에는 5항의 ① 서류 외에 성년후견인의 자격을 증명하는 서면도 함께 첨부해야 합니다.\n ② 협의에 의한 친권자 지정신고\n   - 신고인이 출석한 경우 : 신고인 모두의 신분증명서\n   - 신고인 불출석, 제출인 출석의 경우 : 제출인의 신분증명서 및 신고인 모두의 신분증명서 또는 서명공증 또는 인감증명서(신고인의 신분증명서 없이 신고서에 신고인이 서명한 경우 서명공증, 신고서에 인감 날인한 경우 인감증명)\n   - 우편제출의 경우 : 신고인 모두의 서명공증 또는 인감증명서(신고서에 서명한 경우 서명공증, 인감을 날인한 경우는 인감증명서)"
+        },
+        {
+          "row": 3,
+          "col": 1,
+          "text": "1. 법원이 친권자를 지정․변경한 경우\n  - 재판서등본 및 확정증명서 각 1부.\n  - 조정․화해 성립 : 조정(화해)조서등본 및 송달증명서 각 1부.\n2. 법원이 친권자의 임무대행자를 선임한 경우\n  - 재판서등본 1부\n3. 부모의 협의에 의하여 친권자를 지정한 경우\n  - 부모 중 한쪽이 신고할 경우: 협의사실을 증명하는 서류 1부.\n  - 부모가 함께 신고할 경우: 협의사실 증명하는 서류를 첨부할 필요가 없음.\n※ 아래 4항은 가족관계등록관서에서 전산으로 그 내용을 확인할 수 있는 경우 첨부를 생략합니다.\n4. 당사자의 가족관계등록부의 기본증명서, 가족관계증명서 각 1통.\n5. 신분확인[가족관계등록예규 제443호에 의함]\n ① 재판에 의한 친권자 지정·변경, 임무대행자 선임\n   - 신고인이 출석한 경우 : 신분증명서\n   - 제출인이 출석한 경우 : 제출인의 신분증명서 \n   - 우편제출의 경우 : 신고인의 신분증명서 사본\n※ 신고인이 성년후견인인 경우에는 5항의 ① 서류 외에 성년후견인의 자격을 증명하는 서면도 함께 첨부해야 합니다.\n ② 협의에 의한 친권자 지정신고\n   - 신고인이 출석한 경우 : 신고인 모두의 신분증명서\n   - 신고인 불출석, 제출인 출석의 경우 : 제출인의 신분증명서 및 신고인 모두의 신분증명서 또는 서명공증 또는 인감증명서(신고인의 신분증명서 없이 신고서에 신고인이 서명한 경우 서명공증, 신고서에 인감 날인한 경우 인감증명)\n   - 우편제출의 경우 : 신고인 모두의 서명공증 또는 인감증명서(신고서에 서명한 경우 서명공증, 인감을 날인한 경우는 인감증명서)"
+        },
+        {
+          "row": 3,
+          "col": 2,
+          "text": "1. 법원이 친권자를 지정․변경한 경우\n  - 재판서등본 및 확정증명서 각 1부.\n  - 조정․화해 성립 : 조정(화해)조서등본 및 송달증명서 각 1부.\n2. 법원이 친권자의 임무대행자를 선임한 경우\n  - 재판서등본 1부\n3. 부모의 협의에 의하여 친권자를 지정한 경우\n  - 부모 중 한쪽이 신고할 경우: 협의사실을 증명하는 서류 1부.\n  - 부모가 함께 신고할 경우: 협의사실 증명하는 서류를 첨부할 필요가 없음.\n※ 아래 4항은 가족관계등록관서에서 전산으로 그 내용을 확인할 수 있는 경우 첨부를 생략합니다.\n4. 당사자의 가족관계등록부의 기본증명서, 가족관계증명서 각 1통.\n5. 신분확인[가족관계등록예규 제443호에 의함]\n ① 재판에 의한 친권자 지정·변경, 임무대행자 선임\n   - 신고인이 출석한 경우 : 신분증명서\n   - 제출인이 출석한 경우 : 제출인의 신분증명서 \n   - 우편제출의 경우 : 신고인의 신분증명서 사본\n※ 신고인이 성년후견인인 경우에는 5항의 ① 서류 외에 성년후견인의 자격을 증명하는 서면도 함께 첨부해야 합니다.\n ② 협의에 의한 친권자 지정신고\n   - 신고인이 출석한 경우 : 신고인 모두의 신분증명서\n   - 신고인 불출석, 제출인 출석의 경우 : 제출인의 신분증명서 및 신고인 모두의 신분증명서 또는 서명공증 또는 인감증명서(신고인의 신분증명서 없이 신고서에 신고인이 서명한 경우 서명공증, 신고서에 인감 날인한 경우 인감증명)\n   - 우편제출의 경우 : 신고인 모두의 서명공증 또는 인감증명서(신고서에 서명한 경우 서명공증, 인감을 날인한 경우는 인감증명서)"
+        }
+      ]
+    }
+  ]
+}
