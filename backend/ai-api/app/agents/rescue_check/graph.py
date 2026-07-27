@@ -80,6 +80,20 @@ WINNABILITY_PROMPT = COMMON_PRINCIPLE + """
 [추출 대상]
 제출/언급된 자료 종류, 구조대상자의 주관적 사정 요약(원문 인용 금지, 1~2문장 요약만),
 소멸시효 기산일 및 적용 가능 시효기간(추출 가능한 경우만), 청구권 존재/부존재 시사, 사실관계 입증 가능성 시사.
+
+[소멸시효 기산일(limitation_start_date) 추출 시 주의]
+- 기산일은 "청구권 자체가 발생한 원인이 된 사건의 날짜"가 아니라, "실제로 의무 위반/불이행이
+  시작되어 권리를 행사할 수 있게 된 날짜"여야 합니다. 두 날짜가 다른 경우가 많으니 혼동하지 마세요.
+  예) "이혼한 지 6개월이 됐는데 전남편이 양육비를 6개월째 안 줍니다"
+      -> 기산일은 이혼일이 아니라 "양육비를 지급하지 않기 시작한 날"입니다.
+         (이혼일은 양육비 채무가 발생한 원인 사실일 뿐, 불이행은 그 이후 시작됨)
+- 양육비/부양료처럼 매달 반복 지급되는 정기금 채무의 경우 회차마다 이행기가 다르므로,
+  상담 내용에서 특정할 수 있는 가장 이른 "미지급 시작일"을 기산일로 추출하고,
+  정확한 회차별 기산일까지는 특정하기 어렵다는 점을 review_note에 함께 남기세요.
+- 상담 내용만으로 기산일을 특정하기 어려우면 추측하지 말고 반드시 null로 두세요.
+- limitation_period_years는 참고용으로만 추출하세요. 실제 시효기간 계산은 사건유형별
+  기준표(팀이 검토한 값)를 사용하는 Rule Engine이 전담하며, 여기서 추출한 값은
+  최종 계산에 반영되지 않습니다.
 """
 
 EXECUTABILITY_PROMPT = COMMON_PRINCIPLE + """
@@ -172,12 +186,21 @@ def compute_statute_of_limitations(
 ) -> WinnabilitySignal:
     """소멸시효 완성 여부 계산.
 
-    LLM이 기산일(limitation_start_date)만 추출한 경우, 시효기간은
-    사건유형별 config.STATUTE_OF_LIMITATIONS_MAP 기본값을 사용한다.
+    시효 "기간"은 반드시 팀이 검토/확정한 config.STATUTE_OF_LIMITATIONS_MAP에서만 가져온다.
+    LLM이 signal.limitation_period_years에 스스로 추정치를 채워 넣더라도 그 값은 여기서
+    사용하지 않는다 (참고용 신호로만 남기고 checklist에는 노출되지만, 실제 계산에는 미반영).
+
+    이유: case_type이 표에 없는(=아직 팀 리뷰가 안 된) 사건유형인 경우 "계산 불가"로
+    처리되어야 하는데, 예전 로직은 LLM이 상담 텍스트에서 직접 뽑아낸 기간을 표보다
+    먼저 신뢰했다. 그 결과 이혼/상속/가족관계처럼 표에 없는 사건유형에서도 LLM이
+    자체적으로 시효를 계산해버려 "AI는 최종 판단을 내리지 않는다"는 원칙이 깨졌다.
+
+    - case_type이 표에 있고 값이 숫자면 -> 그 값 사용
+    - case_type이 표에 있지만 값이 None이면(개인회생/파산, 이혼/상속/가족관계 등
+      "시효 개념 비적용" 또는 "리뷰 대기 중") -> 계산 불가
+    - case_type이 표에 아예 없으면(분류 실패, 새로운 유형 등) -> 계산 불가
     """
-    period = signal.limitation_period_years
-    if period is None and case_type is not None:
-        period = config.STATUTE_OF_LIMITATIONS_MAP.get(case_type)
+    period = config.STATUTE_OF_LIMITATIONS_MAP.get(case_type) if case_type is not None else None
 
     if not signal.limitation_start_date or period is None:
         signal.statute_of_limitations_flag = "계산 불가"
