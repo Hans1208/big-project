@@ -8,7 +8,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
 import lombok.Getter;
@@ -50,7 +49,7 @@ public class Attachment {
 
     // STT(음성→텍스트)나 OCR(이미지→텍스트) 결과가 들어갈 자리.
     // 지금은 업로드 시점에 채우는 로직이 없어서 항상 null. 나중에 ai-api 연동 시 채워질 예정.
-    @Lob
+    // @Lob은 쓰지 않는다 — AiAnalysis.summary 주석 참고.
     @Column(name = "extracted_text", columnDefinition = "TEXT")
     private String extractedText;
 
