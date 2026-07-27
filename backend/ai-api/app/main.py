@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import analysis
+from app.routers import analysis, forms
 
 from pydantic import BaseModel
 from app.agents.case_analysis.graph import run_case_analysis
@@ -20,6 +20,7 @@ app.add_middleware(
 )
 
 app.include_router(analysis.router)
+app.include_router(forms.router)
 
 
 @app.get("/health")
