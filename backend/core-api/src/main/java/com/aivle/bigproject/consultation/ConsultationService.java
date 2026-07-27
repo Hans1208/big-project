@@ -5,6 +5,7 @@ import com.aivle.bigproject.attachment.Attachment;
 import com.aivle.bigproject.common.exception.NotFoundException;
 import com.aivle.bigproject.consultation.dto.ConsultationRequest;
 import com.aivle.bigproject.consultation.dto.ConsultationResponse;
+import com.aivle.bigproject.document.GeneratedDocumentRepository;
 import com.aivle.bigproject.storage.FileStorageService;
 import com.aivle.bigproject.user.User;
 import com.aivle.bigproject.user.UserService;
@@ -20,15 +21,18 @@ public class ConsultationService {
     private final FileStorageService fileStorageService; // 삭제 시 첨부파일을 디스크에서도 지우기 위해 필요
     private final UserService userService; // userId로 실제 User가 있는지 확인하기 위해 필요
     private final AiAnalysisRepository aiAnalysisRepository; // 삭제 시 딸린 분석 결과도 같이 지우기 위해 필요
+    private final GeneratedDocumentRepository generatedDocumentRepository; // 삭제 시 딸린 생성 초안도 같이 지우기 위해 필요
 
     public ConsultationService(ConsultationRepository consultationRepository,
                                 FileStorageService fileStorageService,
                                 UserService userService,
-                                AiAnalysisRepository aiAnalysisRepository) {
+                                AiAnalysisRepository aiAnalysisRepository,
+                                GeneratedDocumentRepository generatedDocumentRepository) {
         this.consultationRepository = consultationRepository;
         this.fileStorageService = fileStorageService;
         this.userService = userService;
         this.aiAnalysisRepository = aiAnalysisRepository;
+        this.generatedDocumentRepository = generatedDocumentRepository;
     }
 
     @Transactional
@@ -91,9 +95,11 @@ public class ConsultationService {
         for (Attachment attachment : consultation.getAttachments()) {
             fileStorageService.delete(attachment.getFileUrl());
         }
-        // AiAnalysis는 Consultation이 컬렉션으로 들고 있지 않아서(단방향 FK) cascade가 안 걸림 —
-        // 여기서 먼저 지워줘야 consultation 삭제 시 FK 제약조건 위반이 안 남
+        // AiAnalysis/GeneratedDocument는 둘 다 Consultation이 컬렉션으로 들고 있지 않아서
+        // (단방향 FK) cascade가 안 걸림 — 여기서 먼저 지워줘야 consultation 삭제 시
+        // FK 제약조건 위반이 안 남
         aiAnalysisRepository.deleteByConsultationId(id);
+        generatedDocumentRepository.deleteByConsultationId(id);
         consultationRepository.delete(consultation);
     }
 }
