@@ -15,8 +15,8 @@ import sys
 import traceback
 from pathlib import Path
 
-from services.form_drafter import draft
-from services.form_verifier import verify
+from app.services.forms.form_drafter import draft
+from app.services.forms.form_verifier import verify
 
 sys.stdout.reconfigure(encoding="utf-8")
 

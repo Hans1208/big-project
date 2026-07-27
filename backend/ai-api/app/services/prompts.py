@@ -1,3 +1,5 @@
+from app.schemas.analysis import AIAnalysisSchema
+
 SYSTEM_PROMPT = """
 당신은 대한법률구조공단의 상담 내용을 분석해서 구조화된 JSON으로 정리하는 어시스턴트입니다.
 이 시스템은 가사(家事) 사건만 다룹니다. 아래 상담 내용을 분석해서 지정된 JSON 형식으로만 출력하세요.

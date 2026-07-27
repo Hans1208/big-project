@@ -8,8 +8,8 @@
 import json
 from pathlib import Path
 
-from services.form_recommender import recommend
-from services.form_drafter import draft
+from app.services.forms.form_recommender import recommend
+from app.services.forms.form_drafter import draft
 
 MOCK_ANALYSES = [
     {

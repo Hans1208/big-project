@@ -9,8 +9,8 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-from services.form_drafter import find_hwpx
-from services.form_verifier import verify
+from app.services.forms.form_drafter import find_hwpx
+from app.services.forms.form_verifier import verify
 
 OUTPUT = Path("output")
 
