@@ -40,4 +40,22 @@ public class UserController {
     public UserResponse findById(@PathVariable Long id) {
         return userService.get(id);
     }
+
+    // GET /api/users/pending — 관리자 승인 대기 목록 (ADMIN 전용, SecurityConfig 참고)
+    @GetMapping("/api/users/pending")
+    public List<UserResponse> findPending() {
+        return userService.findPending();
+    }
+
+    // POST /api/users/{id}/approve — 가입 승인 (ADMIN 전용)
+    @PostMapping("/api/users/{id}/approve")
+    public UserResponse approve(@PathVariable Long id) {
+        return userService.approve(id);
+    }
+
+    // POST /api/users/{id}/reject — 가입 거절 (ADMIN 전용)
+    @PostMapping("/api/users/{id}/reject")
+    public UserResponse reject(@PathVariable Long id) {
+        return userService.reject(id);
+    }
 }

@@ -8,7 +8,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -38,7 +37,9 @@ public class AiAnalysis {
     @JoinColumn(name = "consultation_id", nullable = false)
     private Consultation consultation;
 
-    @Lob
+    // @Lob을 붙이면 PostgreSQL에서 값이 pg_largeobject에 따로 저장되고 컬럼엔 OID만 남아
+    // DB를 직접 조회할 때 내용이 안 보이고 행 삭제 시 실제 데이터가 누수된다.
+    // PostgreSQL TEXT는 원래 길이 제한이 없으므로 @Lob 없이 columnDefinition만으로 충분.
     @Column(columnDefinition = "TEXT")
     private String summary;
 

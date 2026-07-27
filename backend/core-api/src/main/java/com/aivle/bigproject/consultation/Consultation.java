@@ -12,7 +12,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
@@ -47,7 +46,7 @@ public class Consultation {
     private String title;
 
     // 상담 본문(텍스트로 직접 입력했거나, STT로 변환된 내용). 녹음파일만 있는 경우 null 가능.
-    @Lob
+    // @Lob은 쓰지 않는다 — AiAnalysis.summary 주석 참고.
     @Column(name = "input_text", columnDefinition = "TEXT")
     private String inputText;
 
