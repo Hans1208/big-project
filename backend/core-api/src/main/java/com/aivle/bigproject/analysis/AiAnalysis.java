@@ -1,9 +1,12 @@
 package com.aivle.bigproject.analysis;
 
 import com.aivle.bigproject.consultation.Consultation;
+import com.aivle.bigproject.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -91,6 +94,22 @@ public class AiAnalysis {
     @Column(name = "estimated_time")
     private String estimatedTime;
 
+    // 상담원 확인/수정 -> 검토요청 -> 승인/반려 흐름. AnalysisReviewStatus 참고.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AnalysisReviewStatus status;
+
+    // 검토한 사용자(변호사 등) — 검토 전엔 null
+    @ManyToOne
+    @JoinColumn(name = "reviewer_id")
+    private User reviewer;
+
+    // 승인 코멘트 또는 반려 사유
+    @Column(name = "review_note", columnDefinition = "TEXT")
+    private String reviewNote;
+
+    private LocalDateTime reviewedAt;
+
     // 계약서엔 updated_at이 없고 created_at(분석일)만 있어서 그대로 맞춤
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -113,5 +132,6 @@ public class AiAnalysis {
         this.timelineJson = timelineJson;
         this.clusterResultJson = clusterResultJson;
         this.estimatedTime = estimatedTime;
+        this.status = AnalysisReviewStatus.DRAFTED;
     }
 }

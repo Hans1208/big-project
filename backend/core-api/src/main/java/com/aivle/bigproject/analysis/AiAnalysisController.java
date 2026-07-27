@@ -2,6 +2,7 @@ package com.aivle.bigproject.analysis;
 
 import com.aivle.bigproject.analysis.dto.AiAnalysisRequest;
 import com.aivle.bigproject.analysis.dto.AiAnalysisResponse;
+import com.aivle.bigproject.analysis.dto.AnalysisReviewRequest;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -54,5 +55,25 @@ public class AiAnalysisController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long consultationId, @PathVariable Long analysisId) {
         aiAnalysisService.delete(consultationId, analysisId);
+    }
+
+    // POST .../analyses/{analysisId}/submit-for-review — 상담원: 확인/수정 끝났으니 검토 요청
+    @PostMapping("/api/consultations/{consultationId}/analyses/{analysisId}/submit-for-review")
+    public AiAnalysisResponse submitForReview(@PathVariable Long consultationId, @PathVariable Long analysisId) {
+        return aiAnalysisService.submitForReview(consultationId, analysisId);
+    }
+
+    // POST .../analyses/{analysisId}/approve — 변호사 전용(SecurityConfig)
+    @PostMapping("/api/consultations/{consultationId}/analyses/{analysisId}/approve")
+    public AiAnalysisResponse approve(@PathVariable Long consultationId, @PathVariable Long analysisId,
+                                       @RequestBody AnalysisReviewRequest request) {
+        return aiAnalysisService.approve(consultationId, analysisId, request);
+    }
+
+    // POST .../analyses/{analysisId}/request-revision — 변호사 전용(SecurityConfig)
+    @PostMapping("/api/consultations/{consultationId}/analyses/{analysisId}/request-revision")
+    public AiAnalysisResponse requestRevision(@PathVariable Long consultationId, @PathVariable Long analysisId,
+                                               @RequestBody AnalysisReviewRequest request) {
+        return aiAnalysisService.requestRevision(consultationId, analysisId, request);
     }
 }

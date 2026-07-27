@@ -43,6 +43,9 @@ public class SecurityConfig {
                         // 서식 초안 승인/반려는 변호사 권한 로직의 핵심이라 실제로 막아둔다.
                         .requestMatchers(HttpMethod.POST, "/api/consultations/*/documents/*/approve").hasRole("LAWYER")
                         .requestMatchers(HttpMethod.POST, "/api/consultations/*/documents/*/request-revision").hasRole("LAWYER")
+                        // AI 분석 결과 승인/반려도 마찬가지로 변호사 전용.
+                        .requestMatchers(HttpMethod.POST, "/api/consultations/*/analyses/*/approve").hasRole("LAWYER")
+                        .requestMatchers(HttpMethod.POST, "/api/consultations/*/analyses/*/request-revision").hasRole("LAWYER")
                         // TODO: 프론트엔드가 로그인 붙이고 토큰을 실제로 보내기 시작하면,
                         // 나머지 라인들도 .authenticated() 등으로 좁혀야 진짜 보호가 됨.
                         // 지금은 기존 화면(로그인 없이 상담 등록 등)이 안 깨지게 전부 permitAll로 둠.
