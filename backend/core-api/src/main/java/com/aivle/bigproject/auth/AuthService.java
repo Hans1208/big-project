@@ -39,6 +39,12 @@ public class AuthService {
         // ADMIN은 가입 즉시 사용 가능, CONSULTANT/LAWYER는 관리자 승인 전까지 로그인 불가(login() 참고)
         user.setApprovalStatus(request.role() == UserRole.ADMIN ? ApprovalStatus.APPROVED : ApprovalStatus.PENDING);
         User saved = userRepository.save(user);
+        // PENDING 상태에서 토큰을 바로 내주면 login()의 승인 대기 차단을 그대로 우회할 수 있다
+        // (JwtAuthenticationFilter는 토큰만 보고 요청마다 승인 상태를 다시 확인하지 않음) —
+        // 승인되기 전까지는 token을 null로 돌려주고, 승인 후 /login으로만 토큰을 받게 한다.
+        if (saved.getApprovalStatus() != ApprovalStatus.APPROVED) {
+            return new AuthResponse(null, saved.getId(), saved.getName(), saved.getRole(), saved.getEmail());
+        }
         return toAuthResponse(saved);
     }
 
