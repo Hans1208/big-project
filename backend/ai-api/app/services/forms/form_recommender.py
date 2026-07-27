@@ -2,7 +2,7 @@
 #
 # 역할: AI 분석 결과(구조화 JSON) → 추천 서식 목록(recommended_forms_json)
 # 사용:
-#   from services.form_recommender import recommend
+#   from app.services.forms.form_recommender import recommend
 #   result = recommend(analysis)   # {"recommendations": [...], "candidates_count": N}
 #
 # FastAPI 연결 예:
@@ -14,7 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from services.form_embeddings import search as embedding_search
+from app.services.forms.form_embeddings import search as embedding_search
 
 load_dotenv()
 client = OpenAI()
@@ -22,7 +22,7 @@ client = OpenAI()
 EMBEDDING_TOP_N = 10
 
 # 서식 매핑 (helplaw24 공식 분류). ai-api 루트에 위치.
-MAPPING_FILE = Path(__file__).resolve().parent.parent / "helplaw24_서식_카테고리_매핑.json"
+MAPPING_FILE = Path(__file__).resolve().parent.parent.parent.parent / "helplaw24_서식_카테고리_매핑.json"
 
 _mapping_cache = None
 def _load_mapping():

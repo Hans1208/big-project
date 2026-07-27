@@ -21,8 +21,8 @@ sys.path.insert(0, str(ROOT))
 import numpy as np
 from hwpx import HwpxDocument
 
-from services.form_drafter import find_hwpx
-from services.form_embeddings import (
+from app.services.forms.form_drafter import find_hwpx
+from app.services.forms.form_embeddings import (
     embed_texts, extract_narrative, form_description,
     DATA_DIR, VECTORS_FILE, INDEX_FILE,
 )

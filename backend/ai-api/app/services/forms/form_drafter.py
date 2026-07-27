@@ -7,7 +7,7 @@
 #      (텍스트 검색이 아니라 문단 객체 직접 수정 → 오염 불가, run쪼개짐 무관)
 #
 # 사용:
-#   from services.form_drafter import draft
+#   from app.services.forms.form_drafter import draft
 #   result = draft("이혼 및 위자료 조정신청서", extracted, summary)
 
 import json
@@ -20,22 +20,25 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from hwpx import HwpxDocument
 
-from services.form_verifier import llm_judge
+from app.services.forms.form_verifier import llm_judge
 
 load_dotenv()
 MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 client = OpenAI()
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent.parent
 HWPX_ROOT = ROOT / "서식_hwpx"
 OUTPUT = ROOT / "output"
 OUTPUT.mkdir(exist_ok=True)
 
 # 서식마다 이름 자리표시자로 쓰는 특수문자가 다르다(○○이 기본이지만
 # ◇◇·◉◉ 같은 반복 기호나, "①○"처럼 원문자+○ 조합으로 쓰는 서식도 있음).
+# "195○. ○. ○"처럼 연도 앞자리만 실제 숫자고 나머지가 ○로 분리된 형식은
+# 사이에 마침표·공백이 껴서 기존 패턴에 안 걸렸다 — \d{2,3}○와 ○\.\s*○를 추가.
 PLACEHOLDER_RE = re.compile(
     r"○\s*○|□\s*□|◎\s*◎|◇\s*◇|◉\s*◉|●\s*●|▲\s*▲|"
-    r"20○○|19○○|△\s*△|[①②③④⑤⑥⑦⑧⑨]\s*○|○\s*[①②③④⑤⑥⑦⑧⑨]"
+    r"20○○|19○○|△\s*△|[①②③④⑤⑥⑦⑧⑨]\s*○|○\s*[①②③④⑤⑥⑦⑧⑨]|"
+    r"\d{2,3}○|○\s*\.\s*○"
 )
 
 
@@ -621,31 +624,88 @@ def _set_paragraph_text(p, text: str):
     return True
 
 
-EXAMPLE_TAG = "[서식 예시—실제 값으로 교체 필요] "
+# 표 안전장치(TABLE_EXAMPLE_TAG)와 같은 이유로 짧은 태그를 쓴다 — 원래
+# 긴 태그("[서식 예시—실제 값으로 교체 필요] ")를 앞에 붙이면 "국 적    중화민국"
+# 같이 라벨-값 사이 간격을 맞춰둔 줄의 정렬이 밀려서 서식이 이상해 보였다.
+# 그래서 (1) 짧은 태그로 바꾸고 (2) 앞이 아니라 뒤에 붙여서 원래 간격을
+# 그대로 보존한다.
+PARA_EXAMPLE_TAG = " [예시:확인필요]"
 
 
-def _mark_unresolved_examples(doc, rewritten_texts: set) -> int:
-    """A·B 단계 처리 후에도 남아있는 원본 예시를 표시한다. 두 가지 신호를 쓴다:
+def _tag_paragraph(runs) -> None:
+    runs[-1].text = (runs[-1].text or "") + PARA_EXAMPLE_TAG
 
-    1) 자리표시자가 남은 '내용 있는' 문단(40자 이상) — 계산식처럼 서술체가
-       아니라 B단계 탐지를 못 통과하는 원본 예시(유류분 계산 내역 등)에 대응.
-    2) 자리표시자가 아예 없이 '이미 다 채워진 것처럼' 완결된 긴 문단인데
+
+# 이 프로젝트가 다루는 서식은 절대다수 내국인 사건이라 "국적: 중화민국"처럼
+# 이미 구체적인 값이 인쇄된 짧은 한 줄짜리 항목도 있다 — 자리표시자가 아니라서
+# 정규식엔 안 걸리고, 40자 미만이라 서술문단 탐지에도 안 걸린다. 특정 값으로
+# 추측해 채우지 않고(예: "국적 없으면 대한민국으로 채우기") 표 안전장치와 같은
+# 원칙으로 "예시일 가능성"만 GPT로 판단해 표시만 한다.
+SHORT_FIELD_CLASSIFY_PROMPT = """너는 법률 서식의 짧은 한 줄짜리 항목(라벨+값 형태)에서,
+서식 제작자가 미리 인쇄해둔 가상의 예시 값(자리표시자가 아니라 이미 구체적인 값처럼
+보이는 것 — 예: "국적    중화민국", "직업    회사원")이 남아있는지, 아니면 정상
+안내문·항목명·라벨 그 자체인지 판단하는 분류기다.
+
+핵심 신호: 라벨 뒤에 구체적이고 특정적인 값(나라 이름, 직업명 등)이 이미 채워져
+있는데 [추출정보]/[사건 요약]에는 그 항목에 대한 언급이 전혀 없다면, 서식
+제작자가 견본으로 인쇄해둔 예시 값일 가능성이 높다.
+
+반대로 "청  구  인", "신청취지" 같은 항목명 자체나, 법조문·관할 안내 같은 정형
+문구는 예시가 아니다. 애매하면 false.
+
+## 출력 JSON (입력 개수·순서와 같은 배열)
+{"is_example": [true/false, ...]}"""
+
+
+def _classify_short_fields_batch(texts: list, extracted: dict, summary: str) -> list:
+    if not texts:
+        return []
+    numbered = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
+    user_msg = (f"[줄 목록]\n{numbered}\n\n"
+                f"[사건 요약]\n{summary}\n\n"
+                f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": SHORT_FIELD_CLASSIFY_PROMPT},
+                      {"role": "user", "content": user_msg}],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        out = json.loads(resp.choices[0].message.content)
+        flags = out.get("is_example", [])
+    except Exception:
+        return [False] * len(texts)
+    if len(flags) != len(texts):
+        return [False] * len(texts)
+    return [bool(f) for f in flags]
+
+
+def _mark_unresolved_examples(doc, rewritten_texts: set, extracted: dict, summary: str) -> int:
+    """A·B 단계 처리 후에도 남아있는 원본 예시를 표시한다. 세 가지 신호를 쓴다:
+
+    1) 자리표시자가 남은 문단 — 길이 상관없이 즉시 표시. 계산식처럼 서술체가
+       아니라 B단계 탐지를 못 통과하는 원본 예시(유류분 계산 내역 등)나,
+       "생년월일    195○. ○. ○"처럼 짧은 한 줄짜리 잔존 자리표시자에 대응.
+    2) 자리표시자가 아예 없이 '이미 다 채워진 것처럼' 완결된 긴 문단(40자↑)인데
        우리가 방금 재서술해 넣은 문단이 아닌 것 — "청구인은 중화민국 국적의
-       화교인 상대방과 198○. ○. ○. 혼인하여..." 같은, 서식 자체에 인쇄된
-       남의 사연이 자리표시자 표기법이 특이해서(198○, 단독 □ 등) 안 걸린
-       경우. 이런 문단은 정규식으로 특정할 수 없어 GPT 분류기
+       화교인 상대방과..." 같은, 서식 자체에 인쇄된 남의 사연. GPT 분류기
        (_classify_is_example)로 "우리 사건과 무관한 예시 사연처럼 보이는가"를
        판단시킨다.
+    3) 40자 미만의 짧은 "라벨+값" 한 줄짜리 항목(예: "국적    중화민국") —
+       자리표시자도 없고 서술문단 취급도 안 돼서 1)·2) 둘 다 놓치는 사각지대.
+       표 안전장치(_classify_table_rows_batch)와 같은 원칙으로 GPT 배치 분류.
 
     rewritten_texts: draft()가 방금 _set_paragraph_text로 써넣은 문단 텍스트
     집합 — 이건 재분류 대상에서 제외한다. (주의: 문단 객체의 id()는 hwpx
     라이브러리가 .paragraphs 접근마다 새 래퍼를 만들어 재사용 불가하므로,
     텍스트 값 자체로 판별한다.)
 
-    2)번 판정은 문단마다 개별 호출하면 문단이 많은 서식에서 GPT 호출이
+    2)·3)번 판정은 문단마다 개별 호출하면 문단이 많은 서식에서 GPT 호출이
     과도하게 쌓여 느려지므로, 후보를 모았다가 문서당 한 번에 배치 분류한다."""
     marked = 0
-    llm_candidates = []  # [(runs, text), ...] — 배치 분류 대상
+    llm_candidates = []  # [(runs, text), ...] — 긴 서술문단 배치 분류 대상
+    short_candidates = []  # [(runs, text), ...] — 짧은 라벨+값 한 줄 배치 분류 대상
 
     for sec in doc.sections:
         for p in sec.paragraphs:
@@ -653,21 +713,48 @@ def _mark_unresolved_examples(doc, rewritten_texts: set) -> int:
             if not runs:
                 continue
             text = "".join(getattr(r, "text", "") or "" for r in runs)
-            if len(text) < 40 or text.startswith(EXAMPLE_TAG):
+            if not text.strip() or PARA_EXAMPLE_TAG.strip() in text:
                 continue
             if PLACEHOLDER_RE.search(text):
-                runs[0].text = EXAMPLE_TAG + runs[0].text
+                _tag_paragraph(runs)
                 marked += 1
                 continue
             if text in rewritten_texts:
                 continue
-            llm_candidates.append((runs, text))
+            if len(text) >= 40:
+                llm_candidates.append((runs, text))
+            elif len(text) >= 4 and re.search(r"\s{2,}", text):
+                # 2칸 이상 공백은 이 서식들이 라벨과 값을 시각적으로 정렬할 때
+                # 쓰는 방식(예: "국 적    중화민국") — 순수 안내문·소제목과
+                # 구분하는 최소 신호로 쓴다. 다만 이것만으로는 "청 구 인"
+                # 같은 순수 라벨이나 "1. 갑 제1호증   혼인관계증명서" 같은
+                # 정상 첨부서류 목록까지 다 걸려서 후보가 희석된다(표에서
+                # 겪었던 것과 같은 문제 — 실측: 19개 후보 중 진짜 예시 2개가
+                # 있었는데 GPT가 전부 false로 답함). 그래서 미리 걸러낸다:
+                # (a) 번호 매긴 목록("1. ...")은 항상 정형 문구이므로 제외
+                # (b) 이미 우리가 채워넣은 "미상" 표기가 있으면 예시가 아니라
+                #     우리 시스템이 넣은 값이므로 제외
+                # (c) 공백을 다 빼고 남는 글자가 6자 미만이면 라벨 그 자체일
+                #     뿐 값이 없는 것으로 보고 제외("청구인"=3자, "첨부서류"=4자)
+                compact = re.sub(r"\s+", "", text)
+                if (not re.match(r"\s*\d+\.\s", text)
+                        and "미상" not in text
+                        and len(compact) >= 6):
+                    short_candidates.append((runs, text))
 
     if llm_candidates:
         flags = _classify_examples_batch([t for (_, t) in llm_candidates])
         for (runs, _text), is_example in zip(llm_candidates, flags):
             if is_example:
-                runs[0].text = EXAMPLE_TAG + runs[0].text
+                _tag_paragraph(runs)
+                marked += 1
+
+    if short_candidates:
+        flags = _classify_short_fields_batch(
+            [t for (_, t) in short_candidates], extracted, summary)
+        for (runs, _text), is_example in zip(short_candidates, flags):
+            if is_example:
+                _tag_paragraph(runs)
                 marked += 1
 
     return marked
@@ -821,7 +908,7 @@ def draft(form_name, extracted, summary=""):
                 rewritten_texts.add(new_text)
 
     # ── C. 최후 안전장치: 처리 후에도 남아있는 원본 예시 표시 ──
-    marked_examples = _mark_unresolved_examples(doc, rewritten_texts)
+    marked_examples = _mark_unresolved_examples(doc, rewritten_texts, extracted, summary)
 
     out = OUTPUT / f"{src.stem}_초안.hwpx"
     try:
