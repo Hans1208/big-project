@@ -12,6 +12,12 @@ spring:
 
 app:
   upload-dir: ${UPLOAD_DIR:./uploads}
+  ai-api:
+    base-url: ${AI_API_URL:http://localhost:8001}
+  jwt:
+    # 개발용 기본값 — 운영 배포 전 반드시 JWT_SECRET 환경변수로 교체할 것 (32바이트 이상)
+    secret: ${JWT_SECRET:dev-only-secret-key-please-change-in-production-32bytes-min}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   s3:
     bucket: aivle-test-ai-34178924
     region: ap-northeast-2
