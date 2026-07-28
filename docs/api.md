@@ -32,7 +32,7 @@ Base URL: `http://localhost:8080`
 
 | status | 상황 |
 |---|---|
-| 400 | 요청 body 파싱 실패 (JSON 형식 오류, 인코딩 오류 등) |
+| 400 | 요청 body 파싱 실패 (JSON 형식 오류, 인코딩 오류 등), 필수 입력값 누락(`POST /api/consultations`의 `title`/`clientName`/`userId` 등) |
 | 401 | 로그인 실패(이메일/비밀번호 불일치), 토큰 없음/만료 |
 | 403 | 가입 승인 대기·거절 계정의 로그인 시도, 역할 권한 부족(예: LAWYER 전용 API를 CONSULTANT 토큰으로 호출) |
 | 404 | 경로의 id에 해당하는 리소스 없음 |
@@ -102,8 +102,8 @@ Response 예시
 ```json
 { "userId": 1, "title": "임금체불 상담", "clientName": "홍길동", "inputText": "3개월치 임금을 못 받았습니다", "opponentName": "OO상사" }
 ```
-- `userId`: 필수, 존재하지 않으면 `404`
-- `title`, `clientName`(내담자 본인 이름 — `opponentName`은 상대방이라 별개): 필수
+- `userId`: 필수(비어있으면 `400`), 존재하지 않는 id면 `404`
+- `title`, `clientName`(내담자 본인 이름 — `opponentName`은 상대방이라 별개): 필수, 비어있으면 `400`
 - `inputText`, `opponentName`: 선택
 - `status`는 생성 시 무시되고 항상 `RECEIVED`로 시작
 - `clientName`은 `User.name`/`email`과 같은 방식으로 DB에 암호화 저장됨(아래 참고)
