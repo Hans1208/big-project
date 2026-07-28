@@ -29,6 +29,7 @@ public record AiAnalysisResponse(
         JsonNode timelineJson,
         JsonNode clusterResultJson,
         String estimatedTime,
+        JsonNode rawInputJson,
         LocalDateTime createdAt,
         // 계약서엔 없는 필드(검토/승인 워크플로우용) — 뒤에 덧붙여서 기존 계약 필드 순서/이름은 안 건드림
         AnalysisReviewStatus status,

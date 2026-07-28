@@ -24,6 +24,7 @@ public record AiAnalysisRequest(
         JsonNode recommendationJson,
         JsonNode timelineJson,
         JsonNode clusterResultJson,
-        String estimatedTime
+        String estimatedTime,
+        JsonNode rawInputJson
 ) {
 }

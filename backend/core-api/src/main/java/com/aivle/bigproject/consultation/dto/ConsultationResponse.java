@@ -15,6 +15,10 @@ public record ConsultationResponse(
         String inputText,
         String opponentName,
         ConsultationStatus status,
+        String category,
+        String type,
+        String legalAidType,
+        Boolean eligibilityEvidenceSubmitted,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         List<AttachmentResponse> attachments
@@ -31,6 +35,10 @@ public record ConsultationResponse(
                 consultation.getInputText(),
                 consultation.getOpponentName(),
                 consultation.getStatus(),
+                consultation.getCategory(),
+                consultation.getType(),
+                consultation.getLegalAidType(),
+                consultation.getEligibilityEvidenceSubmitted(),
                 consultation.getCreatedAt(),
                 consultation.getUpdatedAt(),
                 consultation.getAttachments().stream()

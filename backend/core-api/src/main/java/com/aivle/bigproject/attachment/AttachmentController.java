@@ -1,6 +1,10 @@
 package com.aivle.bigproject.attachment;
 
+import com.aivle.bigproject.attachment.dto.AttachmentPresignedUploadRequest;
+import com.aivle.bigproject.attachment.dto.AttachmentPresignedUploadResponse;
 import com.aivle.bigproject.attachment.dto.AttachmentResponse;
+import com.aivle.bigproject.storage.S3FileStorageService;
+import java.time.Duration;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -10,6 +14,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,9 +24,19 @@ import org.springframework.web.multipart.MultipartFile;
 public class AttachmentController {
 
     private final AttachmentService attachmentService;
+    private final S3FileStorageService s3FileStorageService; // presign만 하므로 DB를 아는 AttachmentService를 안 거침
 
-    public AttachmentController(AttachmentService attachmentService) {
+    public AttachmentController(AttachmentService attachmentService, S3FileStorageService s3FileStorageService) {
         this.attachmentService = attachmentService;
+        this.s3FileStorageService = s3FileStorageService;
+    }
+
+    // POST /api/attachments/presigned-upload — 브라우저가 S3에 직접 PUT할 수 있는 임시 업로드 URL 발급
+    // (frontend/src/services/s3UploadClient.js가 상담 등록 화면에서 파일 선택 즉시 호출)
+    @PostMapping("/api/attachments/presigned-upload")
+    public AttachmentPresignedUploadResponse presignedUpload(@RequestBody AttachmentPresignedUploadRequest request) {
+        var presigned = s3FileStorageService.presignUpload(request.fileName(), request.contentType(), Duration.ofMinutes(15));
+        return new AttachmentPresignedUploadResponse(presigned.uploadUrl(), presigned.key(), presigned.publicUrl());
     }
 
     // POST /api/consultations/{consultationId}/attachments — 파일 업로드
