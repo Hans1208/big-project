@@ -94,6 +94,10 @@ public class AiAnalysis {
     @Column(name = "estimated_time")
     private String estimatedTime;
 
+    // ai-api /consult/analyze 호출 시 실제로 보낸 raw_input을 그대로 보관 (추적용).
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_input_json", columnDefinition = "jsonb")
+    private String rawInputJson;
     // 상담원 확인/수정 -> 검토요청 -> 승인/반려 흐름. AnalysisReviewStatus 참고.
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -118,7 +122,7 @@ public class AiAnalysis {
     public AiAnalysis(Consultation consultation, String summary, String caseType, String caseSubtype,
                        String urgencyLevel, String eligibility, String extractedJson, String missingInfoJson,
                        String checklistJson, String recommendationJson, String timelineJson,
-                       String clusterResultJson, String estimatedTime) {
+                       String clusterResultJson, String estimatedTime, String rawInputJson) {
         this.consultation = consultation;
         this.summary = summary;
         this.caseType = caseType;
@@ -132,6 +136,7 @@ public class AiAnalysis {
         this.timelineJson = timelineJson;
         this.clusterResultJson = clusterResultJson;
         this.estimatedTime = estimatedTime;
+        this.rawInputJson = rawInputJson;
         this.status = AnalysisReviewStatus.DRAFTED;
     }
 }

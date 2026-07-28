@@ -25,6 +25,12 @@ public class GlobalExceptionHandler {
                 .body(errorBody(HttpStatus.NOT_FOUND, e.getMessage(), request));
     }
 
+    @ExceptionHandler(AiApiException.class)
+    public ResponseEntity<Map<String, Object>> handleAiApiError(AiApiException e, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(errorBody(HttpStatus.BAD_GATEWAY, e.getMessage(), request));
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException e, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

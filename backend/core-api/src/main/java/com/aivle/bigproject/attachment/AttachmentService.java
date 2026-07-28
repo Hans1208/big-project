@@ -3,7 +3,7 @@ package com.aivle.bigproject.attachment;
 import com.aivle.bigproject.common.exception.NotFoundException;
 import com.aivle.bigproject.consultation.Consultation;
 import com.aivle.bigproject.consultation.ConsultationService;
-import com.aivle.bigproject.storage.FileStorageService;
+import com.aivle.bigproject.storage.S3FileStorageService;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,25 +15,28 @@ public class AttachmentService {
 
     private final AttachmentRepository attachmentRepository;
     private final ConsultationService consultationService; // 업로드 대상 상담이 실제로 있는지 확인용
-    private final FileStorageService fileStorageService;   // 실제 파일 저장/읽기/삭제 담당
+    private final S3FileStorageService s3FileStorageService; // 실제 파일 저장/읽기/삭제 담당 (S3)
 
     public AttachmentService(AttachmentRepository attachmentRepository,
                               ConsultationService consultationService,
-                              FileStorageService fileStorageService) {
+                              S3FileStorageService s3FileStorageService) {
         this.attachmentRepository = attachmentRepository;
         this.consultationService = consultationService;
-        this.fileStorageService = fileStorageService;
+        this.s3FileStorageService = s3FileStorageService;
     }
 
     @Transactional
     public Attachment upload(Long consultationId, MultipartFile file, String fileType) {
         // 1) 상담이 실제로 존재하는지 확인 (없으면 404)
         Consultation consultation = consultationService.findById(consultationId);
-        // 2) 디스크에 파일 저장하고, 저장된 경로를 돌려받음
-        String storedUrl = fileStorageService.store(consultationId, file);
+        // 2) S3에 파일 저장하고, 저장된 key를 돌려받음
+        String storageKey = s3FileStorageService.store(consultationId, file);
         String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
+        String bucket = s3FileStorageService.getBucket();
+        String fileUrl = "https://" + bucket + ".s3.amazonaws.com/" + storageKey;
         // 3) DB에 첨부파일 정보(메타데이터) 저장
-        return attachmentRepository.save(new Attachment(consultation, originalName, fileType, storedUrl));
+        return attachmentRepository.save(
+                new Attachment(consultation, originalName, fileType, fileUrl, bucket, storageKey, file.getContentType()));
     }
 
     // 다운로드/삭제 전에 "이 첨부파일이 진짜 이 상담 소속이 맞는지"까지 같이 검증하는 조회 메서드.
@@ -49,13 +52,13 @@ public class AttachmentService {
 
     public Resource loadFile(Long consultationId, Long attachmentId) {
         Attachment attachment = findByIdForConsultation(consultationId, attachmentId);
-        return fileStorageService.loadAsResource(attachment.getFileUrl());
+        return s3FileStorageService.loadAsResource(attachment.getStorageKey());
     }
 
     @Transactional
     public void delete(Long consultationId, Long attachmentId) {
         Attachment attachment = findByIdForConsultation(consultationId, attachmentId);
-        fileStorageService.delete(attachment.getFileUrl()); // 디스크 파일 삭제
-        attachmentRepository.delete(attachment);              // DB row 삭제
+        s3FileStorageService.delete(attachment.getStorageKey()); // S3 오브젝트 삭제
+        attachmentRepository.delete(attachment);                  // DB row 삭제
     }
 }

@@ -42,13 +42,25 @@ public class Attachment {
     @Column(name = "file_type", nullable = false)
     private String fileType;
 
-    // 실제 저장된 파일 위치. 지금은 로컬 디스크 경로가 들어감 (FileStorageService 참고).
-    // 나중에 S3 등으로 바꿔도 이 컬럼 이름/역할은 그대로 유지 가능하도록 설계.
+    // 사람이 읽는 참고용 URL. 실제 다운로드/삭제/ai-api 전달은 storageKey 기준으로 함.
     @Column(name = "file_url", nullable = false)
     private String fileUrl;
 
+    // 실제 저장된 S3 버킷/키. ai-api의 /consult/analyze 호출 시 summited_file_link로
+    // 이 storageKey가 그대로 전달됨 (S3FileStorageService 참고).
+    @Column(name = "storage_bucket")
+    private String storageBucket;
+
+    @Column(name = "storage_key")
+    private String storageKey;
+
+    @Column(name = "content_type")
+    private String contentType;
+
     // STT(음성→텍스트)나 OCR(이미지→텍스트) 결과가 들어갈 자리.
     // 지금은 업로드 시점에 채우는 로직이 없어서 항상 null. 나중에 ai-api 연동 시 채워질 예정.
+    // @Lob을 안 붙이는 이유는 Consultation.inputText 주석 참고 (Postgres text + @Lob(String) 조합의
+    // OID 저장 버그 회피).
     // @Lob은 쓰지 않는다 — AiAnalysis.summary 주석 참고.
     @Column(name = "extracted_text", columnDefinition = "TEXT")
     private String extractedText;
@@ -57,10 +69,14 @@ public class Attachment {
     @Column(nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
 
-    public Attachment(Consultation consultation, String fileName, String fileType, String fileUrl) {
+    public Attachment(Consultation consultation, String fileName, String fileType, String fileUrl,
+                       String storageBucket, String storageKey, String contentType) {
         this.consultation = consultation;
         this.fileName = fileName;
         this.fileType = fileType;
         this.fileUrl = fileUrl;
+        this.storageBucket = storageBucket;
+        this.storageKey = storageKey;
+        this.contentType = contentType;
     }
 }
