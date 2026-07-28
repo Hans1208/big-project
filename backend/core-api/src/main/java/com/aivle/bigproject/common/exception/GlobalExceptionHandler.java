@@ -29,6 +29,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleAiApiError(AiApiException e, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(errorBody(HttpStatus.BAD_GATEWAY, e.getMessage(), request));
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorized(UnauthorizedException e, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(errorBody(HttpStatus.UNAUTHORIZED, e.getMessage(), request));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(ConflictException e, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorBody(HttpStatus.CONFLICT, e.getMessage(), request));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException e, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(errorBody(HttpStatus.FORBIDDEN, e.getMessage(), request));
     }
 
     private Map<String, Object> errorBody(HttpStatus status, String message, HttpServletRequest request) {

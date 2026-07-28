@@ -50,6 +50,7 @@ public class Consultation {
     // 실제 텍스트 대신 Large Object OID 참조 숫자를 저장해버리는 알려진 문제가 있음(JPA 세션 안에서는
     // 우연히 정상 조회되어 눈치채기 어렵지만, DB를 직접 SELECT하면 숫자만 보임). Postgres text는 길이
     // 제한이 없어서 애초에 @Lob이 필요 없음.
+    // @Lob은 쓰지 않는다 — AiAnalysis.summary 주석 참고.
     @Column(name = "input_text", columnDefinition = "TEXT")
     private String inputText;
 

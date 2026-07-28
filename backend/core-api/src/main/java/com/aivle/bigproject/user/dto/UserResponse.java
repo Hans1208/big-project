@@ -1,5 +1,6 @@
 package com.aivle.bigproject.user.dto;
 
+import com.aivle.bigproject.user.ApprovalStatus;
 import com.aivle.bigproject.user.User;
 import com.aivle.bigproject.user.UserRole;
 import java.time.LocalDateTime;
@@ -10,6 +11,7 @@ public record UserResponse(
         String name,
         UserRole role,
         String email,
+        ApprovalStatus approvalStatus,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -20,6 +22,7 @@ public record UserResponse(
                 user.getName(),
                 user.getRole(),
                 user.getEmail(),
+                user.getApprovalStatus(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );

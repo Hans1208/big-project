@@ -41,10 +41,17 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    // 로그인/비밀번호 기능은 아직 구현 안 함 — 컬럼만 미리 만들어둔 상태.
-    // 인증 작업 시작하면 이 필드에 해시된 비밀번호를 저장하게 될 예정.
+    // 비밀번호 해시 (BCrypt). AuthService.register()에서 채워짐.
     @Column(name = "password_hash")
     private String passwordHash;
+
+    // 가입 승인 상태. ADMIN은 가입 즉시 APPROVED, CONSULTANT/LAWYER는 PENDING으로
+    // 시작해 관리자가 승인/거절해야 함 (AuthService.login()에서 이 값을 검사).
+    // 필드 기본값 PENDING은 UserService.create()(core-api 자체 조회용 계정 생성 등
+    // 로그인과 무관한 경로)에서도 안전한 기본값이라 그대로 둠.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_status", nullable = false)
+    private ApprovalStatus approvalStatus = ApprovalStatus.PENDING;
 
     @CreatedDate
     @Column(nullable = false, updatable = false) // 생성 시 한 번만 기록, 이후 수정 불가

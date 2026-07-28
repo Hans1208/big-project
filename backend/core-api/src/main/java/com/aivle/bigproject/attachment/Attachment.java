@@ -61,6 +61,7 @@ public class Attachment {
     // 지금은 업로드 시점에 채우는 로직이 없어서 항상 null. 나중에 ai-api 연동 시 채워질 예정.
     // @Lob을 안 붙이는 이유는 Consultation.inputText 주석 참고 (Postgres text + @Lob(String) 조합의
     // OID 저장 버그 회피).
+    // @Lob은 쓰지 않는다 — AiAnalysis.summary 주석 참고.
     @Column(name = "extracted_text", columnDefinition = "TEXT")
     private String extractedText;
 

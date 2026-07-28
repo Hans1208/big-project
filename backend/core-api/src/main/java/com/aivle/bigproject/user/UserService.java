@@ -33,9 +33,30 @@ public class UserService {
                 .toList();
     }
 
+    // 관리자 승인 대기 화면용 — PENDING 상태인 계정만
+    public List<UserResponse> findPending() {
+        return userRepository.findByApprovalStatus(ApprovalStatus.PENDING).stream()
+                .map(UserResponse::from)
+                .toList();
+    }
+
     // 컨트롤러가 호출하는 조회용 — 바로 응답 DTO로 변환해서 돌려줌
     public UserResponse get(Long id) {
         return UserResponse.from(findById(id));
+    }
+
+    @Transactional
+    public UserResponse approve(Long id) {
+        User user = findById(id);
+        user.setApprovalStatus(ApprovalStatus.APPROVED);
+        return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse reject(Long id) {
+        User user = findById(id);
+        user.setApprovalStatus(ApprovalStatus.REJECTED);
+        return UserResponse.from(user);
     }
 
     // 이건 DTO가 아니라 엔티티(User) 자체를 반환 — ConsultationService처럼
