@@ -140,3 +140,28 @@ def test_upsert_rejects_different_document_and_embedding_counts(
             documents=sample_documents(),
             embeddings=[[1.0, 0.0]],
         )
+
+
+class CapturingClient:
+    def __init__(self):
+        self.configuration = None
+
+    def get_or_create_collection(self, **kwargs):
+        self.configuration = kwargs["configuration"]
+        return object()
+
+
+def test_collection_uses_frequent_hnsw_sync(tmp_path):
+    client = CapturingClient()
+
+    ChromaVectorStore(
+        persist_directory=tmp_path / "chroma",
+        collection_name="test-sync-settings",
+        client=client,
+    )
+
+    hnsw_config = client.configuration["hnsw"]
+
+    assert hnsw_config["space"] == "cosine"
+    assert hnsw_config["batch_size"] == 100
+    assert hnsw_config["sync_threshold"] == 100

@@ -51,6 +51,8 @@ class ChromaVectorStore:
                 configuration={
                     "hnsw": {
                         "space": "cosine",
+                        "batch_size": 100,
+                        "sync_threshold": 100,
                     }
                 },
             )
@@ -249,3 +251,4 @@ class ChromaVectorStore:
             )
 
         return results
+
