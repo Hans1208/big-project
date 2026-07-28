@@ -1,38 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { ShieldCheck, ClipboardList, ChevronDown, Search } from 'lucide-react';
 import { today } from '../constants.jsx';
-import { createAnalysisPayload, createAttachmentMetadata, generateDraftText, mapContractAnalysisResponse, searchReferenceCandidates, simulateBackendLatency, validateAnalysisResult } from '../services/legalAidApi.js';
+import { createAttachmentMetadata, generateDraftText, searchReferenceCandidates, simulateBackendLatency, validateAnalysisResult } from '../services/legalAidApi.js';
 import { appendAuditLog, getFavoriteTemplates, readStorage, storageKeys, toggleFavoriteTemplate, writeStorage } from '../services/storage.js';
-import { requestContractAnalysis } from '../services/aiApiClient.js';
+import { triggerCoreAnalysis, mapCoreAnalysisResponse } from '../services/coreApiClient.js';
 import { uploadFileToS3, S3UploadUnavailableError } from '../services/s3UploadClient.js';
 import { caseCategories, legalTemplateSeed } from '../data/domain.js';
 import { HitlConfirmModal } from '../components/common.jsx';
 import { useAsyncAction } from '../components/loading.jsx';
 import { useConfirm, useToast } from '../components/feedback.jsx';
 
-// 실제 backend/ai-api 호출이 실패(서버 꺼짐 등)하면 로컬 목업 결과로 자연스럽게 대체해,
-// 데모/개발 도중에도 화면이 끊기지 않도록 합니다.
+// core-api(/api/consultations/{id}/analyze) 호출이 실패(서버 꺼짐 등)하면 로컬 목업 결과로
+// 자연스럽게 대체해, 데모/개발 도중에도 화면이 끊기지 않도록 합니다.
 async function fetchAnalysisWithFallback(selectedCase) {
   const localFallback = buildAnalysisResult(selectedCase);
   try {
-    const contractResult = await requestContractAnalysis(createAnalysisPayload(selectedCase));
+    const coreResult = await triggerCoreAnalysis(selectedCase);
     // 백엔드가 아직 채워주지 않는 항목(모달리티 요약, 파일별 추출 상태, STT 마스킹 미리보기 등)은
     // 로컬 목업 값을 그대로 이어서 쓰고, 실제 응답이 담긴 핵심 분석 필드만 덮어씁니다.
-    return mergeContractAnalysisResponse(localFallback, contractResult);
+    return mergeContractAnalysisResponse(localFallback, coreResult);
   } catch {
     return localFallback;
   }
 }
 
-function buildScopedAnalysisPayload(selectedCase, requestedOutputs) {
-  return {
-    ...createAnalysisPayload(selectedCase),
-    requestedOutputs,
-  };
-}
-
 function mergeContractAnalysisResponse(baseAnalysis, contractResult, extra = {}) {
-  const mapped = mapContractAnalysisResponse(contractResult);
+  const mapped = mapCoreAnalysisResponse(contractResult);
   // 긴급도 등급과 점수를 항상 짝이 맞게 재구성합니다.
   // - 백엔드가 사건별 점수(case_emergency_ratio)를 주면 그 값을 기준으로 등급을 정합니다(실제 AI).
   // - 점수 없이 등급만 오면(계약 mock은 등급이 고정이라 사건 구분이 안 됨) buildAnalysisResult가
@@ -188,8 +181,9 @@ async function requestEligibilityCandidate(selectedCase, analysis) {
   let mapped = {};
   let response = null;
   try {
-    response = await requestContractAnalysis(buildScopedAnalysisPayload(selectedCase, ['eligibility', 'urgency_level', 'checklist_json', 'missing_info_json']));
-    mapped = mapContractAnalysisResponse(response);
+    // /consult/analyze는 단일화된 파이프라인이라 부분 출력만 요청하는 개념이 없음 — 항상 전체를 반환받음.
+    response = await triggerCoreAnalysis(selectedCase);
+    mapped = mapCoreAnalysisResponse(response);
   } catch {
     // 백엔드가 꺼져 있으면 위에서 계산한 로컬 값만으로 진행합니다.
   }
@@ -240,8 +234,8 @@ async function requestMissingDataCandidate(selectedCase, analysis) {
   let mapped = {};
   let response = null;
   try {
-    response = await requestContractAnalysis(buildScopedAnalysisPayload(selectedCase, ['missing_info_json', 'checklist_json', 'recommendation_json']));
-    mapped = mapContractAnalysisResponse(response);
+    response = await triggerCoreAnalysis(selectedCase);
+    mapped = mapCoreAnalysisResponse(response);
   } catch {
     // 백엔드가 꺼져 있으면 아래 로컬 제안 목록을 씁니다.
   }

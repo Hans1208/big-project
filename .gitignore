@@ -39,3 +39,10 @@ backend/ai-api/서식/
 *.txt
 
 backend/ai-api/rag/data/parsed_templates.json
+
+# 서버 실행 로그 (uvicorn, bootRun 등)
+*.log
+
+# 로컬 검증용 스크립트·목 데이터 (팀 공용 테스트가 아니라 각자 돌려보는 용도)
+backend/ai-api/test_*.py
+backend/ai-api/custom_mocks/

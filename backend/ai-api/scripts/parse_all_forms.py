@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from hwpx import HwpxDocument
 
-from services.form_drafter import find_hwpx
+from app.services.forms.form_drafter import find_hwpx
 
 MVP_CATEGORIES = {"친족", "상속", "가사소송", "가족관계등록"}
 MAPPING_FILE = ROOT / "helplaw24_서식_카테고리_매핑.json"

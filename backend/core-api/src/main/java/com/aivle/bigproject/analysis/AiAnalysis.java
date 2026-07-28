@@ -1,14 +1,16 @@
 package com.aivle.bigproject.analysis;
 
 import com.aivle.bigproject.consultation.Consultation;
+import com.aivle.bigproject.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -38,7 +40,9 @@ public class AiAnalysis {
     @JoinColumn(name = "consultation_id", nullable = false)
     private Consultation consultation;
 
-    @Lob
+    // @Lob을 붙이면 PostgreSQL에서 값이 pg_largeobject에 따로 저장되고 컬럼엔 OID만 남아
+    // DB를 직접 조회할 때 내용이 안 보이고 행 삭제 시 실제 데이터가 누수된다.
+    // PostgreSQL TEXT는 원래 길이 제한이 없으므로 @Lob 없이 columnDefinition만으로 충분.
     @Column(columnDefinition = "TEXT")
     private String summary;
 
@@ -90,6 +94,26 @@ public class AiAnalysis {
     @Column(name = "estimated_time")
     private String estimatedTime;
 
+    // ai-api /consult/analyze 호출 시 실제로 보낸 raw_input을 그대로 보관 (추적용).
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_input_json", columnDefinition = "jsonb")
+    private String rawInputJson;
+    // 상담원 확인/수정 -> 검토요청 -> 승인/반려 흐름. AnalysisReviewStatus 참고.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AnalysisReviewStatus status;
+
+    // 검토한 사용자(변호사 등) — 검토 전엔 null
+    @ManyToOne
+    @JoinColumn(name = "reviewer_id")
+    private User reviewer;
+
+    // 승인 코멘트 또는 반려 사유
+    @Column(name = "review_note", columnDefinition = "TEXT")
+    private String reviewNote;
+
+    private LocalDateTime reviewedAt;
+
     // 계약서엔 updated_at이 없고 created_at(분석일)만 있어서 그대로 맞춤
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -98,7 +122,7 @@ public class AiAnalysis {
     public AiAnalysis(Consultation consultation, String summary, String caseType, String caseSubtype,
                        String urgencyLevel, String eligibility, String extractedJson, String missingInfoJson,
                        String checklistJson, String recommendationJson, String timelineJson,
-                       String clusterResultJson, String estimatedTime) {
+                       String clusterResultJson, String estimatedTime, String rawInputJson) {
         this.consultation = consultation;
         this.summary = summary;
         this.caseType = caseType;
@@ -112,5 +136,7 @@ public class AiAnalysis {
         this.timelineJson = timelineJson;
         this.clusterResultJson = clusterResultJson;
         this.estimatedTime = estimatedTime;
+        this.rawInputJson = rawInputJson;
+        this.status = AnalysisReviewStatus.DRAFTED;
     }
 }

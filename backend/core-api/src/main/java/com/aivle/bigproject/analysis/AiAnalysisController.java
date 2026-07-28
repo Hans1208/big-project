@@ -2,6 +2,7 @@ package com.aivle.bigproject.analysis;
 
 import com.aivle.bigproject.analysis.dto.AiAnalysisRequest;
 import com.aivle.bigproject.analysis.dto.AiAnalysisResponse;
+import com.aivle.bigproject.analysis.dto.AnalysisReviewRequest;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,8 +23,16 @@ public class AiAnalysisController {
         this.aiAnalysisService = aiAnalysisService;
     }
 
-    // POST /api/consultations/{consultationId}/analyses
-    // ai-api가 분석 파이프라인을 돌리고 난 뒤 그 결과를 여기로 저장하게 될 엔드포인트
+    // POST /api/consultations/{consultationId}/analyze — ai-api 분석 파이프라인을 실제로 실행하고
+    // 그 결과를 새 AiAnalysis row로 저장한다. "분석 시작"/"구조대상 판정"/"누락자료 점검" 버튼이 부르는 엔드포인트.
+    @PostMapping("/api/consultations/{consultationId}/analyze")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AiAnalysisResponse analyze(@PathVariable Long consultationId) {
+        return aiAnalysisService.analyze(consultationId);
+    }
+
+    // POST /api/consultations/{consultationId}/analyses — 이미 만들어진 분석 결과(위 /analyze 응답을
+    // 상담원/변호사가 화면에서 수정한 버전 등)를 새 스냅샷으로 그대로 저장. ai-api를 다시 호출하지 않음.
     @PostMapping("/api/consultations/{consultationId}/analyses")
     @ResponseStatus(HttpStatus.CREATED)
     public AiAnalysisResponse create(@PathVariable Long consultationId, @RequestBody AiAnalysisRequest request) {
@@ -54,5 +63,25 @@ public class AiAnalysisController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long consultationId, @PathVariable Long analysisId) {
         aiAnalysisService.delete(consultationId, analysisId);
+    }
+
+    // POST .../analyses/{analysisId}/submit-for-review — 상담원: 확인/수정 끝났으니 검토 요청
+    @PostMapping("/api/consultations/{consultationId}/analyses/{analysisId}/submit-for-review")
+    public AiAnalysisResponse submitForReview(@PathVariable Long consultationId, @PathVariable Long analysisId) {
+        return aiAnalysisService.submitForReview(consultationId, analysisId);
+    }
+
+    // POST .../analyses/{analysisId}/approve — 변호사 전용(SecurityConfig)
+    @PostMapping("/api/consultations/{consultationId}/analyses/{analysisId}/approve")
+    public AiAnalysisResponse approve(@PathVariable Long consultationId, @PathVariable Long analysisId,
+                                       @RequestBody AnalysisReviewRequest request) {
+        return aiAnalysisService.approve(consultationId, analysisId, request);
+    }
+
+    // POST .../analyses/{analysisId}/request-revision — 변호사 전용(SecurityConfig)
+    @PostMapping("/api/consultations/{consultationId}/analyses/{analysisId}/request-revision")
+    public AiAnalysisResponse requestRevision(@PathVariable Long consultationId, @PathVariable Long analysisId,
+                                               @RequestBody AnalysisReviewRequest request) {
+        return aiAnalysisService.requestRevision(consultationId, analysisId, request);
     }
 }

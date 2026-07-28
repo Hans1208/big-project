@@ -18,7 +18,7 @@ load_dotenv()
 client = OpenAI()
 
 EMBED_MODEL = "text-embedding-3-small"
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
 VECTORS_FILE = DATA_DIR / "form_embeddings.npy"
 INDEX_FILE = DATA_DIR / "form_embeddings_index.json"
 

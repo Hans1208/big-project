@@ -19,8 +19,8 @@ import sys
 import traceback
 from pathlib import Path
 
-from services.form_recommender import recommend
-from services.form_drafter import draft, find_hwpx
+from app.services.forms.form_recommender import recommend
+from app.services.forms.form_drafter import draft, find_hwpx
 
 sys.stdout.reconfigure(encoding="utf-8")
 
