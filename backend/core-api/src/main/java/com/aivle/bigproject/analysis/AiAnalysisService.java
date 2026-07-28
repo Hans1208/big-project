@@ -1,6 +1,6 @@
 package com.aivle.bigproject.analysis;
 
-import com.aivle.bigproject.analysis.client.AiApiClient;
+import com.aivle.bigproject.analysis.client.ConsultAiApiClient;
 import com.aivle.bigproject.analysis.client.ConsultAnalyzeApiResponse;
 import com.aivle.bigproject.analysis.client.RawInputRequest;
 import com.aivle.bigproject.analysis.dto.AiAnalysisRequest;
@@ -32,12 +32,12 @@ public class AiAnalysisService {
     private final ConsultationService consultationService; // 대상 상담이 실제 있는지 확인용
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper; // jsonb 컬럼(String)과 JsonNode를 서로 변환하는 데 사용
-    private final AiApiClient aiApiClient; // ai-api POST /consult/analyze 호출용
+    private final ConsultAiApiClient aiApiClient; // ai-api POST /consult/analyze 호출용
 
     public AiAnalysisService(AiAnalysisRepository aiAnalysisRepository,
                               ConsultationService consultationService,
                               ObjectMapper objectMapper,
-                              AiApiClient aiApiClient,
+                              ConsultAiApiClient aiApiClient,
                               UserRepository userRepository) {
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.consultationService = consultationService;

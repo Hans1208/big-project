@@ -23,5 +23,3 @@ app:
     region: ap-northeast-2
     access-key: "임시"
     secret-key: "임시"
-  ai-api:
-    base-url: ${AI_API_BASE_URL:http://localhost:8001}
