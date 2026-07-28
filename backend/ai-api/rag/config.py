@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 
 
 # backend/ai-api/rag/config.py
@@ -14,6 +14,7 @@ EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-small"
 
 # ChromaDB 컬렉션
 COLLECTION_NAME = "legal_documents"
+LEGAL_FORMS_COLLECTION_NAME = "legal_forms"
 
 # 데이터 파일
 CLASSIFICATION_PATH = DATA_DIR / "case_classification.json"
@@ -22,6 +23,7 @@ MOCK_DOCUMENTS_PATH = DATA_DIR / "documents.mock.json"
 EVALUATION_QUERIES_PATH = DATA_DIR / "evaluation_queries.json"
 TEMPLATE_MANIFEST_PATH = DATA_DIR / "template_manifest.json"
 PARSED_TEMPLATES_PATH = DATA_DIR / "parsed_templates.json"
+PARSED_FORMS_PATH = AI_API_DIR / "parsed" / "전체.json"
 
 # 검색 설정
 DEFAULT_TOP_K = 3

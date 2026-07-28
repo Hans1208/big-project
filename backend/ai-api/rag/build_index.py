@@ -1,114 +1,157 @@
-import json
+﻿"""파싱된 법률 서식을 로컬 ChromaDB에 색인한다."""
+
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any
 
-import chromadb
-from sentence_transformers import SentenceTransformer
-
-from classification import (
-    load_case_classification,
-    validate_case_classification,
+from rag.chunking import (
+    DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_CHUNK_SIZE,
+    chunk_documents,
 )
+from rag.config import (
+    CHROMA_DB_DIR,
+    LEGAL_FORMS_COLLECTION_NAME,
+    PARSED_FORMS_PATH,
+)
+from rag.embedding_service import EmbeddingService
+from rag.form_loader import load_form_documents
+from rag.vector_store import ChromaVectorStore
 
 
-BASE_DIR = Path(__file__).resolve().parent
-DATA_PATH = BASE_DIR / "data" / "documents.json"
-DB_PATH = BASE_DIR.parent / "storage" / "chroma"
-
-MODEL_NAME = "intfloat/multilingual-e5-small"
-COLLECTION_NAME = "legal_documents"
-
-REQUIRED_FIELDS = {
-    "id",
-    "document_type",
-    "case_type",
-    "case_subtype",
-    "title",
-    "content",
-}
+DEFAULT_BATCH_SIZE = 32
 
 
-def load_documents() -> list[dict]:
-    """문서 JSON을 읽고 필수 필드와 사건 분류를 검증한다."""
-    if not DATA_PATH.exists():
-        raise FileNotFoundError(
-            f"데이터 파일을 찾을 수 없습니다: {DATA_PATH}"
+def build_form_index(
+    parsed_file: str | Path = PARSED_FORMS_PATH,
+    persist_directory: str | Path = CHROMA_DB_DIR,
+    collection_name: str = LEGAL_FORMS_COLLECTION_NAME,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    embedding_service: Any | None = None,
+    vector_store: Any | None = None,
+) -> dict[str, int]:
+    """서식을 로딩·청킹·임베딩하고 ChromaDB에 저장한다.
+
+    Args:
+        parsed_file:
+            팀원이 생성한 parsed/전체.json 경로.
+        persist_directory:
+            ChromaDB 데이터 저장 폴더.
+        collection_name:
+            서식용 ChromaDB 컬렉션 이름.
+        chunk_size:
+            청크 최대 글자 수.
+        chunk_overlap:
+            인접 청크 간 중복 글자 수.
+        batch_size:
+            한 번에 임베딩하고 저장할 청크 수.
+        embedding_service:
+            테스트 또는 외부 주입용 임베딩 서비스.
+        vector_store:
+            테스트 또는 외부 주입용 벡터 저장소.
+
+    Returns:
+        원본 문서 수, 청크 수, 저장 레코드 수.
+    """
+    if batch_size < 1:
+        raise ValueError(
+            "batch_size는 1 이상이어야 합니다."
         )
 
-    with DATA_PATH.open("r", encoding="utf-8") as file:
-        documents = json.load(file)
+    documents = load_form_documents(
+        parsed_file
+    )
 
-    if not isinstance(documents, list) or not documents:
-        raise ValueError("저장할 문서가 없습니다.")
+    chunks = chunk_documents(
+        documents=documents,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
 
-    classification = load_case_classification()
+    if embedding_service is None:
+        embedding_service = EmbeddingService()
 
-    for index, document in enumerate(documents, start=1):
-        missing_fields = REQUIRED_FIELDS - document.keys()
+    if vector_store is None:
+        vector_store = ChromaVectorStore(
+            persist_directory=persist_directory,
+            collection_name=collection_name,
+        )
 
-        if missing_fields:
-            raise ValueError(
-                f"{index}번째 문서에 필수 필드가 없습니다: "
-                f"{', '.join(sorted(missing_fields))}"
+    total_batches = (
+        len(chunks) + batch_size - 1
+    ) // batch_size
+
+    for batch_number, start in enumerate(
+        range(0, len(chunks), batch_size),
+        start=1,
+    ):
+        batch = chunks[
+            start:start + batch_size
+        ]
+
+        embedding_texts = [
+            chunk["embedding_text"]
+            for chunk in batch
+        ]
+
+        embeddings = (
+            embedding_service.embed_documents(
+                embedding_texts
             )
-
-        validate_case_classification(
-            case_type=document["case_type"],
-            case_subtype=document["case_subtype"],
-            classification=classification,
         )
 
-    return documents
+        vector_store.upsert_documents(
+            documents=batch,
+            embeddings=embeddings,
+        )
+
+        print(
+            "색인 진행:",
+            f"{batch_number}/{total_batches}",
+            f"({min(start + batch_size, len(chunks))}"
+            f"/{len(chunks)} 청크)",
+        )
+
+    return {
+        "documents": len(documents),
+        "chunks": len(chunks),
+        "stored": vector_store.count(),
+    }
 
 
 def main() -> None:
-    documents = load_documents()
-
-    print("Embedding 모델을 불러오는 중...")
-    model = SentenceTransformer(MODEL_NAME)
-
-    client = chromadb.PersistentClient(path=str(DB_PATH))
-
-    collection = client.get_or_create_collection(
-        name=COLLECTION_NAME
+    """CLI에서 실제 법률 서식 색인을 실행한다."""
+    print(
+        "법률 서식 데이터를 불러오고 있습니다."
     )
 
-    passages = [
-        (
-            f"passage: "
-            f"{document['case_type']} "
-            f"{document['case_subtype']} "
-            f"{document['title']} "
-            f"{document['content']}"
-        )
-        for document in documents
-    ]
+    result = build_form_index()
 
-    print("문서를 벡터로 변환하는 중...")
-
-    embeddings = model.encode(
-        passages,
-        normalize_embeddings=True,
-    ).tolist()
-
-    metadatas = [
-        {
-            "title": document["title"],
-            "document_type": document["document_type"],
-            "case_type": document["case_type"],
-            "case_subtype": document["case_subtype"],
-        }
-        for document in documents
-    ]
-
-    collection.upsert(
-        ids=[document["id"] for document in documents],
-        documents=[document["content"] for document in documents],
-        metadatas=metadatas,
-        embeddings=embeddings,
+    print()
+    print("=== 법률 서식 색인 완료 ===")
+    print(
+        "원본 서식 수:",
+        result["documents"],
     )
-
-    print(f"저장 완료: {len(documents)}개 문서")
-    print(f"ChromaDB 위치: {DB_PATH}")
+    print(
+        "생성 청크 수:",
+        result["chunks"],
+    )
+    print(
+        "ChromaDB 저장 수:",
+        result["stored"],
+    )
+    print(
+        "컬렉션:",
+        LEGAL_FORMS_COLLECTION_NAME,
+    )
+    print(
+        "저장 위치:",
+        CHROMA_DB_DIR,
+    )
 
 
 if __name__ == "__main__":

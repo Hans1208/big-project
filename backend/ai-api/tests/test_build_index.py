@@ -1,0 +1,144 @@
+﻿import json
+
+from rag.build_index import build_form_index
+
+
+class FakeEmbeddingService:
+    def __init__(self):
+        self.calls = []
+
+    def embed_documents(self, texts):
+        self.calls.append(list(texts))
+
+        return [
+            [1.0, 0.0]
+            for _ in texts
+        ]
+
+
+class FakeVectorStore:
+    def __init__(self):
+        self.batches = []
+
+    def upsert_documents(
+        self,
+        documents,
+        embeddings,
+    ):
+        self.batches.append(
+            {
+                "documents": list(documents),
+                "embeddings": list(embeddings),
+            }
+        )
+
+    def count(self):
+        return sum(
+            len(batch["documents"])
+            for batch in self.batches
+        )
+
+
+def test_build_form_index_loads_chunks_and_stores_batches(
+    tmp_path,
+):
+    parsed_file = tmp_path / "forms.json"
+
+    parsed_file.write_text(
+        json.dumps(
+            [
+                {
+                    "form_name": "이혼청구의 소",
+                    "main": "가사소송",
+                    "sub": "가,나,다류 가사소송",
+                    "tmpltNo": "FORM-001",
+                    "source_file": "forms/divorce.hwpx",
+                    "markdown": (
+                        "배우자와 재판상 이혼을 청구하는 서식"
+                    ),
+                },
+                {
+                    "form_name": "개명허가신청서",
+                    "main": "가족관계등록",
+                    "sub": "성본창설과 개명",
+                    "tmpltNo": "FORM-002",
+                    "source_file": "forms/name-change.hwpx",
+                    "markdown": (
+                        "현재 이름을 변경하기 위한 신청서"
+                    ),
+                },
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    embedding_service = FakeEmbeddingService()
+    vector_store = FakeVectorStore()
+
+    result = build_form_index(
+        parsed_file=parsed_file,
+        embedding_service=embedding_service,
+        vector_store=vector_store,
+        chunk_size=1000,
+        chunk_overlap=100,
+        batch_size=1,
+    )
+
+    assert result == {
+        "documents": 2,
+        "chunks": 2,
+        "stored": 2,
+    }
+
+    assert len(
+        embedding_service.calls
+    ) == 2
+
+    assert len(
+        vector_store.batches
+    ) == 2
+
+    first_embedding_text = (
+        embedding_service.calls[0][0]
+    )
+
+    assert "서식명: 이혼청구의 소" in (
+        first_embedding_text
+    )
+    assert (
+        "분류: 가사소송 > 가,나,다류 가사소송"
+        in first_embedding_text
+    )
+
+    first_stored_document = (
+        vector_store.batches[0]["documents"][0]
+    )
+
+    assert first_stored_document["chunk_id"] == (
+        "FORM-001::chunk-0000"
+    )
+
+
+def test_build_form_index_rejects_invalid_batch_size(
+    tmp_path,
+):
+    parsed_file = tmp_path / "forms.json"
+    parsed_file.write_text(
+        "[]",
+        encoding="utf-8",
+    )
+
+    try:
+        build_form_index(
+            parsed_file=parsed_file,
+            embedding_service=FakeEmbeddingService(),
+            vector_store=FakeVectorStore(),
+            batch_size=0,
+        )
+    except ValueError as error:
+        assert "batch_size" in str(error)
+    else:
+        raise AssertionError(
+            "ValueError가 발생해야 합니다."
+        )
