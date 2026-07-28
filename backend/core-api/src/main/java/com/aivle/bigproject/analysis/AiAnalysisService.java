@@ -1,10 +1,16 @@
 package com.aivle.bigproject.analysis;
 
+import com.aivle.bigproject.analysis.client.AiApiClient;
+import com.aivle.bigproject.analysis.client.ConsultAnalyzeApiResponse;
+import com.aivle.bigproject.analysis.client.RawInputRequest;
 import com.aivle.bigproject.analysis.dto.AiAnalysisRequest;
 import com.aivle.bigproject.analysis.dto.AiAnalysisResponse;
+import com.aivle.bigproject.attachment.Attachment;
 import com.aivle.bigproject.common.exception.NotFoundException;
 import com.aivle.bigproject.consultation.Consultation;
 import com.aivle.bigproject.consultation.ConsultationService;
+import com.aivle.bigproject.consultation.ConsultationStatus;
+import java.time.format.DateTimeFormatter;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -19,13 +25,79 @@ public class AiAnalysisService {
     private final AiAnalysisRepository aiAnalysisRepository;
     private final ConsultationService consultationService; // 대상 상담이 실제 있는지 확인용
     private final ObjectMapper objectMapper; // jsonb 컬럼(String)과 JsonNode를 서로 변환하는 데 사용
+    private final AiApiClient aiApiClient; // ai-api POST /consult/analyze 호출용
 
     public AiAnalysisService(AiAnalysisRepository aiAnalysisRepository,
                               ConsultationService consultationService,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              AiApiClient aiApiClient) {
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.consultationService = consultationService;
         this.objectMapper = objectMapper;
+        this.aiApiClient = aiApiClient;
+    }
+
+    // 상담 텍스트 + 첨부파일(S3 key)을 ai-api에 보내 실제 분석 파이프라인(/consult/analyze)을 돌리고,
+    // 그 결과를 새 AiAnalysis row로 저장한다. "분석 시작" 버튼이 호출하는 진입점.
+    @Transactional
+    public AiAnalysisResponse analyze(Long consultationId) {
+        Consultation consultation = consultationService.findById(consultationId);
+        consultation.setStatus(ConsultationStatus.ANALYZING);
+
+        RawInputRequest request = buildRawInput(consultation);
+        ConsultAnalyzeApiResponse aiResponse = aiApiClient.analyzeConsult(request);
+
+        JsonNode caseAnalysis = aiResponse.caseAnalysis();
+        JsonNode checklist = aiResponse.reliefReviewChecklist();
+        String caseType = caseAnalysis.path("case_list").path(0).path("case_type").asText(null);
+        String caseTypeReason = caseAnalysis.path("case_list").path(0).path("case_type_reason").asText(null);
+        String urgencyLevel = caseAnalysis.path("case_emergency_level").asText(null);
+        String eligible = checklist.path("eligibility").path("eligible").asText(null);
+        String summary = buildSummary(caseType, caseTypeReason, urgencyLevel, eligible);
+
+        AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, null, urgencyLevel, eligible,
+                caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
+                null, null, null, null, aiResponse.rawInput().toString());
+
+        AiAnalysis saved = aiAnalysisRepository.save(analysis);
+        consultation.setStatus(ConsultationStatus.COMPLETED);
+        return toResponse(saved);
+    }
+
+    // Consultation -> ai-api RawInput 변환. title/inputText는 그대로, 첨부파일은 storageKey(S3 key) 목록으로.
+    private RawInputRequest buildRawInput(Consultation consultation) {
+        List<String> fileLinks = consultation.getAttachments().stream()
+                .map(Attachment::getStorageKey)
+                .filter(key -> key != null && !key.isBlank())
+                .toList();
+        String consultDay = consultation.getCreatedAt() != null
+                ? consultation.getCreatedAt().toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+                : null;
+        return new RawInputRequest(new RawInputRequest.RawInputContent(
+                consultation.getTitle(),
+                consultation.getInputText(),
+                fileLinks,
+                consultDay
+        ));
+    }
+
+    // /consult/analyze 응답에는 계약서 v0.1과 달리 단일 summary 문자열이 없어서,
+    // 핵심 판단 결과(사건유형/사유/긴급도/구조대상여부)를 엮어 사람이 읽을 문장으로 여기서 합성한다.
+    private String buildSummary(String caseType, String caseTypeReason, String urgencyLevel, String eligible) {
+        StringBuilder sb = new StringBuilder();
+        if (caseType != null) {
+            sb.append("사건 유형: ").append(caseType);
+            if (caseTypeReason != null) {
+                sb.append(" (").append(caseTypeReason).append(")");
+            }
+        }
+        if (urgencyLevel != null) {
+            sb.append(sb.isEmpty() ? "" : " / ").append("긴급도: ").append(urgencyLevel);
+        }
+        if (eligible != null) {
+            sb.append(sb.isEmpty() ? "" : " / ").append("법률구조 대상: ").append(eligible);
+        }
+        return sb.toString();
     }
 
     @Transactional
@@ -44,7 +116,8 @@ public class AiAnalysisService {
                 toJsonText(request.recommendationJson()),
                 toJsonText(request.timelineJson()),
                 toJsonText(request.clusterResultJson()),
-                request.estimatedTime()
+                request.estimatedTime(),
+                toJsonText(request.rawInputJson())
         );
         return toResponse(aiAnalysisRepository.save(analysis));
     }
@@ -110,6 +183,9 @@ public class AiAnalysisService {
         if (request.estimatedTime() != null) {
             analysis.setEstimatedTime(request.estimatedTime());
         }
+        if (request.rawInputJson() != null) {
+            analysis.setRawInputJson(toJsonText(request.rawInputJson()));
+        }
         return toResponse(analysis);
     }
 
@@ -142,6 +218,7 @@ public class AiAnalysisService {
                 parseJson(a.getTimelineJson()),
                 parseJson(a.getClusterResultJson()),
                 a.getEstimatedTime(),
+                parseJson(a.getRawInputJson()),
                 a.getCreatedAt()
         );
     }

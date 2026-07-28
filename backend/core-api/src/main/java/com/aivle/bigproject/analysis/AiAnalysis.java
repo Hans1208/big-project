@@ -8,7 +8,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -38,7 +37,8 @@ public class AiAnalysis {
     @JoinColumn(name = "consultation_id", nullable = false)
     private Consultation consultation;
 
-    @Lob
+    // @Lob을 안 붙이는 이유는 Consultation.inputText 주석 참고 (Postgres text + @Lob(String) 조합의
+    // OID 저장 버그 회피).
     @Column(columnDefinition = "TEXT")
     private String summary;
 
@@ -90,6 +90,11 @@ public class AiAnalysis {
     @Column(name = "estimated_time")
     private String estimatedTime;
 
+    // ai-api /consult/analyze 호출 시 실제로 보낸 raw_input을 그대로 보관 (추적용).
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "raw_input_json", columnDefinition = "jsonb")
+    private String rawInputJson;
+
     // 계약서엔 updated_at이 없고 created_at(분석일)만 있어서 그대로 맞춤
     @CreatedDate
     @Column(nullable = false, updatable = false)
@@ -98,7 +103,7 @@ public class AiAnalysis {
     public AiAnalysis(Consultation consultation, String summary, String caseType, String caseSubtype,
                        String urgencyLevel, String eligibility, String extractedJson, String missingInfoJson,
                        String checklistJson, String recommendationJson, String timelineJson,
-                       String clusterResultJson, String estimatedTime) {
+                       String clusterResultJson, String estimatedTime, String rawInputJson) {
         this.consultation = consultation;
         this.summary = summary;
         this.caseType = caseType;
@@ -112,5 +117,6 @@ public class AiAnalysis {
         this.timelineJson = timelineJson;
         this.clusterResultJson = clusterResultJson;
         this.estimatedTime = estimatedTime;
+        this.rawInputJson = rawInputJson;
     }
 }

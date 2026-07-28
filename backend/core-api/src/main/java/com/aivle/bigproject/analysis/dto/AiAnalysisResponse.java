@@ -28,6 +28,7 @@ public record AiAnalysisResponse(
         JsonNode timelineJson,
         JsonNode clusterResultJson,
         String estimatedTime,
+        JsonNode rawInputJson,
         LocalDateTime createdAt
 ) {
 }

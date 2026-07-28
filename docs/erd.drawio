@@ -1,0 +1,180 @@
+<mxfile host="app.diagrams.net" agent="claude-code" version="24.0.0" type="device">
+  <diagram id="agents-consult-erd" name="agents-consult ERD">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ===================== users ===================== -->
+        <mxCell id="tbl_users" value="users" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="240" height="208" as="geometry" />
+        </mxCell>
+        <mxCell id="users_id" value="PK  id : BIGINT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;fontStyle=4;" vertex="1" parent="tbl_users">
+          <mxGeometry y="26" width="240" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="users_name" value="name : VARCHAR(255) NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_users">
+          <mxGeometry y="52" width="240" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="users_role" value="role : VARCHAR(255) NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_users">
+          <mxGeometry y="78" width="240" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="users_email" value="email : VARCHAR(255) NOT NULL UNIQUE" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_users">
+          <mxGeometry y="104" width="240" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="users_password_hash" value="password_hash : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_users">
+          <mxGeometry y="130" width="240" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="users_created_at" value="created_at : TIMESTAMP NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_users">
+          <mxGeometry y="156" width="240" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="users_updated_at" value="updated_at : TIMESTAMP NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_users">
+          <mxGeometry y="182" width="240" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== consultation ===================== -->
+        <mxCell id="tbl_consultation" value="consultation" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="400" y="40" width="260" height="338" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_id" value="PK  id : BIGINT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;fontStyle=4;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="26" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_user_id" value="FK  user_id : BIGINT NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;fontStyle=4;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="52" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_title" value="title : VARCHAR(255) NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="78" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_input_text" value="input_text : TEXT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="104" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_opponent_name" value="opponent_name : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="130" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_status" value="status : VARCHAR(255) NOT NULL DEFAULT 'RECEIVED'" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="156" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_category" value="category : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="182" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_type" value="type : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="208" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_legal_aid_type" value="legal_aid_type : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="234" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_eligibility_evidence_submitted" value="eligibility_evidence_submitted : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="260" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_created_at" value="created_at : TIMESTAMP NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="286" width="260" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="consultation_updated_at" value="updated_at : TIMESTAMP NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_consultation">
+          <mxGeometry y="312" width="260" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== attachment ===================== -->
+        <mxCell id="tbl_attachment" value="attachment" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="760" y="40" width="280" height="286" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_id" value="PK  id : BIGINT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;fontStyle=4;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="26" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_consultation_id" value="FK  consultation_id : BIGINT NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;fontStyle=4;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="52" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_file_name" value="file_name : VARCHAR(255) NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="78" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_file_type" value="file_type : VARCHAR(255) NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="104" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_file_url" value="file_url : VARCHAR(255) NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="130" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_storage_bucket" value="storage_bucket : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="156" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_storage_key" value="storage_key : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="182" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_content_type" value="content_type : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="208" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_extracted_text" value="extracted_text : TEXT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="234" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="attachment_uploaded_at" value="uploaded_at : TIMESTAMP NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_attachment">
+          <mxGeometry y="260" width="280" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== ai_analysis ===================== -->
+        <mxCell id="tbl_ai_analysis" value="ai_analysis" style="swimlane;fontStyle=1;align=center;verticalAlign=top;childLayout=stackLayout;horizontal=1;startSize=26;horizontalStack=0;resizeParent=1;resizeParentMax=0;collapsible=0;marginBottom=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="400" y="440" width="280" height="442" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_id" value="PK  id : BIGINT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;fontStyle=4;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="26" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_consultation_id" value="FK  consultation_id : BIGINT NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;fontStyle=4;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="52" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_summary" value="summary : TEXT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="78" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_case_type" value="case_type : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="104" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_case_subtype" value="case_subtype : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="130" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_urgency_level" value="urgency_level : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="156" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_eligibility" value="eligibility : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="182" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_extracted_json" value="extracted_json : JSONB" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="208" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_missing_info_json" value="missing_info_json : JSONB" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="234" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_checklist_json" value="checklist_json : JSONB" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="260" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_recommendation_json" value="recommendation_json : JSONB" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="286" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_timeline_json" value="timeline_json : JSONB" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="312" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_cluster_result_json" value="cluster_result_json : JSONB" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="338" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_estimated_time" value="estimated_time : VARCHAR(255)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="364" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_raw_input_json" value="raw_input_json : JSONB" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="390" width="280" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="ai_analysis_created_at" value="created_at : TIMESTAMP NOT NULL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=6;spacingRight=4;overflow=hidden;portConstraint=eastwest;whiteSpace=wrap;html=1;" vertex="1" parent="tbl_ai_analysis">
+          <mxGeometry y="416" width="280" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- ===================== relationships ===================== -->
+        <mxCell id="rel_users_consultation" value="" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERmany;startArrow=ERone;rounded=0;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.1;entryDx=0;entryDy=0;" edge="1" parent="1" source="tbl_users" target="tbl_consultation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel_consultation_attachment" value="" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERmany;startArrow=ERone;rounded=0;exitX=1;exitY=0.15;exitDx=0;exitDy=0;entryX=0;entryY=0.15;entryDx=0;entryDy=0;" edge="1" parent="1" source="tbl_consultation" target="tbl_attachment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel_consultation_ai_analysis" value="" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERmany;startArrow=ERone;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="tbl_consultation" target="tbl_ai_analysis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note_title" value="agents/consult ERD — users / consultation / attachment / ai_analysis&#10;PK: 굵게 표시, FK: 별도 표기. 상세 컬럼 설명은 docs/data-definition.md 참고." style="text;html=1;align=left;verticalAlign=top;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="-40" width="700" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

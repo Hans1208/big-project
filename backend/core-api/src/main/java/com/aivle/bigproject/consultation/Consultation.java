@@ -12,7 +12,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import java.time.LocalDateTime;
@@ -47,7 +46,10 @@ public class Consultation {
     private String title;
 
     // 상담 본문(텍스트로 직접 입력했거나, STT로 변환된 내용). 녹음파일만 있는 경우 null 가능.
-    @Lob
+    // 주의: 여기에 @Lob을 붙이면 안 됨 — Postgres text 컬럼에 @Lob(String)을 쓰면 Hibernate/pgjdbc가
+    // 실제 텍스트 대신 Large Object OID 참조 숫자를 저장해버리는 알려진 문제가 있음(JPA 세션 안에서는
+    // 우연히 정상 조회되어 눈치채기 어렵지만, DB를 직접 SELECT하면 숫자만 보임). Postgres text는 길이
+    // 제한이 없어서 애초에 @Lob이 필요 없음.
     @Column(name = "input_text", columnDefinition = "TEXT")
     private String inputText;
 
@@ -58,6 +60,21 @@ public class Consultation {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ConsultationStatus status = ConsultationStatus.RECEIVED;
+
+    // 사건 대분류/소분류 (등록 화면 ChoicePicker 선택값). 분류 체계가 아직 팀 협의 중이라
+    // AiAnalysis.caseType과 마찬가지로 enum이 아닌 자유 문자열로 둠.
+    @Column(name = "category")
+    private String category;
+
+    @Column(name = "type")
+    private String type;
+
+    // 법률구조 대상자 유형 (예: basicLivelihood, nearPoverty, none 등 — frontend legalAidApplicantTypes 참고)
+    @Column(name = "legal_aid_type")
+    private String legalAidType;
+
+    @Column(name = "eligibility_evidence_submitted")
+    private Boolean eligibilityEvidenceSubmitted = false;
 
     // 이 상담에 딸린 첨부파일 목록. 1:N 관계.
     // cascade=ALL: Consultation을 저장/삭제하면 Attachment도 같이 저장/삭제됨
@@ -75,10 +92,15 @@ public class Consultation {
     private LocalDateTime updatedAt;
 
     // 생성 시 필요한 필드만 받는 생성자
-    public Consultation(User user, String title, String inputText, String opponentName) {
+    public Consultation(User user, String title, String inputText, String opponentName,
+                         String category, String type, String legalAidType, Boolean eligibilityEvidenceSubmitted) {
         this.user = user;
         this.title = title;
         this.inputText = inputText;
         this.opponentName = opponentName;
+        this.category = category;
+        this.type = type;
+        this.legalAidType = legalAidType;
+        this.eligibilityEvidenceSubmitted = eligibilityEvidenceSubmitted != null && eligibilityEvidenceSubmitted;
     }
 }
