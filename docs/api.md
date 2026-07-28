@@ -116,7 +116,7 @@ Response 예시
 ```
 
 ### PUT /api/consultations/{id}
-부분 수정 — body에 넣은 필드만 갱신. `status`: `RECEIVED` | `ANALYZING` | `COMPLETED`. `userId`는 이 엔드포인트로 변경 불가.
+부분 수정 — body에 넣은 필드만 갱신. `status`: `RECEIVED` | `ANALYZING` | `COMPLETED` | `HOLD`(보류 — 내담자 연락두절, 추가자료 대기 등으로 상담 자체가 멈춘 상태. 검토워크플로우의 반려와는 별개 개념). `userId`는 이 엔드포인트로 변경 불가.
 
 ### DELETE /api/consultations/{id}
 상담 삭제. 딸린 `Attachment`/`AiAnalysis`/`GeneratedDocument`와 디스크 파일도 함께 삭제됨(cascade). Response `204`
