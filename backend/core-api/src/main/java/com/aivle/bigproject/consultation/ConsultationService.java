@@ -40,7 +40,7 @@ public class ConsultationService {
         // userId가 실제로 존재하는 User인지 먼저 확인 (없으면 UserService가 404를 던짐)
         User user = userService.findById(request.userId());
         Consultation saved = consultationRepository.save(
-                new Consultation(user, request.title(), request.inputText(), request.opponentName()));
+                new Consultation(user, request.title(), request.clientName(), request.inputText(), request.opponentName()));
         // 여기서 바로 DTO로 변환 — 트랜잭션이 열려있는 동안 처리해야
         // ConsultationResponse.from()이 attachments(LAZY)를 문제없이 읽을 수 있음
         return ConsultationResponse.from(saved);
@@ -72,6 +72,9 @@ public class ConsultationService {
         Consultation consultation = findById(id);
         if (request.title() != null) {
             consultation.setTitle(request.title());
+        }
+        if (request.clientName() != null) {
+            consultation.setClientName(request.clientName());
         }
         if (request.inputText() != null) {
             consultation.setInputText(request.inputText());

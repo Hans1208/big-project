@@ -8,6 +8,7 @@ import com.aivle.bigproject.consultation.ConsultationStatus;
 public record ConsultationRequest(
         Long userId,
         String title,
+        String clientName,
         String inputText,
         String opponentName,
         ConsultationStatus status
