@@ -17,9 +17,10 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from app.schemas.analysis import AIAnalysisSchema
-from app.services.prompts import SYSTEM_PROMPT
+from app.ai.analysis.prompts import SYSTEM_PROMPT
 
-_DATA_PATH = Path(__file__).parents[1] / "data" / "few_shot_examples.json"
+# parents[2] == app/ (이 파일이 app/ai/analysis/ 아래에 있음)
+_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "few_shot_examples.json"
 
 _client: genai.Client | None = None
 

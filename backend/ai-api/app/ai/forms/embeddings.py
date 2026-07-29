@@ -1,4 +1,4 @@
-# services/form_embeddings.py — 서식 임베딩 기반 의미 검색
+# ai/forms/embeddings.py — 서식 임베딩 기반 의미 검색
 #
 # 사전계산: scripts/build_form_embeddings.py 로 MVP 서식명+분류경로를
 # text-embedding-3-small로 임베딩해 data/form_embeddings.npy(+index json) 저장.

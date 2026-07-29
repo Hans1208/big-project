@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
-from app.services.forms.form_recommender import recommend
-from app.services.forms.form_drafter import draft, find_hwpx
-from app.services.forms.form_verifier import verify
+from app.ai.forms.recommender import recommend
+from app.ai.forms.drafter import draft, find_hwpx
+from app.ai.forms.verifier import verify
 
 router = APIRouter(prefix="/forms", tags=["forms"])
 

@@ -10,7 +10,7 @@ import re
 import tempfile
 from urllib.parse import urlparse
 
-from .config import S3_BUCKET_NAME, WHISPER_MODEL_SIZE, get_s3_client
+from app.ai.config import S3_BUCKET_NAME, WHISPER_MODEL_SIZE, get_s3_client
 
 s3 = get_s3_client()
 

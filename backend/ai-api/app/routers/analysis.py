@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
-from app.services.llm_client import analyze_consultation
+from app.ai.analysis.llm_client import analyze_consultation
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
