@@ -78,13 +78,14 @@ function classifyCoreError(message, status) {
 }
 
 async function requestCoreJson(path, options = {}) {
+  const { headers, ...restOptions } = options;
   let response;
   try {
     response = await fetch(`${CORE_API_BASE_URL}${path}`, {
-      headers: options.body instanceof FormData
-        ? options.headers
-        : { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      ...options,
+      ...restOptions,
+      headers: restOptions.body instanceof FormData
+        ? headers
+        : { 'Content-Type': 'application/json', ...(headers || {}) },
     });
   } catch {
     throw buildCoreApiError(
@@ -232,6 +233,17 @@ function normalizeTimelineItem(item = {}) {
   return {
     date: item.date || '',
     text: item.text || item.description || '',
+  };
+}
+
+// ai-api가 생성하는 timeline_json 원본 항목은 {날짜, 내용} 키를 쓴다
+// (backend/ai-api/app/schemas/analysis.py의 TimelineItem 참고). core-api는 이를 그대로
+// 통과시키므로, 화면이 기대하는 {date, text} 모양으로 여기서 변환해야 한다.
+function normalizeIncomingTimelineItem(item) {
+  if (typeof item === 'string') return { date: '', text: item };
+  return {
+    date: item?.date || item?.날짜 || '',
+    text: item?.text || item?.내용 || item?.description || '',
   };
 }
 
@@ -436,7 +448,7 @@ export function mapCoreAnalysisResponse(coreAnalysis = {}) {
     missingInfo: (coreAnalysis.missing_info_json || []).map(normalizeMissingInfoItem).filter(Boolean),
     checklist: mapCoreChecklist(coreAnalysis.checklist_json),
     recommendation: coreAnalysis.recommendation_json || {},
-    timeline: coreAnalysis.timeline_json || [],
+    timeline: (coreAnalysis.timeline_json || []).map(normalizeIncomingTimelineItem),
     clusterResult: coreAnalysis.cluster_result_json || [],
     extractedJson,
     status: coreAnalysis.status || '',
