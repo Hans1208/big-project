@@ -1,8 +1,8 @@
-# services/form_recommender.py — 서식 추천 모듈
+# ai/forms/recommender.py — 서식 추천 모듈
 #
 # 역할: AI 분석 결과(구조화 JSON) → 추천 서식 목록(recommended_forms_json)
 # 사용:
-#   from app.services.forms.form_recommender import recommend
+#   from app.ai.forms.recommender import recommend
 #   result = recommend(analysis)   # {"recommendations": [...], "candidates_count": N}
 #
 # FastAPI 연결 예:
@@ -14,7 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from app.services.forms.form_embeddings import search as embedding_search
+from app.ai.forms.embeddings import search as embedding_search
 
 load_dotenv()
 client = OpenAI()

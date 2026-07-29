@@ -1,4 +1,4 @@
-# services/form_drafter.py — 서식 초안 생성 모듈 (정형 치환 + 예시문단 재서술)
+# ai/forms/drafter.py — 서식 초안 생성 모듈 (정형 치환 + 예시문단 재서술)
 #
 # 두 종류의 채우기를 명확히 분리:
 #   A. 정형 치환: 자리표시자(○○○ 등) 주변 라벨로 값 치환. GPT가 before/after 생성.
@@ -7,7 +7,7 @@
 #      (텍스트 검색이 아니라 문단 객체 직접 수정 → 오염 불가, run쪼개짐 무관)
 #
 # 사용:
-#   from app.services.forms.form_drafter import draft
+#   from app.ai.forms.drafter import draft
 #   result = draft("이혼 및 위자료 조정신청서", extracted, summary)
 
 import json
@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from hwpx import HwpxDocument
 
-from app.services.forms.form_verifier import llm_judge
+from app.ai.forms.verifier import llm_judge
 
 load_dotenv()
 MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")

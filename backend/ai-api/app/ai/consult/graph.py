@@ -25,8 +25,8 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
-from . import config
-from .multimodal import (
+from app.ai import config
+from app.ai.stt.multimodal import (
     determine_file_category,
     download_to_temp_from_s3,
     extract_text_from_audio_video,
