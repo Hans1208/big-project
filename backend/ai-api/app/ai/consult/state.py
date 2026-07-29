@@ -21,10 +21,9 @@ class ConsultState(TypedDict, total=False):
     # --- parse_input (기존 case_analysis) ---
     summary: str
     details: str
-    submitted_file_link: List[str]
     consult_day: str
 
-    # --- process_multimodal_content (기존 case_analysis) ---
+    # --- stt 단계 결과 (app/ai/stt/extract.py가 뽑아 넘겨준 값) ---
     extracted_content: List[str]  # 파일별 추출 텍스트 배열. extracted_content_detail과 동일 인덱스
     extracted_content_detail: list
 

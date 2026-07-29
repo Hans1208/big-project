@@ -26,13 +26,6 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
 from app.ai import config
-from app.ai.stt.multimodal import (
-    determine_file_category,
-    download_to_temp_from_s3,
-    extract_text_from_audio_video,
-    extract_text_from_caption,
-    extract_text_from_document,
-)
 from .schemas import (
     CandidateList,
     DocumentMappedList,
@@ -457,88 +450,23 @@ def _primary_case_type(state: ConsultState) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def parse_input_node(state: ConsultState) -> dict:
-    """Input 노드: 원본 {"content": {...}} 구조를 State 필드로 펼침"""
-    content = state["raw_input"]["content"]
+    """Input 노드: 원본 {"content": {...}} 구조를 State 필드로 펼침.
 
-    file_links = content.get("summited_file_link", [])
-    if isinstance(file_links, str):
-        file_links = [file_links] if file_links else []
-    elif file_links is None:
-        file_links = []
+    첨부파일 텍스트(extracted_*)는 이 그래프가 만들지 않는다.
+    앞단 stt 층(app/ai/stt/extract.py)이 이미 뽑아서 넘겨준 값을 그대로 받는다.
+    이 그래프는 파일도 S3도 모르고 텍스트만 다룬다.
+    """
+    raw = state["raw_input"]
+    content = raw["content"]
+    extracted = raw.get("extracted") or {}
 
     return {
         "summary": content.get("summary", ""),
         "details": content.get("details", ""),
-        "submitted_file_link": file_links,
         "consult_day": content.get("consult_day", ""),
-    }
-
-
-def process_multimodal_content_node(state: ConsultState) -> dict:
-    """submitted_file_link(array)에 있는 파일들을 S3에서 받아 STT/문서추출 처리.
-    개별 파일 처리 실패가 전체 파이프라인을 막지 않는다.
-
-    extracted_content_text: rescue_check/missing_check 단계가 그대로 쓸 수 있도록,
-    "내용없음"/"파일 오류"를 걸러 이어붙인 문자열도 여기서 함께 만들어둔다
-    (기존에는 EligibilityCheckRequest.to_consult_fields()가 매번 재계산하던 로직).
-    """
-    links = state.get("submitted_file_link") or []
-    if not links:
-        return {"extracted_content": [], "extracted_content_detail": [], "extracted_content_text": ""}
-
-    extracted_texts = []
-    detail_logs = []
-
-    for link in links:
-        log = {"file_link": link, "status": "failed", "file_type": None, "error": None}
-        text_entry = "파일 오류"
-
-        try:
-            local_path, content_type = download_to_temp_from_s3(link)
-            ext = os.path.splitext(urlparse(link).path)[1].lower()
-            category = determine_file_category(link, content_type)
-            log["file_type"] = category
-
-            if category == "audio_video":
-                text = extract_text_from_audio_video(local_path)
-            elif category == "caption":
-                text = extract_text_from_caption(local_path)
-            elif category == "document":
-                text = extract_text_from_document(local_path, ext)
-            elif category == "unsupported_hwp":
-                log["status"] = "unsupported"
-                log["error"] = "HWP/HWPX는 kordoc 변환 파이프라인 연동이 필요하여 이번 백본에서는 미구현"
-                detail_logs.append(log)
-                extracted_texts.append("파일 오류")
-                continue
-            else:
-                log["status"] = "unsupported"
-                log["error"] = f"인식할 수 없는 파일 유형 (content-type: {content_type})"
-                detail_logs.append(log)
-                extracted_texts.append("파일 오류")
-                continue
-
-            if text:
-                text_entry = text
-                log["status"] = "success"
-            else:
-                text_entry = "내용없음"
-                log["status"] = "empty"
-                log["error"] = "텍스트 추출 결과가 비어있음"
-
-        except Exception as e:
-            log["error"] = str(e)
-            text_entry = "파일 오류"
-
-        detail_logs.append(log)
-        extracted_texts.append(text_entry)
-
-    usable_texts = [t for t in extracted_texts if t not in ("내용없음", "파일 오류")]
-
-    return {
-        "extracted_content": extracted_texts,
-        "extracted_content_detail": detail_logs,
-        "extracted_content_text": "\n\n".join(usable_texts),
+        "extracted_content": extracted.get("texts", []),
+        "extracted_content_detail": extracted.get("details", []),
+        "extracted_content_text": extracted.get("text", ""),
     }
 
 
@@ -709,7 +637,6 @@ async def document_mapping_node(state: ConsultState) -> dict:
 _graph_builder = StateGraph(ConsultState)
 
 _graph_builder.add_node("parse_input", parse_input_node)
-_graph_builder.add_node("process_multimodal_content", process_multimodal_content_node)
 _graph_builder.add_node("classify_case_type", classify_case_type_node)
 _graph_builder.add_node("classify_emergency", classify_emergency_node)
 _graph_builder.add_node("combine_case_analysis", combine_case_analysis_node)
@@ -721,8 +648,7 @@ _graph_builder.add_node("validation", validation_node)
 _graph_builder.add_node("document_mapping", document_mapping_node)
 
 _graph_builder.add_edge(START, "parse_input")
-_graph_builder.add_edge("parse_input", "process_multimodal_content")
-_graph_builder.add_edge("process_multimodal_content", "classify_case_type")
+_graph_builder.add_edge("parse_input", "classify_case_type")
 _graph_builder.add_edge("classify_case_type", "classify_emergency")
 _graph_builder.add_edge("classify_emergency", "combine_case_analysis")
 _graph_builder.add_edge("combine_case_analysis", "extract_all_signals")
