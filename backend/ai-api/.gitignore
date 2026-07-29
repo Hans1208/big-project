@@ -24,3 +24,4 @@ storage/chroma/
 
 # Logs
 *.lograg/data/parsed_templates.json
+storage/chroma*/
