@@ -151,7 +151,7 @@ class CapturingClient:
         return object()
 
 
-def test_collection_uses_frequent_hnsw_sync(tmp_path):
+def test_collection_avoids_broken_hnsw_compaction(tmp_path):
     client = CapturingClient()
 
     ChromaVectorStore(
@@ -164,4 +164,5 @@ def test_collection_uses_frequent_hnsw_sync(tmp_path):
 
     assert hnsw_config["space"] == "cosine"
     assert hnsw_config["batch_size"] == 100
-    assert hnsw_config["sync_threshold"] == 100
+    assert hnsw_config["sync_threshold"] == 100_000
+

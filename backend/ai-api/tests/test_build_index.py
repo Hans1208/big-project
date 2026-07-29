@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 from rag.build_index import build_form_index
 
@@ -182,7 +182,7 @@ class UniqueFakeVectorStore:
         return len(self.records)
 
 
-def test_build_form_index_reupserts_sync_batch(
+def test_build_form_index_stores_each_chunk_once(
     tmp_path,
 ):
     parsed_file = tmp_path / "forms.json"
@@ -192,14 +192,14 @@ def test_build_form_index_reupserts_sync_batch(
     for index in range(120):
         records.append(
             {
-                "form_name": f"테스트 서식 {index}",
-                "main": "가사소송",
-                "sub": "기타",
+                "form_name": f"??? ?? {index}",
+                "main": "????",
+                "sub": "??",
                 "tmpltNo": f"FORM-{index:03d}",
                 "source_file": (
                     f"forms/form-{index:03d}.hwpx"
                 ),
-                "markdown": f"테스트 본문 {index}",
+                "markdown": f"??? ?? {index}",
             }
         )
 
@@ -221,8 +221,6 @@ def test_build_form_index_reupserts_sync_batch(
         chunk_size=1000,
         chunk_overlap=100,
         batch_size=32,
-        flush_upsert_size=100,
-        flush_wait_seconds=0,
     )
 
     assert result == {
@@ -231,15 +229,11 @@ def test_build_form_index_reupserts_sync_batch(
         "stored": 120,
     }
 
-    # 일반 색인 4회 + 동기화 재업서트 1회
-    assert len(vector_store.batches) == 5
+    assert len(vector_store.batches) == 4
 
-    flush_batch = vector_store.batches[-1]
+    stored_items = sum(
+        len(batch["documents"])
+        for batch in vector_store.batches
+    )
 
-    assert len(
-        flush_batch["documents"]
-    ) == 100
-
-    assert flush_batch["documents"][0][
-        "chunk_id"
-    ] == "FORM-000::chunk-0000"
+    assert stored_items == 120
