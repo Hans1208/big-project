@@ -1,4 +1,4 @@
-# services/form_verifier.py — 범용 서식 초안 검증 모듈 (v2, 오탐 제거)
+# ai/forms/verifier.py — 범용 서식 초안 검증 모듈 (v2, 오탐 제거)
 #
 # v1 문제: "한글 2~4자 다 긁기"로 고유명사를 잡으려다 서식 본문의 평범한
 #   법률 단어(친권자·제한·동의 등)까지 환각 의심으로 잡아 오탐 폭발.
@@ -200,4 +200,4 @@ if __name__ == "__main__":
         rep = verify(sys.argv[1], sys.argv[2], {"청구인": {"이름": "박지연"}})
         print(json.dumps(rep, ensure_ascii=False, indent=2))
     else:
-        print("사용법: python form_verifier.py <원본.hwpx> <초안.hwpx>")
+        print("사용법: python verifier.py <원본.hwpx> <초안.hwpx>")
