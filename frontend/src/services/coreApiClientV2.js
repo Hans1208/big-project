@@ -33,9 +33,10 @@ function extractCoreErrorMessage(bodyText, fallback) {
   }
 }
 
-function buildCoreApiError(code, message) {
+function buildCoreApiError(code, message, status) {
   const error = new Error(message);
   error.code = code;
+  if (status != null) error.status = status;
   return error;
 }
 
@@ -100,7 +101,7 @@ async function requestCoreJson(path, options = {}) {
       `Core API 요청 실패 (HTTP ${response.status}): ${response.statusText}`,
     );
     const normalized = classifyCoreError(rawMessage, response.status);
-    throw buildCoreApiError(normalized.code, normalized.message);
+    throw buildCoreApiError(normalized.code, normalized.message, response.status);
   }
 
   return response.json();
@@ -298,6 +299,26 @@ export function fetchCoreConsultations() {
 
 export function fetchCoreUsers() {
   return requestCoreJson('/api/users');
+}
+
+function toLocalApprovalStatus(approvalStatus) {
+  if (approvalStatus === 'APPROVED') return '승인';
+  if (approvalStatus === 'REJECTED') return '거절';
+  return '대기';
+}
+
+// 관리자 화면(활성 사용자/승인 대기)이 이 브라우저에 없던 실제 가입자도 보여줄 수 있도록,
+// core-api User 응답을 프론트가 쓰는 로컬 사용자 모양으로 바꿉니다. organization/branch/phone은
+// core-api User 엔티티에 아예 없는 로컬 전용 필드라 여기서 채우지 않습니다.
+export function mapCoreUserToLocal(row = {}) {
+  return {
+    backendId: row.id,
+    name: row.name || '',
+    role: toFrontendRole(row.role),
+    email: row.email || '',
+    status: toLocalApprovalStatus(row.approvalStatus),
+    requestedAt: (row.createdAt || '').slice(0, 10) || '',
+  };
 }
 
 export function checkCoreApiStatus() {
