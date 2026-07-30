@@ -1,4 +1,4 @@
-# ai/forms/recommender.py — 서식 추천 모듈
+﻿# ai/forms/recommender.py — 서식 추천 모듈
 #
 # 역할: AI 분석 결과(구조화 JSON) → 추천 서식 목록(recommended_forms_json)
 # 사용:
@@ -14,10 +14,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from app.ai.forms.embeddings import search as embedding_search
+from app.ai.forms.rag_candidates import search_rag_candidates
 
 load_dotenv()
-client = OpenAI()
+_client = None
+
+
+def _get_openai_client():
+    global _client
+
+    if _client is None:
+        _client = OpenAI()
+
+    return _client
 
 EMBEDDING_TOP_N = 10
 
@@ -72,7 +81,7 @@ def get_candidates(case_type: str, case_subtype: str = None, query_text: str = N
               if case_subtype in m["name"] and m["main"] in MVP_CATEGORIES])
 
     if query_text:
-        _add(embedding_search(query_text, top_n=EMBEDDING_TOP_N))
+        _add(search_rag_candidates(query_text, top_n=EMBEDDING_TOP_N))
 
     return candidates
 
@@ -114,7 +123,7 @@ def _ask_gpt(analysis: dict, candidates: list) -> dict:
         f"추출정보: {json.dumps(analysis.get('extracted_json', {}), ensure_ascii=False)}\n\n"
         f"[서식 후보 목록]\n" + "\n".join(f"- {c['name']}" for c in candidates)
     )
-    resp = client.chat.completions.create(
+    resp = _get_openai_client().chat.completions.create(
         model="gpt-4.1-mini",
         messages=[
             {"role": "system", "content": RECOMMEND_PROMPT},
@@ -176,3 +185,5 @@ if __name__ == "__main__":
     }
     out = recommend(mock)
     print(json.dumps(out, ensure_ascii=False, indent=2))
+
+
