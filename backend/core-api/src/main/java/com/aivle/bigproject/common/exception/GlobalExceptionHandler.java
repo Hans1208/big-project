@@ -44,6 +44,12 @@ public class GlobalExceptionHandler {
                 .body(errorBody(HttpStatus.CONFLICT, e.getMessage(), request));
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequest(BadRequestException e, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(errorBody(HttpStatus.BAD_REQUEST, e.getMessage(), request));
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException e, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

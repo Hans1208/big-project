@@ -1217,6 +1217,86 @@ button:disabled:active {
   line-height: 1.5;
 }
 
+/* 입력칸 바로 아래 붙는 규칙 안내입니다. 오류(.formError)와 달리 틀리기 전부터 항상 보입니다. */
+.fieldHint {
+  margin: -6px 0 12px;
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+/* ── 개인정보 수집·이용 동의 ──
+   개인정보 보호법 제15조 제2항은 목적·항목·보유기간·거부권을 알리고 동의를 받도록 합니다.
+   네 가지가 한눈에 들어와야 해서 표로 두고, 체크박스는 표 아래에 둡니다. */
+.consentCard {
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-surface);
+  background: var(--surface-subtle, #f9f9fb);
+}
+
+/* 좁은 화면에서 표가 페이지 전체를 밀지 않도록 표만 따로 가로 스크롤합니다. */
+.consentTableWrap {
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.consentTable {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.consentTable th,
+.consentTable td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.consentTable th {
+  background: var(--surface-muted, #f3f3f7);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.consentNotice {
+  margin: 0 0 12px;
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+.consentNotice:last-child {
+  margin-bottom: 0;
+}
+
+.consentCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-chip);
+  background: var(--surface);
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.consentCheck input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
 /* 관리자 대시보드 통계 카드가 core-api 집계 대신 로컬 어림값으로 폴백했을 때 보여주는 경고 문구. */
 .adminStatsNotice {
   margin: 0 0 16px;
@@ -1302,6 +1382,13 @@ button:disabled:active {
 /* 아직 링크가 아니므로 밑줄·손가락 커서를 빼서 누를 수 있는 것처럼 보이지 않게 합니다. */
 .footerLinks span {
   cursor: default;
+}
+
+/* 실제 문서가 연결된 항목만 링크로 보입니다(현재 개인정보 처리방침). */
+.footerLinks a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .footer p {

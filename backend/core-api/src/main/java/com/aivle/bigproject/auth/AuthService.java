@@ -3,6 +3,7 @@ package com.aivle.bigproject.auth;
 import com.aivle.bigproject.auth.dto.AuthResponse;
 import com.aivle.bigproject.auth.dto.LoginRequest;
 import com.aivle.bigproject.auth.dto.RegisterRequest;
+import com.aivle.bigproject.common.exception.BadRequestException;
 import com.aivle.bigproject.common.exception.ConflictException;
 import com.aivle.bigproject.common.exception.ForbiddenException;
 import com.aivle.bigproject.common.exception.UnauthorizedException;
@@ -31,6 +32,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        validatePasswordRule(request.password(), request.email());
         userRepository.findByEmail(request.email()).ifPresent(existing -> {
             throw new ConflictException("이미 가입된 이메일입니다: " + request.email());
         });
@@ -61,6 +63,43 @@ public class AuthService {
             throw new ForbiddenException("가입이 거절된 계정입니다.");
         }
         return toAuthResponse(user);
+    }
+
+    // ── 비밀번호 작성규칙 ──
+    //
+    // "개인정보의 기술적·관리적 보호조치 기준" 제4조 ⑧항:
+    //   1. 영문·숫자·특수문자 중 2종류 이상 조합 시 최소 10자리 이상,
+    //      3종류 이상 조합 시 최소 8자리 이상
+    //   2. 아이디와 비슷한 비밀번호는 사용하지 않을 것
+    //
+    // 회원가입 화면(auth.jsx validatePassword)에서도 같은 규칙을 안내하지만, 화면 검사만으로는
+    // /api/auth/register를 직접 부르면 그냥 통과한다. 실제 차단은 여기가 담당한다.
+    //
+    // MasterAccountInitializer가 만드는 테스트 계정은 이 경로를 타지 않아 영향받지 않는다.
+    private static final int MIN_LENGTH_TWO_KINDS = 10;
+    private static final int MIN_LENGTH_THREE_KINDS = 8;
+
+    private void validatePasswordRule(String password, String email) {
+        if (password == null || password.isBlank()) {
+            throw new BadRequestException("비밀번호를 입력해주세요.");
+        }
+        int kindCount = 0;
+        if (password.matches(".*[A-Za-z].*")) kindCount++;
+        if (password.matches(".*[0-9].*")) kindCount++;
+        if (password.matches(".*[^A-Za-z0-9].*")) kindCount++;
+
+        boolean longEnough = (kindCount >= 3 && password.length() >= MIN_LENGTH_THREE_KINDS)
+                || (kindCount >= 2 && password.length() >= MIN_LENGTH_TWO_KINDS);
+        if (!longEnough) {
+            throw new BadRequestException(
+                    "비밀번호는 영문·숫자·특수문자 중 2종류 이상 10자리, 또는 3종류를 모두 섞어 8자리 이상이어야 합니다.");
+        }
+
+        // 이메일 앞부분(아이디)을 그대로 넣은 비밀번호는 추측이 쉬워 규칙 2항에서 막는다.
+        String localPart = email == null ? "" : email.split("@")[0].trim();
+        if (localPart.length() >= 3 && password.toLowerCase().contains(localPart.toLowerCase())) {
+            throw new BadRequestException("이메일 아이디가 그대로 들어간 비밀번호는 사용할 수 없습니다.");
+        }
     }
 
     // MasterAccountInitializer가 만드는 @test.test 마스터 계정은 평문 비밀번호로 저장되므로
