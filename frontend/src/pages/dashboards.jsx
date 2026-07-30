@@ -1030,12 +1030,22 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
         <div className="hitlSection">
           <h3>사실관계 타임라인</h3>
           <div className="resultCard lawyerTimeline">
-            {timelineItems.map((item, index) => (
-              <span key={`${item.date}-${item.text}-${index}`}>
-                <strong>{item.date || '-'}</strong>
-                {item.text || item}
-              </span>
-            ))}
+            {/* ai-api가 만드는 timeline_json 항목은 {날짜, 내용} 키를 씁니다
+                (backend/ai-api/app/schemas/analysis.py의 TimelineItem).
+                예전엔 마지막 폴백이 `item` 자체여서, 변환을 안 거친 항목이 하나라도 있으면
+                React가 객체를 자식으로 받고 이 화면 전체가 흰 화면이 됐습니다.
+                timeline_json은 원래 항상 null이라 티가 안 나다가, 파이프라인이 이 필드를
+                채우기 시작하면서 드러났습니다. 두 가지 키를 모두 받고, 객체는 절대 그리지 않습니다. */}
+            {timelineItems.map((item, index) => {
+              const date = item.date || item.날짜 || '-';
+              const text = item.text || item.내용 || item.description || '';
+              return (
+                <span key={`${date}-${index}`}>
+                  <strong>{date}</strong>
+                  {text}
+                </span>
+              );
+            })}
           </div>
         </div>
 

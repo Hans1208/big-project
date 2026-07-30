@@ -5,6 +5,7 @@ import { Header, Footer, DashboardHeader } from './components/layout.jsx';
 import { initialConsultations, initialReviews, today } from './constants.jsx';
 import { LoginPage, RegisterPage, PasswordFindPage } from './pages/auth.jsx';
 import { CounselorDashboard, LawyerDashboard, AdminDashboard } from './pages/dashboards.jsx';
+import { hydrateAnalysisForDisplay } from './pages/workflows.jsx';
 import { appendAuditLog, readStorage, readTextStorage, storageKeys, writeStorage, writeTextStorage } from './services/storage.js';
 import { LoadingProvider } from './components/loading.jsx';
 import { FeedbackProvider, useToast } from './components/feedback.jsx';
@@ -51,11 +52,21 @@ function pickLatestCoreAnalysis(rows = []) {
     .sort((left, right) => coreAnalysisTime(right) - coreAnalysisTime(left))[0] || null;
 }
 
-function buildHydratedAnalysis(row) {
+// 저장된 분석을 화면이 쓸 수 있는 모양으로 되살립니다.
+//
+// mapCoreAnalysisResponse는 계약(AI_ANALYSIS) 필드만 줍니다. 그런데 상담 분석 화면은
+// modalities(입력자료 구성)·extractionDetail(첨부 읽기 결과)·sttPreview·verification처럼
+// 계약에 없는 값도 그립니다. 그 넷은 로컬 목업(buildAnalysisResult)이 만들어 주던 것들입니다.
+//
+// 분석을 방금 돌린 직후에는 mergeContractAnalysisResponse가 둘을 합쳐 줘서 문제가 없는데,
+// 새로고침 후 복원할 때는 그 병합이 없어 modalities가 undefined인 채로 화면에 들어가고
+// `analysis.modalities.map(...)`에서 터져 흰 화면이 됐습니다.
+// 복원할 때도 같은 병합을 거치게 해서 두 경로의 결과 모양을 맞춥니다.
+function buildHydratedAnalysis(row, consultation) {
   if (!row) return null;
   return {
     coreAnalysisId: coreAnalysisIdOf(row),
-    analysis: mapCoreAnalysisResponse(row),
+    analysis: hydrateAnalysisForDisplay(row, consultation),
   };
 }
 
@@ -84,6 +95,41 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
   const [activeView, setActiveView] = useState(defaultView);
   const [focusedConsultationId, setFocusedConsultationId] = useState(null);
   const [focusedReviewCaseNo, setFocusedReviewCaseNo] = useState(null);
+
+  // ── 브라우저 뒤로가기 ──
+  //
+  // 이 앱은 라우터가 없어 화면 전환이 전부 state로만 일어납니다. 그래서 주소가 한 번도
+  // 바뀌지 않고, 서식 생성 화면에서 뒤로가기를 누르면 앱 안에서 뒤로 가는 게 아니라
+  // 이 페이지에 오기 전 방문지(새 탭이면 빈 페이지)로 나가버립니다.
+  //
+  // 주소를 화면마다 붙이는 것(#/서식생성 같은 것)은 activeView를 쓰는 모든 곳을 손봐야 해서
+  // 범위가 큽니다. 여기서는 화면을 옮길 때 히스토리 항목만 하나 쌓아, 뒤로가기가 앱 안에서
+  // 이전 화면으로 돌아가게 합니다. 첫 화면(대시보드)에서 한 번 더 누르면 그때는 밖으로 나갑니다
+  // — 나갈 수 없게 가두지는 않습니다.
+  useEffect(() => {
+    const onPopState = (event) => {
+      const view = event.state?.appView;
+      // 우리가 쌓은 항목이면 그 화면으로 돌아가고, 아니면(앱 진입 이전 기록) 그대로 나갑니다.
+      if (!view) return;
+      setFocusedConsultationId(null);
+      setFocusedReviewCaseNo(null);
+      setActiveView(view);
+    };
+    window.addEventListener('popstate', onPopState);
+    // 앱에 들어온 첫 상태를 기록해둬야, 두 번째 화면에서 뒤로가기했을 때 돌아올 자리가 있습니다.
+    if (!window.history.state?.appView) {
+      window.history.replaceState({ appView: defaultView }, '');
+    }
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [defaultView]);
+
+  // 화면이 바뀌면 히스토리에 한 칸 쌓습니다. 뒤로가기가 되돌아갈 자리를 만드는 것이 목적이라
+  // 주소(URL)는 건드리지 않습니다.
+  const pushViewHistory = (nextView) => {
+    if (window.history.state?.appView === nextView) return;
+    window.history.pushState({ appView: nextView }, '');
+  };
+
   const [consultations, setConsultations] = useState(() => readStorage(storageKeys.consultations, initialConsultations));
   const [reviews, setReviews] = useState(() => readStorage(storageKeys.reviews, initialReviews));
   const [notifications, setNotifications] = useState(() => readStorage(storageKeys.notifications, []));
@@ -180,7 +226,8 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     analysisResults.forEach((result, index) => {
       if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
       const latest = pickLatestCoreAnalysis(result.value);
-      const hydrated = buildHydratedAnalysis(latest);
+      // 상담을 함께 넘겨야 첨부·메모 기반 값(입력자료 구성, 첨부 읽기 결과)이 채워집니다.
+      const hydrated = buildHydratedAnalysis(latest, candidateCases[index]);
       if (hydrated) analysisByCoreId.set(candidateCases[index].coreId, hydrated);
     });
     if (!analysisByCoreId.size) return;
@@ -349,6 +396,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     setActiveView('대시보드');
   };
   const changeActiveView = (nextView) => {
+    pushViewHistory(nextView);
     setFocusedConsultationId(null);
     setFocusedReviewCaseNo(null);
     setActiveView(nextView);
@@ -554,7 +602,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
   return (
     <div className="dashboardScreen">
       <DashboardHeader role={role} activeView={activeView} onViewChange={changeActiveView} onLogout={onLogout} currentUser={currentUser} unreadCount={unreadCount} />
-      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} /> : null}
+      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} /> : null}
       {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} /> : null}
     </div>
