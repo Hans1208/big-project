@@ -104,6 +104,13 @@ public class AuthService {
 
     // MasterAccountInitializer가 만드는 @test.test 마스터 계정은 평문 비밀번호로 저장되므로
     // BCrypt matches() 대신 단순 문자열 비교로 분기한다 (이메일 도메인만으로 테스트 계정 식별).
+    //
+    // TODO(규제): 배포 전 이 분기를 제거할 것.
+    //   보호조치 기준 제6조는 비밀번호를 복호화되지 않도록 일방향 암호화해 저장하라고 한다.
+    //   지우는 걸 잊어도 운영에서 안 켜지도록, 남겨야 한다면 프로파일 플래그로 감쌀 것:
+    //     @Value("${app.auth.allow-plain-test-login:false}") private boolean allowPlainTestLogin;
+    //   마스터 계정 비밀번호 test1234도 아래 validatePasswordRule 기준에 미달한다
+    //   (가입 경로를 타지 않아 지금 로그인은 되지만, 테스트 계정 정리 시 함께 바꿔야 함).
     private boolean matchesPassword(String rawPassword, User user) {
         if (user.getEmail() != null && user.getEmail().endsWith("@test.test")) {
             return rawPassword.equals(user.getPasswordHash());

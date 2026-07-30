@@ -164,6 +164,10 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
   const [role, setRole] = useState('counselor');
   const [form, setForm] = useState({ name: '', organization: '', department: '', phone: '', branch: legalAidBranchOffices[0], email: '', password: '', confirmPassword: '' });
   // 개인정보 보호법 제15조 제2항 — 수집·이용에 대한 동의는 받아야 가입을 진행할 수 있습니다.
+  //
+  // TODO(규제): 동의한 사실 자체는 아직 저장하지 않습니다. 화면에서 받기만 합니다.
+  //   분쟁이 생기면 동의를 받았다는 증빙이 없으므로, User에 privacy_agreed_at 컬럼을 두고
+  //   가입 시각과 함께 남겨야 합니다. 스키마 변경이 필요해 이번 범위에서 뺐습니다.
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const emailInvalid = form.email.length > 0 && !form.email.includes('@');
   const passwordsMismatch = form.confirmPassword && form.password !== form.confirmPassword;

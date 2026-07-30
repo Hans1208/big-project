@@ -49,6 +49,11 @@ public class S3FileStorageService {
     // 실제 오브젝트는 아직 존재하지 않음 — key는 여기서 미리 채번만 함.
     public record PresignedUpload(String key, String uploadUrl, String publicUrl) {}
 
+    // TODO(규제): 파일명·contentType을 클라이언트가 준 그대로 서명하고 있음 — 검증 필요.
+    //   시큐어코딩 가이드 "위험한 형식 파일 업로드" 항목. 확장자 화이트리스트, 확장자와
+    //   contentType 일치 확인, 파일명의 경로문자(/ \)·개행 제거가 필요하다.
+    //   실제 바이트는 S3로 직행해 서버를 거치지 않으므로 Spring의 multipart 제한이 걸리지 않는다.
+    //   크기는 프론트 file.size 검사와 application.yaml 양쪽으로 막아야 한다.
     public PresignedUpload presignUpload(String originalFileName, String contentType, Duration expiration) {
         String key = "consult-attachments/" + UUID.randomUUID() + "__" + originalFileName;
         try (S3Presigner presigner = S3Presigner.builder().region(Region.of(region)).credentialsProvider(credentialsProvider).build()) {
