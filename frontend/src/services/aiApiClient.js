@@ -19,9 +19,9 @@ async function requestJson(path, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
   let response;
   try {
     response = await fetch(`${AI_API_BASE_URL}${path}`, {
+      ...options,
       headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
       signal: controller.signal,
-      ...options,
     });
   } catch (error) {
     if (error.name === 'AbortError') {

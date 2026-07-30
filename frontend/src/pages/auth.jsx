@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { BadgeCheck, Clock, FileText, ShieldCheck } from 'lucide-react';
-import { roleOptions } from '../constants.jsx';
+import { roleOptions, today } from '../constants.jsx';
 import { caseCategories, legalAidBranchOffices } from '../data/domain.js';
+
+function formatDotDate(isoDate) {
+  return isoDate.replaceAll('-', '.');
+}
 
 // 지부와 부서를 하나의 소속 문자열로 합칩니다. 회원가입·비밀번호 찾기·프로필이 모두 이 규칙을 따라야
 // 관리자가 가입 기록과 대조할 때 표기가 어긋나지 않습니다.
@@ -19,19 +23,12 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
     <div className="screen loginScreen">
       <div className="loginSplit">
         <section className="loginHeroPanel" aria-labelledby="main-copy-title">
-          <div className="loginHeroTop">
-            <span className="heroBadge"><img src="/brand-mark.png" alt="" aria-hidden="true" /> 공단 업무 지원</span>
-          </div>
           <div className="loginHeroCopy">
             <p className="heroEyebrow">법률구조 상담 지원 포털</p>
             <h1 id="main-copy-title">
-              상담 기록부터 서식 초안까지,
-              <span>인공지능이 함께 정리합니다</span>
+              상담 업무 지원 포털
             </h1>
-            <p>
-              상담원이 입력한 기록과 첨부자료를 바탕으로 사건 유형, 누락자료,<br />
-              검토 체크리스트와 서식 초안을 한 화면에서 확인할 수 있도록 돕습니다.
-            </p>
+            <p>상담 기록 · 누락자료 확인 · 서식 초안 생성</p>
           </div>
           <div className="heroFeatureGrid" aria-label="주요 지원 기능">
             <span><FileText size={16} /> 상담 내용 구조화</span>
@@ -43,14 +40,13 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
               {caseCategories.map((category) => <span className="heroScopeChip" key={category.key}>{category.key}</span>)}
             </div>
             <p className="heroScopeText">
-              가사법 4대 분류와 전국 {legalAidBranchOffices.length}개 지부({legalAidBranchOffices[0]}~{legalAidBranchOffices[legalAidBranchOffices.length - 1]})<br />
-              상담원·변호사를 대상으로 우선 운영되며, 이후 순차 확대될 예정입니다.
+              가사법 4대 분류 · 전국 {legalAidBranchOffices.length}개 지부 우선 운영
             </p>
           </div>
           <div className="heroPreviewCard" aria-hidden="true">
             <div className="heroPreviewHeader">
-              <span className="heroPreviewDots"><i /><i /><i /></span>
               <strong>오늘의 상담 현황</strong>
+              <span className="heroPreviewDate">{formatDotDate(today)}</span>
             </div>
             {consultations.length ? (
               <div className="heroPreviewStats">
@@ -70,16 +66,15 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
                   <span className="heroPreviewStatValue">{completedCount}건</span>
                 </div>
               </div>
-            ) : <p className="heroPreviewEmpty">등록된 상담 데이터가 아직 없습니다.</p>}
+            ) : <p className="heroPreviewEmpty">상담 데이터 없음</p>}
           </div>
           <p className="loginHeroNote">대한법률구조공단 내부 상담 업무 보조 시스템</p>
         </section>
 
         <section className="loginFormPanel" aria-labelledby="login-title">
           <div className="loginIntro">
-            <span>로그인</span>
             <h2 id="login-title">업무 시스템에 로그인하세요</h2>
-            <p>계정이 있으면 이메일과 비밀번호로 로그인하세요. 계정이 없다면 회원가입 후 관리자 승인을 기다려주세요.</p>
+            <p>이메일 로그인 · 신규 계정 승인 후 사용</p>
           </div>
           <section className="loginCard">
             <label className="field">
@@ -114,8 +109,8 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
           </section>
           {onQuickLogin ? (
             <section className="loginCard quickLoginCard">
-              <div className="sectionLabel">테스트용 빠른 로그인</div>
-              <p className="helperText">기능 테스트를 위해 권한을 선택하면 계정 없이 바로 접속합니다.</p>
+              <div className="sectionLabel">테스트용 빠른 로그인 <span className="quickLoginBadge">시연용</span></div>
+              <p className="helperText">권한을 고르면 계정 없이 바로 접속합니다.</p>
               <div className="roleGrid quickLoginGrid">
                 {roleOptions.map((item) => {
                   const Icon = item.icon;
@@ -160,14 +155,26 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
     // 상담원/변호사의 소속은 '선택한 지부 + 입력한 부서'를 합쳐 하나의 문자열로 보관합니다.
     // (헤더 배지·관리자 계정 목록 등 기존 화면이 organization 한 필드를 그대로 쓰고 있어 호환을 유지합니다)
     const organization = requiresBranch ? buildOrganization(form.branch, form.department) : form.organization;
-    onComplete({ ...form, role, organization });
+    // 관리자는 지부 선택 UI 자체가 없는데도 form.branch가 초기값(legalAidBranchOffices[0])으로
+    // 남아 있어서, 이 값을 그대로 넘기면 헤더 배지(layout.jsx formatIdentityBadge)가
+    // currentUser.branch를 "관리자가 실제로 고른 지부"로 오인해 organization 대신
+    // 엉뚱한 지부명을 보여줬습니다. 관리자는 branch를 비워서 넘깁니다.
+    onComplete({ ...form, role, organization, branch: requiresBranch ? form.branch : '' });
   };
 
   return (
     <div className="screen">
       <div className="content registerContent">
         <form className="registerCard" aria-labelledby="register-title" onSubmit={submit}>
-          <h1 id="register-title">회원가입</h1>
+          <div className="registerIntro">
+            <span>계정 신청</span>
+            <h1 id="register-title">회원가입</h1>
+            <ul className="loginIntroList compact">
+              <li>역할 선택</li>
+              <li>기본 정보 입력</li>
+              <li>관리자 승인 후 사용</li>
+            </ul>
+          </div>
           <div className="sectionLabel">권한 선택</div>
           <div className="roleGrid">
             {roleOptions.map((item) => {
@@ -215,7 +222,7 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
               aria-describedby={emailInvalid ? 'register-email-error' : undefined}
             />
           </label>
-          {emailInvalid ? <p className="formError" id="register-email-error">이메일 형식이 아닙니다. @가 포함된 이메일을 입력해주세요.</p> : null}
+          {emailInvalid ? <p className="formError" id="register-email-error">이메일에 @를 포함해주세요.</p> : null}
           <div className="formGrid">
             <label className="field"><span>비밀번호</span><input value={form.password} onChange={(e) => update('password', e.target.value)} type="password" placeholder="비밀번호 입력" /></label>
             <label className="field"><span>비밀번호 확인</span><input value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} type="password" placeholder="비밀번호 확인" /></label>
@@ -226,8 +233,8 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
             {role === 'admin' ? <BadgeCheck size={18} /> : <Clock size={18} />}
             <p>
               {role === 'admin'
-                ? '관리자 권한은 가입 즉시 시스템에 접근할 수 있습니다.'
-                : '가입 신청 후 관리자 승인이 완료되어야 로그인할 수 있습니다. 승인 결과는 가입 시 입력한 이메일로 안내됩니다.'}
+                ? '관리자는 가입 후 바로 사용할 수 있습니다.'
+                : '관리자 승인 후 로그인할 수 있습니다. 결과는 이메일로 안내됩니다.'}
             </p>
           </div>
           {registerError ? <p className="formError">{registerError}</p> : null}
@@ -256,7 +263,7 @@ function PasswordFindPage({ users, onBack }) {
   const verify = (event) => {
     event.preventDefault();
     if (isVerifyDisabled) {
-      setMessage('모든 항목을 입력해야 회원 정보를 대조할 수 있습니다.');
+      setMessage('본인 확인 항목을 모두 입력해주세요.');
       return;
     }
     // 관리자가 가입 기록과 대조하는 기준입니다. 회원가입 때와 같은 방식(지부 + 부서)으로 소속을 만들어
@@ -269,7 +276,7 @@ function PasswordFindPage({ users, onBack }) {
       && normalizePhone(user.phone) === normalizePhone(form.phone)
     ));
     if (!matched) {
-      setMessage('입력한 정보와 일치하는 회원가입 기록이 없습니다. 이름·소속기관·부서·연락처·이메일이 가입 시 등록한 내용과 같은지 확인해주세요.');
+      setMessage('가입 기록 없음 · 입력 정보 확인');
       return;
     }
     setMessage('');
@@ -281,10 +288,27 @@ function PasswordFindPage({ users, onBack }) {
     <div className="screen">
       <div className="content registerContent">
         <section className="registerCard passwordCard" aria-labelledby="password-title">
-          <h1 id="password-title">비밀번호 찾기</h1>
+          <div className="registerIntro">
+            <span>비밀번호 재설정</span>
+            <h1 id="password-title">비밀번호 찾기</h1>
+            <ul className="loginIntroList compact">
+              <li>가입 정보 입력</li>
+              <li>계정 확인</li>
+              <li>임시 비밀번호 요청</li>
+            </ul>
+          </div>
+          {/* "비밀번호 찾기"라는 제목만 보고 이 화면에서 바로 새 비밀번호를 정할 수 있다고
+              오해하기 쉬워, 실제로는 본인 확인 후 관리자가 임시 비밀번호를 전달하는 절차임을
+              맨 위에서 먼저 알려 기대치를 맞춥니다. */}
+          <div className="notice">
+            <p>이 화면에서 바로 비밀번호를 재설정할 수는 없습니다. 본인 확인 후 관리자가 임시 비밀번호를 전달합니다.</p>
+          </div>
           {step === 'verify' ? (
             <form onSubmit={verify}>
-              <p className="helperText">관리자가 기존 회원가입 정보와 대조할 수 있도록, 가입할 때 등록한 내용을 그대로 입력하세요.</p>
+              <div className="sectionLabel">본인 확인</div>
+              <div className="notice">
+                <p>가입 당시 정보와 같게 입력해주세요.</p>
+              </div>
               <label className="field"><span>이름</span><input value={form.name} onChange={(e) => update('name', e.target.value)} placeholder="이름 입력" /></label>
               {/* 회원가입과 똑같이 지부는 목록에서 고르고 부서는 직접 입력받습니다. 자유 입력이면 표기가 달라져 대조가 실패합니다. */}
               <label className="field">
@@ -301,7 +325,7 @@ function PasswordFindPage({ users, onBack }) {
             </form>
           ) : (
             <form onSubmit={(event) => event.preventDefault()}>
-              <p className="helperText success">회원가입 정보가 확인되었습니다. 임시 비밀번호를 받을 수 있는 연락처를 작성해주세요.</p>
+              <p className="helperText success">계정을 확인했습니다. 받을 연락처를 입력해주세요.</p>
               {/* 어떤 계정으로 확인됐는지 보여줘, 동명이인이 있을 때 엉뚱한 계정으로 진행하는 것을 막습니다. */}
               <div className="verifiedAccountBox">
                 <span>확인된 계정</span>
@@ -309,7 +333,7 @@ function PasswordFindPage({ users, onBack }) {
                 <em>{verifiedUser?.email}</em>
               </div>
               <label className="field"><span>연락처</span><input value={form.contact} onChange={(e) => update('contact', e.target.value)} placeholder="휴대폰 번호 또는 이메일" /></label>
-              <button className="primaryButton" type="button" disabled={!form.contact} onClick={() => setMessage('관리자 확인 후 입력한 연락처로 임시 비밀번호가 전달됩니다.')}>임시 비밀번호 요청</button>
+              <button className="primaryButton" type="button" disabled={!form.contact} onClick={() => setMessage('관리자 확인 후 임시 비밀번호를 전달합니다.')}>임시 비밀번호 요청</button>
               {message ? <p className="helperText success">{message}</p> : null}
             </form>
           )}

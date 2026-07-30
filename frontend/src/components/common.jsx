@@ -1,9 +1,85 @@
-import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Inbox, Search, Trash2 } from 'lucide-react';
 import { useConfirm } from './feedback.jsx';
 import { statusAll, today } from '../constants.jsx';
 import { getDaysInMonth, getRecentYears, months, toIsoDate, weekDays } from '../utils/date.js';
 import { statusChipClass } from '../utils/statusTone.js';
+
+// 목록 표는 첫 7개 열(이름 포함)까지만 화면에 바로 보이고, 그 다음 열부터는 가로로
+// 드래그하거나 스크롤해야 보이도록 합니다(표에 열이 늘어나도 항상 같은 규칙 하나로 처리).
+// 트랙패드/스크롤바로도 당연히 넘길 수 있어야 하므로 overflow-x:auto는 그대로 두고,
+// 여기서는 '마우스로 표를 붙잡고 좌우로 끄는' 동작만 추가로 얹습니다.
+function useHorizontalDragScroll() {
+  const containerRef = useRef(null);
+  const dragRef = useRef({ dragging: false, startX: 0, startScrollLeft: 0 });
+
+  const beginDrag = (event) => {
+    const container = containerRef.current;
+    if (!container) return;
+    dragRef.current = { dragging: true, startX: event.pageX, startScrollLeft: container.scrollLeft };
+    container.classList.add('dragging');
+  };
+  const continueDrag = (event) => {
+    const container = containerRef.current;
+    if (!dragRef.current.dragging || !container) return;
+    event.preventDefault();
+    container.scrollLeft = dragRef.current.startScrollLeft - (event.pageX - dragRef.current.startX);
+  };
+  const endDrag = () => {
+    dragRef.current.dragging = false;
+    containerRef.current?.classList.remove('dragging');
+  };
+
+  return { containerRef, beginDrag, continueDrag, endDrag };
+}
+
+// 표 하나를 가로 스크롤 컨테이너로 감싸는 공용 래퍼입니다. ConsultationTable뿐 아니라
+// 관리자 화면의 일자별 상담 내역 표처럼 '7열까지만 바로 보이고 이후는 가로 스크롤'이
+// 필요한 다른 목록 표에서도 그대로 재사용합니다.
+function HorizontalScrollBox({ children, className = '' }) {
+  const { containerRef, beginDrag, continueDrag, endDrag } = useHorizontalDragScroll();
+  return (
+    <div
+      className={className ? `tableScrollX ${className}` : 'tableScrollX'}
+      ref={containerRef}
+      onMouseDown={beginDrag}
+      onMouseMove={continueDrag}
+      onMouseUp={endDrag}
+      onMouseLeave={endDrag}
+    >
+      {children}
+    </div>
+  );
+}
+
+// 표 안 7개 칸(이름 포함)이 항상 스크롤 없이 보이도록 칸마다 최소 너비를 못 박아 둡니다.
+// 칸이 8개 이상으로 늘어나면 표 전체 너비가 컨테이너보다 커져 HorizontalScrollBox가
+// 자동으로 가로 스크롤을 만들어 냅니다(테이블 레이아웃을 auto로 두어 칸 수가 늘어난 만큼
+// 표 너비도 함께 늘어나게 합니다 — fixed였다면 칸이 늘어도 기존 칸들만 좁아질 뿐입니다).
+const FIRST_SEVEN_COLUMN_MIN_WIDTHS = [100, 120, 90, 100, 96, 110, 90];
+
+function ScrollableDataTable({ className = '', children }) {
+  return (
+    <table className={className ? `dataTable ${className}` : 'dataTable'} style={{ tableLayout: 'auto', width: 'max-content', minWidth: '100%' }}>
+      {children}
+    </table>
+  );
+}
+
+// 모든 업무 화면의 제목 영역은 '큰 제목 → 한 줄 설명' 두 단으로 통일합니다.
+// 화면마다 h2/p를 따로 쓰면 글자 크기·간격이 조금씩 달라지므로 이 컴포넌트 하나로 모읍니다.
+// meta는 제목 오른쪽에 붙는 보조 표시(예: '새 알림 2건')입니다.
+function WorkPageHeader({ title, description, meta }) {
+  return (
+    <header className="workPageHeader">
+      <div className="workPageHeaderText">
+        <h2>{title}</h2>
+        {description ? <p className="workPageDescription">{description}</p> : null}
+      </div>
+      {meta ? <div className="workPageHeaderMeta">{meta}</div> : null}
+    </header>
+  );
+}
 
 function StatusButton({ children, onClick, active }) {
   return <button className={active ? 'tableAction active' : 'tableAction'} type="button" onClick={onClick}>{children}</button>;
@@ -25,14 +101,45 @@ function SummaryCards({ cards, activeFilter, onFilter, allowToggle = true }) {
 // 표를 항상 같은 높이로 두기 위해 부족한 줄만큼 빈 줄을 채웁니다.
 // 다만 원본 데이터가 아예 0건일 때 빈 줄만 여러 개 늘어놓으면 "화면이 비어 보이는 건지,
 // 고장 난 건지" 알 수 없습니다. 그럴 때는 빈 줄 대신 안내 문구 한 줄만 보여줍니다.
-function EmptyRows({ count, columns, isEmpty = false, emptyLabel = '아직 표시할 항목이 없습니다.' }) {
+//
+// 빈 칸도 실제 데이터 칸과 똑같이 .cellBody(첫 줄 26px + 둘째 줄 18px)로 감싸야 합니다.
+// 그냥 <td>&nbsp;</td>만 두면 실제 데이터 행보다 짧아져서, 같은 6줄이어도 실제 데이터가
+// 몇 건 있느냐에 따라 표 전체 높이가 달라집니다(나란히 둔 다른 표와 아래쪽이 어긋납니다).
+function EmptyRows({ count, columns, isEmpty = false, emptyLabel = '표시할 항목 없음' }) {
   if (count <= 0) return null;
   if (isEmpty) {
-    return <tr><td className="tableEmptyNotice" colSpan={columns}>{emptyLabel}</td></tr>;
+    // 표마다 "없습니다" 텍스트 한 줄만 있으면 화면이 빈 건지 고장 난 건지 헷갈리므로,
+    // 모든 표가 같은 아이콘+문구 패턴을 쓰게 공용 컴포넌트(EmptyRows) 한 곳에서 통일합니다.
+    return (
+      <tr>
+        <td className="tableEmptyNotice" colSpan={columns}>
+          <Inbox size={18} strokeWidth={1.8} aria-hidden="true" />
+          <span>{emptyLabel}</span>
+        </td>
+      </tr>
+    );
   }
   return Array.from({ length: count }).map((_, rowIndex) => (
-    <tr key={`empty-${rowIndex}`}>{Array.from({ length: columns }).map((__, columnIndex) => <td key={columnIndex}>&nbsp;</td>)}</tr>
+    <tr key={`empty-${rowIndex}`}>
+      {Array.from({ length: columns }).map((__, columnIndex) => (
+        <td key={columnIndex}><div className="cellBody"><span>&nbsp;</span><span>&nbsp;</span></div></td>
+      ))}
+    </tr>
   ));
+}
+
+// 표 밖(패널·리스트 등)에서 쓰는 짧은 빈 상태 한 줄입니다. EmptyRows(표 안)와 같은
+// 아이콘+문구 패턴을 표 밖에서도 그대로 재사용해 "정보 없음"류 문구가 화면마다
+// 제각각으로 보이지 않게 합니다.
+function InlineEmptyNotice({ children, action }) {
+  if (!children) return null;
+  return (
+    <p className="templateEmpty">
+      <Inbox size={16} strokeWidth={1.8} aria-hidden="true" />
+      <span>{children}</span>
+      {action || null}
+    </p>
+  );
 }
 
 function CalendarPicker({ selectedDate, onChange }) {
@@ -185,7 +292,7 @@ function ConsultationTable({ title, rows, onAdd, onDelete, onOpenAnalysis, tall 
     const accepted = await confirm({
       title: '이 상담을 삭제할까요?',
       // 무엇이 지워지는지 사건번호까지 보여줘서 다른 건을 잘못 지우는 일을 막습니다.
-      message: `${row.caseNo} · ${row.name || '상담자'}님 「${row.title || '제목 없음'}」\n삭제하면 연결된 검토 요청도 함께 사라지며 되돌릴 수 없습니다.`,
+      message: `${row.caseNo} · ${row.name || '상담자'} · 「${row.title || '제목 없음'}」\n연결된 검토 요청도 함께 삭제됩니다.`,
       confirmLabel: '삭제',
       tone: 'danger',
     });
@@ -215,19 +322,23 @@ function ConsultationTable({ title, rows, onAdd, onDelete, onOpenAnalysis, tall 
         {onAdd ? <button type="button" onClick={onAdd}>+ 새 상담 등록</button> : null}
         {tall ? <CalendarPicker selectedDate={selectedDate} onChange={onDateChange} /> : null}
       </div>
-      <div className={scrollable ? 'tableScroll' : ''}>
-        <table className={`dataTable${tall ? ' tallTable' : ''}`}>
+      <HorizontalScrollBox>
+        <div className={scrollable ? 'tableScroll' : ''}>
+          <ScrollableDataTable className={tall ? 'tallTable' : ''}>
           <thead>
             <tr>
-              <th>이름</th><th>사건 번호</th><th>상태</th><th>구조대상</th>
-              <th>등록일시</th>
-              <th>처리 단계</th>
-              {onDelete ? <th>삭제</th> : null}
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[0] }}>이름</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[1] }}>사건 번호</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[2] }}>상태</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[3] }}>구조대상</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[4] }}>등록일시</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[5] }}>처리 단계</th>
+              {onDelete ? <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[6] }}>삭제</th> : null}
             </tr>
           </thead>
           <tbody>
             {noSearchResult ? (
-              <tr><td className="tableEmptyNotice" colSpan={columns}>‘{query.trim()}’에 대한 검색 결과가 없습니다.</td></tr>
+              <tr><td className="tableEmptyNotice" colSpan={columns}>검색 결과 없음</td></tr>
             ) : null}
             {/* 모든 칸을 .cellBody로 감쌉니다.
                 첫 줄은 칩(26px), 둘째 줄은 보조 설명(18px) 자리로 고정해서,
@@ -283,16 +394,17 @@ function ConsultationTable({ title, rows, onAdd, onDelete, onOpenAnalysis, tall 
                 {onDelete ? (
                   <td>
                     <div className="cellBody">
-                      <button className="tableAction danger" type="button" onClick={() => handleDelete(row)}>삭제</button>
+                      <button className="tableAction danger" type="button" onClick={() => handleDelete(row)}><Trash2 size={12} strokeWidth={2.4} />삭제</button>
                     </div>
                   </td>
                 ) : null}
               </tr>
             ))}
-            {scrollable || noSearchResult ? null : <EmptyRows count={Math.max(0, visibleRowCount - displayRows.length)} columns={columns} isEmpty={rows.length === 0} emptyLabel="등록된 상담이 없습니다." />}
+            {scrollable || noSearchResult ? null : <EmptyRows count={Math.max(0, visibleRowCount - displayRows.length)} columns={columns} isEmpty={rows.length === 0} emptyLabel="등록된 상담 없음" />}
           </tbody>
-        </table>
-      </div>
+          </ScrollableDataTable>
+        </div>
+      </HorizontalScrollBox>
     </section>
   );
 }
@@ -312,13 +424,13 @@ function HitlConfirmModal({ title = 'AI 분석 결과 최종 확인', actionLabe
         <div className="modalHeader"><h2>{title}</h2></div>
         {caseInfo ? <p className="hitlConfirmCase">{caseInfo}</p> : null}
         <div className="hitlConfirmNotice">
-          <strong>AI 분석 결과는 참고용 후보입니다.</strong>
-          <span>최종 사건유형·긴급도·구조대상 확정은 상담원/변호사가 직접 검토 후 결정합니다.</span>
+          <strong>AI 결과는 참고용입니다.</strong>
+          <span>최종 판단은 담당자가 확정합니다.</span>
         </div>
         <ul className="hitlConfirmList">
-          <li>AI가 제시한 분류와 근거를 그대로 확정하지 않습니다.</li>
-          <li>첨부자료, 증빙서류, 법령·판례 근거를 사람이 확인합니다.</li>
-          <li>이 작업은 감사 로그에 남고 이후 업무 단계에 반영됩니다.</li>
+          <li>분류·근거 확인</li>
+          <li>첨부자료·증빙 확인</li>
+          <li>감사 로그 반영</li>
         </ul>
         <div className="inlineControls statusConfirmActions">
           <button className="smallButton light" type="button" onClick={onCancel}>취소</button>
@@ -329,4 +441,4 @@ function HitlConfirmModal({ title = 'AI 분석 결과 최종 확인', actionLabe
   );
 }
 
-export { StatusButton, SummaryCards, EmptyRows, CalendarPicker, ConsultationTable, HitlConfirmModal, workflowStatusTone };
+export { StatusButton, SummaryCards, EmptyRows, InlineEmptyNotice, CalendarPicker, ConsultationTable, HitlConfirmModal, WorkPageHeader, workflowStatusTone, HorizontalScrollBox, ScrollableDataTable, FIRST_SEVEN_COLUMN_MIN_WIDTHS };

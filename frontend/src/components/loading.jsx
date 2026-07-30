@@ -57,17 +57,24 @@ const LoadingActionContext = createContext(null);
 function LoadingProvider({ children }) {
   // 여러 버튼이 동시에 비동기 작업을 실행할 수 있으므로 boolean이 아닌 진행 중 개수로 관리합니다.
   const [pendingCount, setPendingCount] = useState(0);
-  const [message, setMessage] = useState(DEFAULT_LOADING_MESSAGE);
+  // message는 단일 값이 아니라 "현재 진행 중인 작업들의 메시지 스택"입니다. 단일 값으로 두면
+  // 작업 A가 도는 중에 짧은 작업 B가 끼어들었다가 먼저 끝날 때, 오버레이가 계속 A를 보여줘야
+  // 하는데도 B의 메시지로 덮어쓴 채 남아 있었습니다. 스택의 맨 위(가장 최근 시작한 작업)를 보여주고,
+  // 작업이 끝나면 그 항목만 스택에서 제거해 이전 작업의 메시지로 자연스럽게 돌아가게 합니다.
+  const [messageStack, setMessageStack] = useState([]);
 
   const runWithLoading = async (task, taskMessage = DEFAULT_LOADING_MESSAGE) => {
-    setMessage(taskMessage);
+    const entry = { id: `${Date.now()}-${Math.random()}`, message: taskMessage };
+    setMessageStack((stack) => [...stack, entry]);
     setPendingCount((count) => count + 1);
     try {
       return await task();
     } finally {
+      setMessageStack((stack) => stack.filter((item) => item.id !== entry.id));
       setPendingCount((count) => count - 1);
     }
   };
+  const message = messageStack.length ? messageStack[messageStack.length - 1].message : DEFAULT_LOADING_MESSAGE;
 
   return (
     <LoadingActionContext.Provider value={runWithLoading}>

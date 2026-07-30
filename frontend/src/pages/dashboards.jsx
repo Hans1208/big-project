@@ -1,18 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardCheck, Search, Trash2 } from 'lucide-react';
 import { statusAll, today } from '../constants.jsx';
-import { EmptyRows, StatusButton, SummaryCards, ConsultationTable, HitlConfirmModal, workflowStatusTone } from '../components/common.jsx';
+import { EmptyRows, InlineEmptyNotice, StatusButton, SummaryCards, ConsultationTable, HitlConfirmModal, WorkPageHeader, workflowStatusTone, HorizontalScrollBox, ScrollableDataTable, FIRST_SEVEN_COLUMN_MIN_WIDTHS } from '../components/common.jsx';
 import { useConfirm, useToast } from '../components/feedback.jsx';
-import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel } from './workflows.jsx';
+import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList } from './workflows.jsx';
 import { appendAuditLog, getAuditLogs } from '../services/storage.js';
 import { checkTemplateRevision, simulateBackendLatency } from '../services/legalAidApi.js';
 import { checkAiApiHealth } from '../services/aiApiClient.js';
-import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, requestCoreAnalysisRevision, requestCoreDocumentRevision, verifyCoreAuditLogChain } from '../services/coreApiClientV2.js';
-import { readSubmittedLocalDocumentReviews, updateLocalDocumentReview, removeLocalDocumentReview, dismissDocumentReview, isDocumentReviewDismissed } from '../services/documentReviewStore.js';
+import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, requestCoreAnalysisRevision, verifyCoreAuditLogChain } from '../services/coreApiClientV2.js';
+import { readSubmittedLocalDocumentReviews, updateLocalDocumentReview, removeLocalDocumentReview, dismissDocumentReview, isDocumentReviewDismissed, saveLawyerDraftEdit, readLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { hydrateDraftDocument } from '../services/draftDocumentStore.js';
 import { caseCategories, getCaseCategory } from '../data/domain.js';
 import { useAsyncAction } from '../components/loading.jsx';
 import { statusChipClass } from '../utils/statusTone.js';
+
+// 표 하나에서 한 번에 보여줄 데이터 줄 수입니다. 이름을 포함한 머리글 1줄 + 이 개수만큼의
+// 본문 줄까지만 스크롤 없이 바로 보이고, 더 있으면 마우스로 내려야 볼 수 있게 표 전체에서
+// 이 기준 하나로 통일합니다(회원 목록·감사 로그처럼 표마다 3/4/5로 제각각이던 것을 맞춥니다).
+const VISIBLE_ROW_COUNT = 6;
+
+const adminCardUnitsByFilter = {
+  consultations: '건',
+  activeUsers: '명',
+  pendingUsers: '건',
+};
+
+function withAdminCardUnit(card) {
+  const unit = adminCardUnitsByFilter[card.filter];
+  if (!unit || String(card.value).endsWith(unit)) return card;
+  return { ...card, value: `${card.value}${unit}` };
+}
 
 function CounselorDashboard({ consultations, setConsultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onDeleteConsultation, onOpenConsultationForm, onOpenAnalysis, onOpenDraft, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedConsultationId }) {
   const [filter, setFilter] = useState(statusAll);
@@ -28,21 +45,37 @@ function CounselorDashboard({ consultations, setConsultations, onCreateConsultat
   const reworkRows = consultations.filter((item) => item.reviewAction && !item.reviewAction.resolved);
 
   if (activeView !== '대시보드') {
-    return <UtilityPanel view={activeView} role="counselor" consultations={consultations} onCreateConsultation={onCreateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} onUpdateConsultation={(id, updates) => setConsultations((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item))} currentUser={currentUser} onUpdateProfile={onUpdateProfile} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} focusedConsultationId={focusedConsultationId} onOpenConsultationForm={onOpenConsultationForm} onOpenAnalysis={onOpenAnalysis} />;
+    // onOpenConsultationForm은 UtilityPanel이 '실시간 상담' 화면에서 '상담 자료 업로드'로
+    // 넘어가는 다음 단계 링크(onGoToUpload)에도 그대로 재사용합니다. onOpenDraft는 분석이 끝난
+    // 직후 추천 서식 패널에서 '이 서식으로 초안 만들기'를 눌렀을 때 서식 생성 화면으로 사건을
+    // 그대로 이어서 넘기는 데 씁니다.
+    return <UtilityPanel view={activeView} role="counselor" consultations={consultations} onCreateConsultation={onCreateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} onUpdateConsultation={(id, updates) => setConsultations((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item))} currentUser={currentUser} onUpdateProfile={onUpdateProfile} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} focusedConsultationId={focusedConsultationId} onOpenConsultationForm={onOpenConsultationForm} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} />;
   }
   return (
-    <main className="dashboard dashboard-counselor">
-      <section className="dashboardLeft">
-        <SummaryCards cards={cards} activeFilter={filter} onFilter={setFilter} />
-        <ConsultationTable title={filter === statusAll ? '최근 상담 목록' : `${filter} 상담 목록`} rows={filtered} onAdd={onOpenConsultationForm} onDelete={onDeleteConsultation} onOpenAnalysis={onOpenAnalysis} searchable />
-      </section>
-      <section className="dashboardRight">
-        <div className="counselorTopSlot">
-          <CounselorReworkPanel rows={reworkRows} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} />
+    <>
+      <div className="dashboardIntroWrap">
+        <div className="dashboardIntroRow">
+          <div className="dashboardIntro">
+            <h1>상담 현황</h1>
+            <p>전체 {consultations.length}건 · 보완 요청 {reworkRows.length}건</p>
+          </div>
+          {/* 이 버튼이 오른쪽 그리드(보완 요청 상담) 안에 있으면 그 줄만큼 상자 위쪽이 눌려,
+              왼쪽 '진행 중인 상담' 카드 윗변과 높이가 어긋나 보입니다. 인트로 영역으로 빼서
+              보완 요청 상담 박스가 카드 블록과 정확히 같은 윗변에서 시작하게 합니다. */}
+          <button className="addConsultationButton" type="button" onClick={onOpenConsultationForm}>+ 새 상담 접수</button>
         </div>
-        <ConsultationTable title="일정별 상담 목록" rows={dateRows} onDelete={onDeleteConsultation} onOpenAnalysis={onOpenAnalysis} tall selectedDate={selectedDate} onDateChange={setSelectedDate} />
-      </section>
-    </main>
+      </div>
+      <main className="dashboard dashboard-counselor">
+        <section className="dashboardLeft">
+          <SummaryCards cards={cards} activeFilter={filter} onFilter={setFilter} />
+          <ConsultationTable title={filter === statusAll ? '최근 상담 목록' : `${filter} 상담 목록`} rows={filtered} onDelete={onDeleteConsultation} onOpenAnalysis={onOpenAnalysis} searchable />
+        </section>
+        <section className="dashboardRight">
+          <CounselorReworkPanel rows={reworkRows} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} />
+          <ConsultationTable title="일정별 상담 목록" rows={dateRows} onOpenAnalysis={onOpenAnalysis} tall selectedDate={selectedDate} onDateChange={setSelectedDate} />
+        </section>
+      </main>
+    </>
   );
 }
 
@@ -57,7 +90,7 @@ function CounselorReworkPanel({ rows, onOpenAnalysis, onOpenDraft }) {
 
   return (
     <section className="panel reworkPanel">
-      <div className="panelTitleRow"><h2>보완 요청 상담</h2></div>
+      <div className="panelTitleRow"><h2>보완 요청 상담</h2><span className="panelCountBadge">{rows.length}건</span></div>
       {rows.length ? (
         <div className="reworkList">
           {rows.map((row) => (
@@ -77,7 +110,7 @@ function CounselorReworkPanel({ rows, onOpenAnalysis, onOpenDraft }) {
           ))}
         </div>
       ) : (
-        <p className="reworkEmptyNotice">변호사 검토 후 다시 처리할 상담이 없습니다.</p>
+        <InlineEmptyNotice>다시 처리할 상담 없음</InlineEmptyNotice>
       )}
     </section>
   );
@@ -133,7 +166,7 @@ function buildLawyerDocumentCases(reviews = [], consultations = []) {
   return [...mergedReviewCases, ...remainingConsultations];
 }
 
-function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDecision, onDocumentReviewDecision, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedReviewCaseNo }) {
+function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDecision, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedReviewCaseNo }) {
   const [filter, setFilter] = useState(statusAll);
   const [logs, setLogs] = useState([]);
   const [activeReview, setActiveReview] = useState(null);
@@ -153,11 +186,14 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
       setActiveReview(target);
     }
   }, [activeView, documentReviewCases, focusedReviewCaseNo]);
+  const countByStatus = (status) => reviews.filter((item) => item.status === status).length;
+  const waitingCount = countByStatus('검토 대기');
+  // 시안 순서 그대로: 전체 요청 → 구조 검토 대기 → 구조 검토 중 → 구조 승인 완료.
   const cards = [
-    { title: '구조 검토 대기', value: `${reviews.filter((item) => item.status === '검토 대기').length}건`, filter: '검토 대기' },
-    { title: '구조 검토 중', value: `${reviews.filter((item) => item.status === '검토 중').length}건`, filter: '검토 중' },
-    { title: '구조 승인 완료', value: `${reviews.filter((item) => item.status === '승인').length}건`, filter: '승인' },
-    { title: '구조 반려 처리', value: `${reviews.filter((item) => item.status === '반려').length}건`, filter: '반려' },
+    { title: '전체 요청', value: `${reviews.length}건`, filter: statusAll },
+    { title: '구조 검토 대기', value: `${waitingCount}건`, filter: '검토 대기' },
+    { title: '구조 검토 중', value: `${countByStatus('검토 중')}건`, filter: '검토 중' },
+    { title: '구조 승인 완료', value: `${countByStatus('승인')}건`, filter: '승인' },
   ];
   // HITL 최종 결정: 결정(status)과 사유(reason)를 함께 기록하고 감사 로그로 남깁니다.
   // 예전엔 이 결정이 로컬 상태(reviews)에만 반영되고 core-api의 실제 검토 상태
@@ -168,7 +204,8 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
   // 그 네 가지를 구분하는 별도 상태가 없고(api.md 기준 APPROVED/REVISION_REQUESTED 둘 뿐),
   // 구체적인 사유는 note로 함께 전달됩니다. 아직 core-api에 동기화 안 된 사건(로컬 프로토타입
   // 진행 중)에서는 이 호출만 조용히 건너뛰고 로컬 처리만 그대로 진행합니다.
-  const decideReview = async (id, status, reason, recipientEmail) => {
+  const decideReview = async (id, status, reason, recipientEmail, editorial = {}) => {
+    const { lawyerComment = '', editedSummary = '' } = editorial;
     const target = reviews.find((item) => item.id === id);
     const reviewerInfo = {
       name: currentUser?.name || '변호사',
@@ -194,6 +231,8 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
       reason,
       reviewer: reviewerInfo,
       recipientEmail: recipient,
+      lawyerComment,
+      editedSummary,
     });
     if (target) setLogs((items) => [{ ...target, status, reason: reason || '', loggedAt: today }, ...items]);
     appendAuditLog({
@@ -224,10 +263,36 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
     // 분석 검토 요청(reviews)을 거친 사건뿐 아니라, 서식만 먼저 제출된 사건까지 합쳐둔
     // documentReviewCases를 그대로 넘깁니다. 여기서 빠뜨리면 변호사 쪽 법률·판례 화면에서
     // 그 사건 자체를 CasePicker에서 고를 수 없게 됩니다.
-    return <UtilityPanel view={activeView} role="lawyer" currentUser={currentUser} onUpdateProfile={onUpdateProfile} consultations={documentReviewCases} onUpdateConsultation={() => {}} onCreateConsultation={() => {}} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} onDocumentReviewDecision={onDocumentReviewDecision} />;
+    return <UtilityPanel view={activeView} role="lawyer" currentUser={currentUser} onUpdateProfile={onUpdateProfile} consultations={documentReviewCases} onUpdateConsultation={() => {}} onCreateConsultation={() => {}} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} />;
+  }
+  // 법률구조 최종 검토는 다른 업무 화면(실시간 상담 분석·서식 생성 등)과 같은 '화면 전환' 방식입니다.
+  // 예전엔 대시보드 위에 반투명 배경 모달로 덮어 띄웠지만, 상단 네비게이션 바가 그대로 보이는
+  // 일반 업무 페이지로 통일합니다(위 UtilityPanel 조기 리턴과 같은 규칙).
+  if (activeReview) {
+    return (
+      <HitlReviewPage
+        review={activeReview}
+        reviewer={currentUser?.name || '변호사'}
+        onDecide={decideReview}
+        onClose={() => setActiveReview(null)}
+      />
+    );
   }
   return (
-    <main className="dashboard dashboard-lawyer">
+    <>
+      {/* 상담원 대시보드의 제목 영역과 완전히 같은 래퍼 구조(dashboardIntroWrap > dashboardIntroRow >
+          dashboardIntro)를 씁니다. 이 화면엔 상담원 쪽의 '+ 새 상담 접수' 같은 버튼이 없지만, 껍데기
+          구조를 맞춰야 여백·정렬 계산이 완전히 같아져 두 화면의 제목 영역이 위치·크기·모양까지
+          그대로 일치합니다. */}
+      <div className="dashboardIntroWrap lawyerIntroWrap">
+        <div className="dashboardIntroRow">
+          <div className="dashboardIntro">
+            <h1>검토</h1>
+            <p>전체 요청 {reviews.length}건 · 검토 대기 {waitingCount}건</p>
+          </div>
+        </div>
+      </div>
+      <main className="dashboard dashboard-lawyer">
       <section className="dashboardLeft">
         <SummaryCards cards={cards} activeFilter={filter} onFilter={setFilter} />
         <ReviewTable
@@ -239,19 +304,12 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
       </section>
       <section className="dashboardRight">
         <div className="lawyerTopSlot">
-          <DocumentReviewQueuePanel candidateCases={documentReviewCases} currentUser={currentUser} onNotify={onNotify} onDocumentReviewDecision={onDocumentReviewDecision} />
+          <DocumentReviewQueuePanel candidateCases={documentReviewCases} currentUser={currentUser} />
         </div>
         <ReviewLog logs={logs} onDelete={(row) => setLogs((items) => items.filter((item) => !(item.id === row.id && item.status === row.status && item.loggedAt === row.loggedAt)))} />
       </section>
-      {activeReview ? (
-        <HitlDecisionModal
-          review={activeReview}
-          reviewer={currentUser?.name || '변호사'}
-          onDecide={decideReview}
-          onClose={() => setActiveReview(null)}
-        />
-      ) : null}
-    </main>
+      </main>
+    </>
   );
 }
 
@@ -262,15 +320,19 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
 // 저장된 상담 중 아직 분석 검토는 안 갔지만 서식만 먼저 검토 요청됐을 수 있는 사건 모두 포함 —
 // LawyerDashboard에서 조립해 넘깁니다). 여기서는 그중 실제로 SUBMITTED_FOR_REVIEW 상태인
 // 서식만 core-api에서 확인해 추려 보여주고, 그 자리에서 바로 승인/반려할 수 있게 합니다.
-function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDocumentReviewDecision }) {
+function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
+  const showToast = useToast();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [previewingKey, setPreviewingKey] = useState(null);
   const [reviewingKey, setReviewingKey] = useState(null);
-  const [reviewAction, setReviewAction] = useState('approve');
   const [noteText, setNoteText] = useState('');
-  const [materialsText, setMaterialsText] = useState('');
   const [pending, setPending] = useState(false);
+  // 코치 피드백: "변호사가 코멘트 및 편집할 수 있게끔". 승인/반려 메모와 별개로, 초안 본문
+  // 자체를 변호사가 고쳐 쓸 수 있게 합니다. 로컬 전용 문서(ai-api-local 등)는 이 화면이
+  // 유일한 저장소라 그대로 덮어써 반영되고, core-api 문서는 실제 HWPX를 다시 만들어주는
+  // API가 없어 이 브라우저에 '변호사 수정본'으로만 남겨 상담원 화면에서 참고하게 합니다.
+  const [contentDraft, setContentDraft] = useState('');
 
   // candidateCases 배열 자체는 매 렌더마다 새 객체지만, 실제로 훑어야 할 사건(coreId) 목록이
   // 바뀌지 않으면 다시 불러올 필요가 없어서, coreId만 뽑아 문자열로 비교합니다.
@@ -324,19 +386,22 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDoc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseKey]);
 
-  const startReview = (doc, action) => {
+  const startReview = (doc) => {
     const key = reviewDocumentKey(doc);
     setReviewingKey(key);
     setPreviewingKey(key);
-    setReviewAction(action);
     setNoteText('');
-    setMaterialsText('');
+    // 변호사 수정본은 doc.document_id만으로 키를 잡습니다(DraftWorkbench의 사건별 검토 패널과
+    // 같은 문서를 같은 값으로 가리켜야, 어느 화면에서 검토하든 서로의 수정본을 이어받습니다).
+    setContentDraft(readLawyerDraftEdit(doc.document_id)?.content || doc.draft_content || '');
   };
   const togglePreview = (doc) => {
     const key = reviewDocumentKey(doc);
     setPreviewingKey((current) => current === key ? null : key);
   };
-  const cancelReview = () => setReviewingKey(null);
+  const cancelReview = () => {
+    setReviewingKey(null);
+  };
 
   // 로컬 큐 항목은 실제로 지우고, 코어 API 항목은 삭제 API가 없어 이 화면에서만 숨깁니다.
   const deleteDocument = (doc) => {
@@ -352,62 +417,41 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDoc
   };
 
   const confirmReview = async (doc) => {
-    if (reviewAction === 'revision' && !noteText.trim()) return;
+    const isLocalDocument = doc.source === 'ai-api-local' || doc.source === 'text-local' || doc.source === 'client-hwpx';
+    const contentEdited = contentDraft.trim() !== (doc.draft_content || '').trim();
     setPending(true);
     try {
-      const requestedMaterials = materialsText.split(',').map((item) => item.trim()).filter(Boolean);
-      const reviewerInfo = {
-        name: currentUser?.name || '변호사',
-        email: currentUser?.email || '',
-        organization: currentUser?.organization || '',
-      };
-      if (doc.source === 'ai-api-local' || doc.source === 'text-local' || doc.source === 'client-hwpx') {
+      if (isLocalDocument) {
         updateLocalDocumentReview(doc.local_key || doc.document_id, {
-          status: reviewAction === 'approve' ? 'APPROVED' : 'REVISION_REQUESTED',
+          status: 'APPROVED',
           review_note: noteText || '',
-          requested_materials: reviewAction === 'revision' ? requestedMaterials : [],
+          requested_materials: [],
+          // 로컬 전용 문서는 이 화면이 유일한 저장소라, 변호사가 고친 내용을 그대로 반영합니다.
+          ...(contentEdited ? { draft_content: contentDraft } : {}),
         });
       } else {
+        // core-api 문서는 서버 원본을 다시 만들어주는 API가 없어, 승인 요청이 실패(예: 권한 없음)
+        // 하더라도 변호사가 고친 내용을 이 브라우저에 먼저 남겨 작업이 사라지지 않게 합니다.
+        if (contentEdited) saveLawyerDraftEdit(doc.document_id, contentDraft);
         const token = currentUser?.token;
-        if (reviewAction === 'approve') {
-          await approveCoreDocument(doc.coreId, doc.document_id, noteText, token);
-        } else {
-          await requestCoreDocumentRevision(doc.coreId, doc.document_id, noteText, requestedMaterials, token);
-        }
-      }
-      onDocumentReviewDecision?.({
-        caseNo: doc.caseNo,
-        action: reviewAction === 'approve' ? 'approve' : 'revision',
-        reason: noteText || '',
-        reviewer: reviewerInfo,
-        recipientEmail: doc.counselor?.email || '',
-        formName: doc.requested_form_name || doc.form_name || '',
-        requestedMaterials: reviewAction === 'revision' ? requestedMaterials : [],
-      });
-      if (onNotify) {
-        onNotify({
-          roles: 'counselor',
-          title: reviewAction === 'approve' ? '서식 초안 승인' : '서식 보완 요청',
-          message: `${doc.caseNo} · ${doc.form_name}${noteText ? ` / ${noteText}` : ''}`,
-          target: doc.caseNo,
-          recipientEmail: doc.counselor?.email || '',
-          view: '서식 생성',
-        });
+        await approveCoreDocument(doc.coreId, doc.document_id, noteText, token);
       }
       appendAuditLog({
         actor: currentUser?.email || '변호사',
-        action: reviewAction === 'approve' ? '서식 초안 승인' : '서식 초안 반려',
+        action: '서식 초안 내부 검토 완료',
         target: doc.caseNo,
-        metadata: { formName: doc.form_name, note: noteText || '' },
+        metadata: { formName: doc.form_name, note: noteText || '', contentEdited },
       });
       setReviewingKey(null);
       reload();
+    } catch (error) {
+      showToast(`검토 처리에 실패했습니다: ${error.message || '서버 오류'}`, 'warn');
     } finally {
       setPending(false);
     }
   };
 
-  const columnCount = 7;
+  const columnCount = 6;
   // 이 패널은 이미 .lawyerTopSlot .documentReviewQueuePanel(max-height 360px) +
   // .documentReviewList(flex:1, overflow-y:auto)로 칸이 고정되고 넘치면 스크롤되도록
   // 되어 있어서, 다른 표처럼 별도 tableScroll을 씌우지 않아도 같은 동작을 합니다.
@@ -422,15 +466,14 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDoc
         <div className="documentReviewList">
           <table className="dataTable reviewRequestTable documentReviewTable">
             <colgroup>
-              <col style={{ width: '17%' }} />
-              <col style={{ width: '24%' }} />
               <col style={{ width: '14%' }} />
-              <col style={{ width: '10%' }} />
+              <col style={{ width: '30%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '17%' }} />
               <col style={{ width: '14%' }} />
               <col style={{ width: '12%' }} />
-              <col style={{ width: '9%' }} />
             </colgroup>
-            <thead><tr><th>상담 번호</th><th>서식 정보</th><th>담당 상담원</th><th>긴급도</th><th>요청 경과</th><th>검토</th><th>삭제</th></tr></thead>
+            <thead><tr><th>상담 번호</th><th>서식 정보</th><th>긴급도</th><th>요청 경과</th><th>검토</th><th>삭제</th></tr></thead>
             <tbody>
               {documents.map((doc) => {
                 const key = reviewDocumentKey(doc);
@@ -454,12 +497,6 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDoc
                       </td>
                       <td>
                         <div className="cellBody">
-                          <span>{doc.counselor?.name || '미지정'}</span>
-                          {doc.counselor?.email ? <span className="reviewCaseType" title={doc.counselor.email}>{doc.counselor.email}</span> : null}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="cellBody">
                           {doc.urgency ? <span className={`statusChip tone-${urgencyTone(doc.urgency)}`}>{doc.urgency}</span> : <span className="reviewCaseType">미확인</span>}
                         </div>
                       </td>
@@ -470,12 +507,12 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDoc
                       </td>
                       <td>
                         <div className="cellBody">
-                          <button className="tableAction reviewActionButton" type="button" onClick={() => togglePreview(doc)}>{isExpanded ? '접기' : '검토하기'}</button>
+                          <button className="tableAction reviewActionButton" type="button" onClick={() => togglePreview(doc)}><ClipboardCheck size={13} strokeWidth={2.4} />{isExpanded ? '접기' : '검토하기'}</button>
                         </div>
                       </td>
                       <td>
                         <div className="cellBody">
-                          <button className="tableAction danger" type="button" onClick={() => deleteDocument(doc)} aria-label="검토 대기 목록에서 삭제">삭제</button>
+                          <button className="tableAction danger" type="button" onClick={() => deleteDocument(doc)} aria-label="검토 대기 목록에서 삭제"><Trash2 size={12} strokeWidth={2.4} />삭제</button>
                         </div>
                       </td>
                     </tr>
@@ -496,46 +533,79 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDoc
                               downloadFileName={doc.download_file_name}
                             />
                             <DraftContentReviewLabel content={doc.draft_content} />
-                            <div className="documentReviewPreview">
-                              <div className="documentReviewPreviewHeader"><strong>검토 내용</strong></div>
-                              {doc.draft_content ? (
-                                <pre>{doc.draft_content}</pre>
-                              ) : doc.draft_file_path ? (
-                                <p>HWPX 파일 경로를 기준으로 검토합니다. 파일 경로: {doc.draft_file_path}</p>
-                              ) : (
-                                <p>검토 가능한 본문 또는 파일 경로가 없습니다. 상담원에게 서식 초안 재생성을 요청하세요.</p>
-                              )}
-                            </div>
+                            {(() => {
+                              const lawyerEdit = readLawyerDraftEdit(doc.document_id);
+                              const isLocalOnlyDocument = doc.source === 'ai-api-local' || doc.source === 'text-local' || doc.source === 'client-hwpx';
+                              const displayContent = lawyerEdit?.content || doc.draft_content;
+                              return (
+                                <>
+                                  {/* 서버에 반영되지 않는 core-api 문서 수정본은, 편집 중이 아닐 때도 항상 눈에
+                                      띄는 노란 캡션으로 남겨 '서버에 반영됐다'고 오해하지 않게 합니다. */}
+                                  {lawyerEdit && !isLocalOnlyDocument ? (
+                                    <p className="localEditOnlyCaption">로컬 임시 저장됨 · 서버에는 반영되지 않았습니다 (이 브라우저에서만 보입니다)</p>
+                                  ) : null}
+                                  {isReviewing ? (
+                                    <div className="draftView">
+                                      <div className="draftViewPane">
+                                        <div className="draftViewPaneHeader"><strong>편집</strong></div>
+                                        <textarea
+                                          className="documentReviewContentEditor"
+                                          value={contentDraft}
+                                          onChange={(event) => setContentDraft(event.target.value)}
+                                          placeholder="서식 초안 내용을 입력하거나 고치세요."
+                                        />
+                                      </div>
+                                      <div className="draftViewPane">
+                                        <div className="draftViewPaneHeader">
+                                          <strong>미리보기</strong>
+                                          <span className="statusChip tone-info">변호사 수정본</span>
+                                        </div>
+                                        {contentDraft ? <pre>{contentDraft}</pre> : <p className="helperText">입력 내용 없음</p>}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="documentReviewPreview">
+                                      <div className="documentReviewPreviewHeader">
+                                        <strong>검토 내용</strong>
+                                        {lawyerEdit ? <span className="statusChip tone-warn">변호사 수정본</span> : null}
+                                      </div>
+                                  {displayContent ? (
+                                        <pre>{displayContent}</pre>
+                                      ) : doc.draft_file_path ? (
+                                        <p>HWPX 파일 경로: {doc.draft_file_path}</p>
+                                      ) : (
+                                        <p>검토 본문 없음 · 상담원에게 재작성 요청</p>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                             {isReviewing ? (
                               <div className="documentReviewForm">
+                                {doc.source !== 'ai-api-local' && doc.source !== 'text-local' && doc.source !== 'client-hwpx' ? (
+                                  <p className="localEditOnlyCaption">core-api 문서 · 수정본은 로컬 임시 저장</p>
+                                ) : null}
                                 <textarea
                                   value={noteText}
                                   onChange={(event) => setNoteText(event.target.value)}
-                                  placeholder={reviewAction === 'approve' ? '승인 코멘트 (선택)' : '반려 사유 (필수)'}
+                                  placeholder="내부 검토 메모 (선택)"
                                 />
-                                {reviewAction === 'revision' ? (
-                                  <input
-                                    value={materialsText}
-                                    onChange={(event) => setMaterialsText(event.target.value)}
-                                    placeholder="상담원에게 요청할 자료 (쉼표로 구분, 선택)"
-                                  />
-                                ) : null}
                                 <div className="inlineControls documentReviewActions">
                                   <button className="reviewCancelButton" type="button" onClick={cancelReview} disabled={pending}>취소</button>
                                   <button
-                                    className={reviewAction === 'approve' ? 'reviewApproveButton' : 'reviewRejectButton'}
+                                    className="reviewApproveButton"
                                     type="button"
                                     onClick={() => confirmReview(doc)}
-                                    disabled={pending || (reviewAction === 'revision' && !noteText.trim())}
+                                    disabled={pending}
                                   >
-                                    {pending ? '처리하는 중…' : reviewAction === 'approve' ? '승인 확정' : '반려 확정'}
+                                    {pending ? '처리하는 중…' : '검토 완료'}
                                   </button>
                                 </div>
                               </div>
                             ) : (
                               <div className="inlineControls documentReviewActions">
-                                <button className="reviewApproveButton" type="button" onClick={() => startReview(doc, 'approve')}>승인</button>
-                                <button className="reviewRejectButton" type="button" onClick={() => startReview(doc, 'revision')}>반려</button>
+                                <button className="reviewApproveButton" type="button" onClick={() => startReview(doc)}>검토 완료</button>
                               </div>
                             )}
                           </div>
@@ -549,7 +619,7 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser, onNotify, onDoc
           </table>
         </div>
       ) : (
-        <p className="templateEmpty">{loading ? '' : '검토 대기 중인 서식 초안이 없습니다.'}</p>
+        !loading ? <InlineEmptyNotice>검토 대기 초안 없음</InlineEmptyNotice> : null
       )}
     </section>
   );
@@ -613,15 +683,15 @@ function ReviewTable({ title = '법률구조 검토 요청', rows, onOpenReview,
     return (daysWaitingFrom(right.requestedAt) ?? 0) - (daysWaitingFrom(left.requestedAt) ?? 0);
   });
   const noSearchResult = Boolean(normalizedQuery) && !displayRows.length;
-  const columnCount = onDelete ? 8 : 7;
+  const columnCount = onDelete ? 7 : 6;
   // '최근 상담 목록'과 같은 규칙: 6칸을 유지하고, 그보다 많으면 칸을 늘리지 않고 스크롤로 봅니다.
-  const visibleRowCount = 6;
+  const visibleRowCount = VISIBLE_ROW_COUNT;
   const scrollable = displayRows.length > visibleRowCount;
   const handleDelete = async (row) => {
     if (!onDelete) return;
     const accepted = await confirm({
       title: '이 검토 요청을 삭제할까요?',
-      message: `${row.caseNo} · 「${row.title || '제목 없음'}」\n검토 대기 목록에서 삭제하며 되돌릴 수 없습니다.`,
+      message: `${row.caseNo} · 「${row.title || '제목 없음'}」\n검토 대기 목록에서 삭제됩니다.`,
       confirmLabel: '삭제',
       tone: 'danger',
     });
@@ -629,7 +699,7 @@ function ReviewTable({ title = '법률구조 검토 요청', rows, onOpenReview,
   };
 
   return (
-    <section className="panel">
+    <section className="panel reviewRequestPanel">
       <div className="panelTitleRow">
         <h2>{title}</h2>
         <div className="tableSearchBox">
@@ -640,19 +710,19 @@ function ReviewTable({ title = '법률구조 검토 요청', rows, onOpenReview,
       <div className={scrollable ? 'tableScroll' : ''}>
       <table className="dataTable reviewRequestTable">
         <colgroup>
-          <col style={{ width: '16%' }} />
-          <col style={{ width: '15%' }} />
           <col style={{ width: '14%' }} />
-          <col style={{ width: '10%' }} />
+          <col style={{ width: '22%' }} />
           <col style={{ width: '12%' }} />
-          <col style={{ width: '11%' }} />
-          <col style={{ width: '12%' }} />
+          <col style={{ width: '15%' }} />
+          {/* '추가자료 요청'처럼 긴 상태 문구가 잘리지 않도록 다른 칸보다 넓게 잡습니다. */}
+          <col style={{ width: '14%' }} />
+          <col style={{ width: '13%' }} />
           {onDelete ? <col style={{ width: '10%' }} /> : null}
         </colgroup>
-        <thead><tr><th>상담 번호</th><th>사건 정보</th><th>담당 상담원</th><th>긴급도</th><th>요청 경과</th><th>상태</th><th>검토</th>{onDelete ? <th>삭제</th> : null}</tr></thead>
+        <thead><tr><th>상담 번호</th><th>사건 정보</th><th>긴급도</th><th>요청 경과</th><th>상태</th><th>검토</th>{onDelete ? <th>삭제</th> : null}</tr></thead>
         <tbody>
           {noSearchResult ? (
-            <tr><td className="tableEmptyNotice" colSpan={columnCount}>‘{query.trim()}’에 대한 검색 결과가 없습니다.</td></tr>
+            <tr><td className="tableEmptyNotice" colSpan={columnCount}>검색 결과 없음</td></tr>
           ) : null}
           {displayRows.map((row) => {
             const waitingDays = daysWaitingFrom(row.requestedAt);
@@ -665,12 +735,6 @@ function ReviewTable({ title = '법률구조 검토 요청', rows, onOpenReview,
                   <div className="cellBody reviewCaseCell">
                     <strong title={row.title}>{row.title}</strong>
                     <span className="reviewCaseType">{row.type || '유형 미분류'}</span>
-                  </div>
-                </td>
-                <td>
-                  <div className="cellBody">
-                    <span>{row.counselor?.name || '미지정'}</span>
-                    {row.counselor?.email ? <span className="reviewCaseType" title={row.counselor.email}>{row.counselor.email}</span> : null}
                   </div>
                 </td>
                 <td>
@@ -691,20 +755,20 @@ function ReviewTable({ title = '법률구조 검토 요청', rows, onOpenReview,
                 {/* HITL: 결정을 바로 누르지 않고 검토 모달을 열어 AI 결과 확인 후 사유와 함께 확정합니다. */}
                 <td>
                   <div className="cellBody">
-                    <button className="tableAction reviewActionButton" type="button" onClick={() => onOpenReview(row)}>{row.status === '검토 대기' || row.status === '검토 중' ? '검토하기' : '재검토하기'}</button>
+                    <button className="tableAction reviewActionButton" type="button" onClick={() => onOpenReview(row)}><ClipboardCheck size={13} strokeWidth={2.4} />{row.status === '검토 대기' || row.status === '검토 중' ? '검토하기' : '재검토하기'}</button>
                   </div>
                 </td>
                 {onDelete ? (
                   <td>
                     <div className="cellBody">
-                      <button className="tableAction danger" type="button" onClick={() => handleDelete(row)}>삭제</button>
+                      <button className="tableAction danger" type="button" onClick={() => handleDelete(row)}><Trash2 size={12} strokeWidth={2.4} />삭제</button>
                     </div>
                   </td>
                 ) : null}
               </tr>
             );
           })}
-          {noSearchResult || scrollable ? null : <EmptyRows count={Math.max(0, visibleRowCount - displayRows.length)} columns={columnCount} isEmpty={rows.length === 0} emptyLabel="검토 요청이 없습니다." />}
+          {noSearchResult || scrollable ? null : <EmptyRows count={Math.max(0, visibleRowCount - displayRows.length)} columns={columnCount} isEmpty={rows.length === 0} emptyLabel="검토 요청 없음" />}
         </tbody>
       </table>
       </div>
@@ -714,16 +778,46 @@ function ReviewTable({ title = '법률구조 검토 요청', rows, onOpenReview,
 
 // 법률구조 HITL(Human-in-the-loop) 최종 결정 모달.
 // AI 분석은 참고용이고, 변호사/공익법무관이 법률 판단 항목을 확인한 뒤 결정과 사유를 확정합니다.
+// needsReason은 카드 자체에 작은 "사유 필수" 배지로 보여주므로, 힌트 문장에서는
+// 중복으로 적지 않습니다.
 const hitlDecisions = [
   { key: '승인', label: '승인', hint: '법률구조 대상으로 확정하고 다음 단계로 진행', tone: 'success', needsReason: false },
-  { key: '수정 요청', label: '수정 요청', hint: '상담원에게 서식·내용 수정을 요청 (사유 필수)', tone: 'warn', needsReason: true },
-  { key: '추가자료 요청', label: '추가자료 요청', hint: '판단에 필요한 자료 보완을 요청 (사유 필수)', tone: 'warn', needsReason: true },
-  { key: '반려', label: '반려', hint: '구조 대상 부적합으로 거절 (사유 필수)', tone: 'danger', needsReason: true },
-  { key: '보류', label: '보류', hint: '추가 검토가 필요해 결정을 보류 (사유 필수)', tone: 'warn', needsReason: true },
+  { key: '수정 요청', label: '수정 요청', hint: '상담원에게 서식·내용 수정을 요청', tone: 'warn', needsReason: true },
+  { key: '추가자료 요청', label: '추가자료 요청', hint: '판단에 필요한 자료 보완을 요청', tone: 'warn', needsReason: true },
+  { key: '반려', label: '반려', hint: '구조 대상 부적합으로 거절', tone: 'danger', needsReason: true },
+  { key: '보류', label: '보류', hint: '추가 검토가 필요해 결정을 보류', tone: 'warn', needsReason: true },
 ];
 
 function formatAnalysisList(items, emptyText) {
   return Array.isArray(items) && items.length ? items : [emptyText];
+}
+
+function evidenceDisplayName(item = {}) {
+  return item.fileName || item.name || item.fileKey || item.fileUrl || '첨부파일';
+}
+
+function evidenceDisplayLocation(item = {}) {
+  return item.fileKey || item.fileUrl || item.uploadedUrl || item.storageBucket || '저장 위치 없음';
+}
+
+function LawyerReviewBrief({ review, analysis, attachments }) {
+  const submittedEvidenceCount = attachments.filter((item) => evidenceDisplayLocation(item) !== '저장 위치 없음').length;
+  return (
+    <div className="lawyerReviewBrief">
+      <article>
+        <strong>AI 상담 요약</strong>
+        <SummaryBulletList text={analysis.summary || review.memo || review.title} emptyText="상담 요약 없음" />
+      </article>
+      <article>
+        <strong>법률구조 검토 신호</strong>
+        <dl>
+          <div><dt>구조대상</dt><dd>{analysis.eligibility || review.eligibility || '검토 필요'}</dd></div>
+          <div><dt>긴급도</dt><dd>{analysis.urgency || review.urgency || '미확인'}</dd></div>
+          <div><dt>증빙자료</dt><dd>{submittedEvidenceCount}건 확인</dd></div>
+        </dl>
+      </article>
+    </div>
+  );
 }
 
 function fileExtractionLabel(status) {
@@ -731,7 +825,9 @@ function fileExtractionLabel(status) {
   return labels[status] || status || '상태 미확인';
 }
 
-function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
+// 법률구조 최종 검토 화면입니다. 모달이 아니라 대시보드를 대체하는 업무 페이지라서
+// 다른 업무 화면과 같은 껍데기(.workspacePage + WorkPageHeader)를 씁니다.
+function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   const [decision, setDecision] = useState('');
   const [reason, setReason] = useState('');
   const [recipientEmail, setRecipientEmail] = useState(review.counselor?.email || '');
@@ -744,21 +840,33 @@ function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
   const extractedItems = formatAnalysisList(analysis.extractionDetail, { status: '', fileLink: '', note: '첨부파일 추출 정보 없음' });
   const attachmentItems = formatAnalysisList(analysis.sourceAttachments?.length ? analysis.sourceAttachments : analysis.extractedJson?.attachment_links, { fileName: '첨부 링크 정보 없음', fileKey: '', fileUrl: '' });
   const modalityItems = formatAnalysisList(analysis.modalities, { key: '입력자료', count: 0 });
-  const sttOriginal = analysis.sttPreview?.original || 'STT 원문 정보가 없습니다.';
-  const sttMasked = analysis.sttPreview?.masked || '마스킹본 정보가 없습니다.';
+  const sttOriginal = analysis.sttPreview?.original || 'STT 원문 없음';
+  const sttMasked = analysis.sttPreview?.masked || '마스킹본 없음';
   const allChecked = checks.eligibility && checks.evidence && checks.hallucination;
   const trimmedReason = reason.trim();
   const reasonRequired = selectedDecision?.needsReason && !trimmedReason;
   const canSubmit = decision && allChecked && !reasonRequired;
+  // 코치 피드백: "변호사가 코멘트 및 편집할 수 있게끔 수정". 반려·수정요청처럼 부정적 결정에만
+  // 남기던 '사유'와 별개로, 승인 포함 모든 결정에서 남길 수 있는 코멘트와, AI 요약을 변호사가
+  // 직접 다듬을 수 있는 편집 칸을 둡니다.
+  const [lawyerComment, setLawyerComment] = useState('');
+  const [editedSummary, setEditedSummary] = useState(analysis.summary || '');
+  const summaryEdited = editedSummary.trim() !== (analysis.summary || '').trim();
   const completeDecision = () => {
     setShowFinalHitlConfirm(false);
-    onDecide(review.id, decision, trimmedReason, recipientEmail);
+    onDecide(review.id, decision, trimmedReason, recipientEmail, {
+      lawyerComment: lawyerComment.trim(),
+      editedSummary: summaryEdited ? editedSummary.trim() : '',
+    });
   };
 
   return (
-    <div className="modalBackdrop" role="presentation">
-      <div className="modal hitlModal">
-        <div className="modalHeader"><h2>법률구조 최종 검토</h2><button type="button" onClick={onClose}>닫기</button></div>
+    <main className="workspacePage hitlReviewPage">
+      <section className="hitlReviewPanel">
+        <WorkPageHeader
+          title="법률구조 최종 검토"
+          meta={<button className="hitlReviewCloseButton" type="button" onClick={onClose}>닫기</button>}
+        />
 
         <div className="hitlCaseMeta">
           <span><strong>{review.caseNo}</strong></span>
@@ -783,21 +891,38 @@ function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
                 {review.counselor?.email ? `${review.counselor.name || '담당 상담원'} (${review.counselor.email})` : '담당 상담원 미지정'}
               </option>
             </select>
-            <small className="helperText">현재는 담당 상담원에게만 전달됩니다.</small>
+            <small className="helperText">전달 대상: 담당 상담원</small>
           </label>
         </div>
 
         {/* AI 분석은 참고용임을 명확히 (HITL 원칙) */}
-        <div className="hitlBanner">아래 AI 분석은 참고용입니다. 법률 판단 항목을 직접 확인하신 뒤 최종 결정을 확정해주세요.</div>
+        <div className="hitlBanner">
+          <strong>AI 분석은 참고용</strong>
+          <span>법률 판단 확인 · 체크리스트 완료 후 확정</span>
+        </div>
+
+        <div className="hitlSection">
+          <h3>검토 대상 상담 패키지</h3>
+          <LawyerReviewBrief review={review} analysis={analysis} attachments={attachmentItems} />
+        </div>
 
         <div className="hitlSection">
           <h3>상담원 분석 내용</h3>
           <div className="resultCard lawyerAnalysisCard">
             <div className="lawyerAnalysisHeader">
               <strong>검토 요청에 포함된 상담 분석 패키지</strong>
-              <span>상담원이 저장한 AI 분석·보완자료·채택 항목을 기준으로 최종 판단합니다.</span>
+              <span>AI 분석 · 보완자료 · 채택 항목</span>
             </div>
-            <p>{analysis.summary || review.summary || '상담원이 저장한 분석 요약이 없습니다.'}</p>
+            <SummaryBulletList text={analysis.summary || review.summary} emptyText="저장된 분석 요약 없음" />
+            <label className="field lawyerSummaryEditField">
+              <span className="lawyerSummaryEditLabel">AI 원문 <ChevronRight size={13} strokeWidth={2.6} aria-hidden="true" /> 수정본 {summaryEdited ? <em className="requiredMark">수정됨</em> : null}</span>
+              <textarea
+                value={editedSummary}
+                onChange={(event) => setEditedSummary(event.target.value)}
+                placeholder="AI 요약을 변호사 판단에 맞게 직접 다듬을 수 있습니다."
+              />
+              <small className="helperText">확정 시 상담원에게 전달</small>
+            </label>
             <div className="hitlAnalysisGrid">
               <span>사건 유형: {analysis.caseType || review.type}</span>
               <span>사건 소분류: {analysis.caseSubtype || '미입력'}</span>
@@ -885,10 +1010,10 @@ function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
             <div>
               <strong>첨부 저장 위치</strong>
               {attachmentItems.map((item, index) => {
-                const location = item.fileKey || item.fileUrl || item.fileName || '저장 위치 없음';
+                const location = evidenceDisplayLocation(item);
                 return (
                   <span key={`${location}-${index}`}>
-                    {item.fileName || '첨부파일'} · {location}
+                    {evidenceDisplayName(item)} · {location}
                   </span>
                 );
               })}
@@ -933,7 +1058,10 @@ function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
                 className={`hitlDecisionCard tone-${item.tone}${decision === item.key ? ' selected' : ''}`}
                 onClick={() => setDecision(item.key)}
               >
-                <strong>{item.label}</strong>
+                <span className="hitlDecisionCardHead">
+                  <strong>{item.label}</strong>
+                  {item.needsReason ? <em className="hitlReasonRequiredBadge">사유 필수</em> : null}
+                </span>
                 <small>{item.hint}</small>
               </button>
             ))}
@@ -941,11 +1069,20 @@ function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
         </div>
 
         {selectedDecision?.needsReason ? (
-          <label className="field">
-            <span>사유 <strong className="requiredMark">필수</strong></span>
-            <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="사유를 입력하세요." />
-          </label>
+          <div className="noteBox warn">
+            <label className="field">
+              <span>사유 <strong className="requiredMark">필수</strong></span>
+              <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="사유를 입력하세요." />
+            </label>
+          </div>
         ) : null}
+
+        {/* 반려·수정요청 등 일부 결정에만 열리는 '사유'와 달리, 코멘트는 승인을 포함한 모든 결정에서
+            남길 수 있습니다. 상담원에게 참고용으로 함께 전달됩니다. */}
+        <label className="field">
+          <span>코멘트 (선택)</span>
+          <textarea value={lawyerComment} onChange={(event) => setLawyerComment(event.target.value)} placeholder="결정과 별개로 상담원에게 남길 코멘트가 있으면 적어주세요." />
+        </label>
 
         {reasonRequired ? <p className="formError">{decision} 결정에는 사유 입력이 필요합니다.</p> : null}
         {decision && !allChecked ? <p className="formError">법률 판단 항목을 모두 확인해야 결정을 확정할 수 있습니다.</p> : null}
@@ -954,7 +1091,7 @@ function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
           <button className="smallButton light" type="button" onClick={onClose}>취소</button>
           <button className="primaryButton hitlSubmitButton" type="button" disabled={!canSubmit} onClick={() => setShowFinalHitlConfirm(true)}>검토 확정</button>
         </div>
-        <p className="helperText">결정자: {reviewer} · 확정하면 감사 로그와 담당 상담원 알림에 반영됩니다.</p>
+        <p className="helperText">결정자 {reviewer} · 감사 로그/알림 반영</p>
         {showFinalHitlConfirm ? (
           <HitlConfirmModal
             title="검토 결과 확정 전 최종 확인"
@@ -965,8 +1102,8 @@ function HitlDecisionModal({ review, reviewer, onDecide, onClose }) {
             nested
           />
         ) : null}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
@@ -977,7 +1114,7 @@ function ReviewLog({ logs, onDelete }) {
     if (!onDelete) return;
     const accepted = await confirm({
       title: '이 결정 로그를 삭제할까요?',
-      message: `R-${row.id} · ${row.caseNo} 「${row.title || '제목 없음'}」\n목록에서 삭제하며 되돌릴 수 없습니다.`,
+      message: `R-${row.id} · ${row.caseNo} 「${row.title || '제목 없음'}」\n목록에서 삭제됩니다.`,
       confirmLabel: '삭제',
       tone: 'danger',
     });
@@ -985,7 +1122,7 @@ function ReviewLog({ logs, onDelete }) {
   };
   // 예전엔 slice(0, 6)으로 최신 6건만 보여주고 그 이전 기록은 화면에서 아예 사라졌습니다.
   // '최근 상담 목록'과 같은 규칙(6칸을 유지하되, 넘치면 스크롤로 나머지를 본다)으로 맞춥니다.
-  const visibleRowCount = 6;
+  const visibleRowCount = VISIBLE_ROW_COUNT;
   const scrollable = logs.length > visibleRowCount;
   return (
     <section className="panel">
@@ -1002,10 +1139,10 @@ function ReviewLog({ logs, onDelete }) {
                 <td>{row.loggedAt}</td>
                 <td><span className={reviewStatusTone(row.status)}>{row.status}</span></td>
                 <td>{row.reason || '-'}</td>
-                {onDelete ? <td><button className="tableAction danger" type="button" onClick={() => handleDelete(row)}>삭제</button></td> : null}
+                {onDelete ? <td><button className="tableAction danger" type="button" onClick={() => handleDelete(row)}><Trash2 size={12} strokeWidth={2.4} />삭제</button></td> : null}
               </tr>
             ))}
-            {scrollable ? null : <EmptyRows count={Math.max(0, visibleRowCount - logs.length)} columns={columnCount} isEmpty={logs.length === 0} emptyLabel="아직 검토 결정 이력이 없습니다." />}
+            {scrollable ? null : <EmptyRows count={Math.max(0, visibleRowCount - logs.length)} columns={columnCount} isEmpty={logs.length === 0} emptyLabel="검토 결정 이력 없음" />}
           </tbody>
         </table>
       </div>
@@ -1049,11 +1186,13 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
   }, [currentUser?.token]);
 
   const localAnalysisRate = reviews.length ? Math.round((reviews.filter((item) => item.status === '승인').length / reviews.length) * 100) : 0;
+  const pendingApprovals = adminStats ? adminStats.pending_user_approvals : users.filter((item) => item.status === '대기').length;
+  // KPI 타일에는 단위 없이 숫자만 둡니다(시안 기준). 무엇을 센 값인지는 아래 라벨이 말해 줍니다.
   const cards = [
-    { title: '전체 상담 건수', value: `${adminStats ? adminStats.total_consultations : consultations.length}건`, filter: 'consultations' },
-    { title: '활성 사용자', value: `${adminStats ? adminStats.active_users : users.filter((item) => item.status === '승인').length}명`, filter: 'activeUsers' },
+    { title: '전체 상담 건수', value: `${adminStats ? adminStats.total_consultations : consultations.length}`, filter: 'consultations' },
+    { title: '활성 사용자', value: `${adminStats ? adminStats.active_users : users.filter((item) => item.status === '승인').length}`, filter: 'activeUsers' },
     { title: '분석 처리율', value: `${adminStats ? Math.round(adminStats.analysis_processing_rate * 100) : localAnalysisRate}%`, filter: 'analysis' },
-    { title: '직원 승인 대기', value: `${adminStats ? adminStats.pending_user_approvals : users.filter((item) => item.status === '대기').length}건`, filter: 'pendingUsers' },
+    { title: '직원 승인 대기', value: `${pendingApprovals}`, filter: 'pendingUsers' },
   ];
 
   // 관리자 업무 범위(전체 조회/계정 권한 관리/통계 대시보드/DB 관리/감사로그)에는
@@ -1063,18 +1202,30 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
   if (activeView === '기타') return <AdminOpsPanel currentUser={currentUser} />;
   if (activeView === '알림') return <UtilityPanel view={activeView} role="admin" currentUser={currentUser} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} />;
   return (
-    <main className="dashboard dashboard-admin">
+    <>
+      <div className="dashboardIntroWrap">
+        <div className="dashboardIntro">
+          <h1>운영 현황</h1>
+          <p>가입 승인 대기 {pendingApprovals}건 · 실시간 집계 반영 중</p>
+        </div>
+      </div>
+      <main className="dashboard dashboard-admin">
       {adminStatsFailed ? (
         <p className="adminStatsNotice">
-          core-api 통계(/api/admin/stats) 조회에 실패해{currentUser?.token ? '' : ' (테스트용 빠른 로그인은 실제 인증 토큰을 발급하지 않습니다)'} 아래
-          4개 카드 수치는 실제 DB 집계값이 아니라 이 브라우저에 저장된 로컬 데이터로 어림잡은 값입니다.
+          {currentUser?.token
+            ? 'DB 통계 연결 실패 · 브라우저 임시 데이터 표시'
+            : '테스트 로그인 중 · DB 통계 대신 브라우저 임시 데이터 표시'}
         </p>
       ) : null}
-      <SummaryCards cards={cards} activeFilter={activeAdminView} onFilter={setActiveAdminView} allowToggle={false} />
+      <SummaryCards cards={cards.map(withAdminCardUnit)} activeFilter={activeAdminView} onFilter={setActiveAdminView} allowToggle={false} />
+      {/* 시안: 왼쪽은 주간 상담 현황, 오른쪽은 '사건 유형별 상담 통계'와 '분석 처리 현황'을 위아래로 둡니다. */}
       {activeAdminView === 'consultations' ? (
         <div className="adminSplit">
           <ConsultationStatsPanel consultations={consultations} />
-          <BarChartMock consultations={consultations} />
+          <div className="adminSplitStack">
+            <BarChartMock consultations={consultations} />
+            <DonutChartMock reviews={reviews} />
+          </div>
         </div>
       ) : null}
       {activeAdminView === 'analysis' ? (
@@ -1085,7 +1236,8 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
       ) : null}
       {activeAdminView === 'activeUsers' ? <ActiveUsersPanel users={users} /> : null}
       {activeAdminView === 'pendingUsers' ? <AccountTable rows={filteredUsers} onUpdate={handleUpdateUserStatus} title="회원가입 승인 대기" /> : null}
-    </main>
+      </main>
+    </>
   );
 }
 
@@ -1098,6 +1250,7 @@ function ActiveUsersPanel({ users }) {
     label: roleLabels[role],
     count: approved.filter((user) => user.role === role).length,
   }));
+  const scrollable = approved.length > VISIBLE_ROW_COUNT;
 
   return (
     <section className="panel activeUsersPanel">
@@ -1110,44 +1263,49 @@ function ActiveUsersPanel({ users }) {
           </div>
         ))}
       </div>
-      <table className="dataTable">
-        <thead><tr><th>이름</th><th>역할</th><th>소속기관 / 부서</th><th>지부</th><th>연락처</th><th>이메일</th><th>가입 신청일</th></tr></thead>
-        <tbody>
-          {approved.map((row) => (
-            <tr key={row.email}>
-              <td>{row.name}</td>
-              <td>{roleLabels[row.role] || row.role}</td>
-              <td>{row.organization || '-'}</td>
-              <td>{row.branch || '-'}</td>
-              <td>{row.phone || '-'}</td>
-              <td>{row.email}</td>
-              <td>{row.requestedAt || '-'}</td>
-            </tr>
-          ))}
-          <EmptyRows count={Math.max(0, 6 - approved.length)} columns={7} isEmpty={approved.length === 0} emptyLabel="활성 사용자가 없습니다." />
-        </tbody>
-      </table>
+      <div className={scrollable ? 'tableScroll' : ''}>
+        <table className="dataTable">
+          <thead><tr><th>이름</th><th>역할</th><th>소속기관 / 부서</th><th>지부</th><th>연락처</th><th>이메일</th><th>가입 신청일</th></tr></thead>
+          <tbody>
+            {approved.map((row) => (
+              <tr key={row.email}>
+                <td>{row.name}</td>
+                <td>{roleLabels[row.role] || row.role}</td>
+                <td>{row.organization || '-'}</td>
+                <td>{row.branch || '-'}</td>
+                <td>{row.phone || '-'}</td>
+                <td>{row.email}</td>
+                <td>{row.requestedAt || '-'}</td>
+              </tr>
+            ))}
+            {scrollable ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - approved.length)} columns={7} isEmpty={approved.length === 0} emptyLabel="활성 사용자 없음" />}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
 
 function AccountTable({ rows, onUpdate, title = '회원가입 승인 관리', compact = false }) {
+  const scrollable = rows.length > VISIBLE_ROW_COUNT;
   return (
     <section className="panel">
       <div className="panelTitleRow"><h2>{title}</h2></div>
-      <table className="dataTable">
-        <thead><tr><th>이름</th><th>신청 역할</th>{compact ? null : <th>소속</th>}<th>이메일</th>{compact ? null : <th>신청일</th>}<th>승인/거절</th></tr></thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.email}>
-              <td>{row.name}</td><td>{roleLabels[row.role] || row.role}</td>{compact ? null : <td>{row.organization}</td>}<td>{row.email}</td>{compact ? null : <td>{row.requestedAt}</td>}
-              {/* 관리자만 상담원/변호사 계정을 승인·거절할 수 있고, 승인 전에는 로그인이 막힙니다. */}
-              <td><div className="statusActions"><StatusButton active={row.status === '승인'} onClick={() => onUpdate(row.email, '승인')}>승인</StatusButton><StatusButton active={row.status === '거절'} onClick={() => onUpdate(row.email, '거절')}>거절</StatusButton></div></td>
-            </tr>
-          ))}
-          <EmptyRows count={Math.max(0, 3 - rows.length)} columns={compact ? 4 : 6} isEmpty={rows.length === 0} emptyLabel="가입 승인 대기 중인 계정이 없습니다." />
-        </tbody>
-      </table>
+      <div className={scrollable ? 'tableScroll' : ''}>
+        <table className="dataTable">
+          <thead><tr><th>이름</th><th>신청 역할</th>{compact ? null : <th>소속</th>}<th>이메일</th>{compact ? null : <th>신청일</th>}<th>승인/거절</th></tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.email}>
+                <td>{row.name}</td><td>{roleLabels[row.role] || row.role}</td>{compact ? null : <td>{row.organization}</td>}<td>{row.email}</td>{compact ? null : <td>{row.requestedAt}</td>}
+                {/* 관리자만 상담원/변호사 계정을 승인·거절할 수 있고, 승인 전에는 로그인이 막힙니다. */}
+                <td><div className="statusActions"><StatusButton active={row.status === '승인'} onClick={() => onUpdate(row.email, '승인')}>승인</StatusButton><StatusButton active={row.status === '거절'} onClick={() => onUpdate(row.email, '거절')}>거절</StatusButton></div></td>
+              </tr>
+            ))}
+            {scrollable ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - rows.length)} columns={compact ? 4 : 6} isEmpty={rows.length === 0} emptyLabel="승인 대기 계정 없음" />}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -1262,37 +1420,50 @@ function ConsultationStatsPanel({ consultations }) {
           </button>
         ))}
       </div>
-      <div className="adminTableScroll">
-        <table className="dataTable adminConsultationTable">
+      <HorizontalScrollBox>
+        <div className={dayRows.length > VISIBLE_ROW_COUNT ? 'adminTableScroll tableScroll' : 'adminTableScroll'}>
+          <ScrollableDataTable className="adminConsultationTable">
           <thead>
             <tr>
               <th colSpan={7} className="adminTableCaption">
                 {selectedDay.closed ? `${selectedDay.label}요일 (휴무) 상담 내역` : `${selectedDay.year}.${selectedDay.monthNum}.${selectedDay.dayOfMonth} (${selectedDay.label}) 상담 내역 · ${dayRows.length}건`}
               </th>
             </tr>
-            <tr><th>사건 번호</th><th>상담자</th><th>담당 상담원</th><th>검토 변호사</th><th>사건 유형</th><th>등록일</th><th>처리 단계</th></tr>
+            <tr>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[1] }}>사건 번호</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[0] }}>상담자</th>
+              <th style={{ minWidth: 100 }}>담당 상담원</th>
+              <th style={{ minWidth: 100 }}>검토 변호사</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[3] }}>사건 유형</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[4] }}>등록일</th>
+              <th style={{ minWidth: FIRST_SEVEN_COLUMN_MIN_WIDTHS[5] }}>처리 단계</th>
+            </tr>
           </thead>
           <tbody>
             {dayRows.map((row) => <tr key={row.id}><td>{row.caseNo}</td><td>{row.name}</td><td>{row.counselor?.name || '미지정'}</td><td>{row.lawyer?.name || row.reviewAction?.reviewer?.name || '미지정'}</td><td>{row.type}</td><td>{row.date}</td><td><span className={workflowStatusTone(row.workflowStatus)}>{row.workflowStatus || '분석 전'}</span></td></tr>)}
-            <EmptyRows count={Math.max(0, 5 - dayRows.length)} columns={7} isEmpty={dayRows.length === 0} emptyLabel="선택한 날짜에 등록된 상담이 없습니다." />
+            {dayRows.length > VISIBLE_ROW_COUNT ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - dayRows.length)} columns={7} isEmpty={dayRows.length === 0} emptyLabel="선택일 상담 없음" />}
           </tbody>
-        </table>
-      </div>
+          </ScrollableDataTable>
+        </div>
+      </HorizontalScrollBox>
     </section>
   );
 }
 
 function AnalysisStatsPanel({ reviews }) {
+  const scrollable = reviews.length > VISIBLE_ROW_COUNT;
   return (
     <section className="panel">
       <div className="panelTitleRow"><h2>분석 처리 상세</h2></div>
-      <table className="dataTable">
-        <thead><tr><th>사건 번호</th><th>사건 제목</th><th>상태</th><th>요청일</th></tr></thead>
-        <tbody>
-          {reviews.map((row) => <tr key={row.id}><td>{row.caseNo}</td><td>{row.title}</td><td><span className={reviewStatusTone(row.status)}>{row.status}</span></td><td>{row.requestedAt}</td></tr>)}
-          <EmptyRows count={Math.max(0, 5 - reviews.length)} columns={4} isEmpty={reviews.length === 0} emptyLabel="분석 처리 이력이 없습니다." />
-        </tbody>
-      </table>
+      <div className={scrollable ? 'tableScroll' : ''}>
+        <table className="dataTable">
+          <thead><tr><th>사건 번호</th><th>사건 제목</th><th>상태</th><th>요청일</th></tr></thead>
+          <tbody>
+            {reviews.map((row) => <tr key={row.id}><td>{row.caseNo}</td><td>{row.title}</td><td><span className={reviewStatusTone(row.status)}>{row.status}</span></td><td>{row.requestedAt}</td></tr>)}
+            {scrollable ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - reviews.length)} columns={4} isEmpty={reviews.length === 0} emptyLabel="분석 처리 이력 없음" />}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -1412,12 +1583,12 @@ function AdminOpsPanel({ currentUser }) {
         <div className="workflowColumns">
           <div>
             <h3>감사 로그</h3>
-            <div className="adminTableScroll">
+            <div className={`adminTableScroll${auditRows.length > VISIBLE_ROW_COUNT ? ' tableScroll' : ''}`}>
               <table className="dataTable auditTable">
                 <thead><tr><th>일시</th><th>주체</th><th>작업</th><th>대상</th><th>상세</th></tr></thead>
                 <tbody>
                   {auditRows.map((row) => <tr key={`${row.action}-${row.target}-${row.id}`}><td>{formatAuditTimestamp(row.createdAt || today)}</td><td>{row.actor}</td><td>{row.action}</td><td>{formatAuditTarget(row.target)}</td><td>{formatAuditDetail(row)}</td></tr>)}
-                  <EmptyRows count={Math.max(0, 4 - auditRows.length)} columns={5} isEmpty={auditRows.length === 0} emptyLabel="감사 로그가 없습니다." />
+                  {auditRows.length > VISIBLE_ROW_COUNT ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - auditRows.length)} columns={5} isEmpty={auditRows.length === 0} emptyLabel="감사 로그 없음" />}
                 </tbody>
               </table>
             </div>

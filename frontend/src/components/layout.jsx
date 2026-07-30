@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Bell, BookOpen, ClipboardCheck, FileText, LayoutDashboard, Search, UserRound } from 'lucide-react';
+import { Activity, Bell, BookOpen, ClipboardCheck, FileText, LayoutDashboard, Search, UserRound } from 'lucide-react';
 
 function Brand({ onClick }) {
   const content = (
@@ -81,39 +81,47 @@ function DashboardHeader({ role, activeView, onViewChange, onLogout, currentUser
   // - 상담원: 상담 접수(상담 등록) → 상담 분석(기타) → 법률·판례 참고 → 서식 초안 생성까지 전체 흐름 담당
   // - 변호사/공익법무관: 상담 접수는 관여하지 않고, 대시보드의 검토 요청 목록에서 검토·승인만 담당
   // - 관리자: 상담 접수/분석/서식 생성에는 관여하지 않고, 운영 관리(계정 승인·통계·감사로그)만 담당
+  // 실시간 통화 중심 흐름으로 바뀌면서, 상담원이 통화를 받자마자 가장 먼저 눌러야 하는
+  // '실시간 상담'을 상담 목록 조회(상담 현황) 바로 다음, 후처리 성격의 자료 업로드보다도
+  // 앞자리에 둡니다. (코치 피드백: "실시간으로 바꾸면서, 메뉴를 앞단으로 뺀다")
   const navConfig = {
+    // 법령·판례 검색/추천은 변호사만 쓰도록 정리합니다(코치 피드백: "관련 법률 판례 같은 경우에는
+    // 변호사만 검색하거나 추천받을 수 있게... 상담원에서는 지워주셔도 될 것 같다").
     counselor: [
-      { view: '알림', label: '알림' },
       { view: '대시보드', label: '상담 현황' },
-      { view: '상담 등록', label: '상담 문서 업로드' },
-      { view: '기타', label: '실시간 분석 AI' },
-      { view: '법률, 판례', label: '법률, 판례' },
-      { view: '서식 생성', label: '서식 생성' },
-      { view: '프로필', label: '프로필' },
+      { view: '기타', label: '실시간 상담' },
+      { view: '상담 등록', label: '상담 자료 업로드' },
+      { view: '서식 생성', label: '서식 초안' },
+      { view: '알림', label: '알림' },
+      { view: '프로필', label: '내 정보' },
     ],
     lawyer: [
-      { view: '알림', label: '알림' },
       { view: '대시보드', label: '검토' },
-      { view: '법률, 판례', label: '법률, 판례' },
-      { view: '프로필', label: '프로필' },
+      { view: '법률, 판례', label: '법령·판례' },
+      { view: '알림', label: '알림' },
+      { view: '프로필', label: '내 정보' },
     ],
     admin: [
-      { view: '알림', label: '알림' },
       { view: '대시보드', label: '운영 현황' },
       { view: '기타', label: '운영 관리' },
-      { view: '프로필', label: '프로필' },
+      { view: '알림', label: '알림' },
+      { view: '프로필', label: '내 정보' },
     ],
   };
   const navItems = navConfig[role] || navConfig.counselor;
-  const navIcon = ({ view, label }) => {
-    if (role === 'lawyer' && view === '대시보드') return ClipboardCheck;
-    if (view === '대시보드') return LayoutDashboard;
-    if (label === '상담 등록' || label === '상담 문서 업로드') return FileText;
-    if (label === '상담 분석' || label === '실시간 분석 AI' || label === '검토' || label === '운영 관리') return ClipboardCheck;
-    if (label === '법률, 판례') return Search;
-    if (view === '서식 생성') return BookOpen;
-    if (label === '알림') return Bell;
-    return UserRound;
+  // 아이콘은 화면(view)에만 의존시킵니다. 표시 문구(label)로 분기하면 문구를 다듬을 때마다
+  // 아이콘이 조용히 바뀌어 버립니다. '기타'만 역할별로 뜻이 달라 한 번 갈라 줍니다.
+  const navIconByView = {
+    '상담 등록': FileText,
+    '법률, 판례': Search,
+    '서식 생성': BookOpen,
+    알림: Bell,
+    프로필: UserRound,
+  };
+  const navIcon = ({ view }) => {
+    if (view === '대시보드') return role === 'lawyer' ? ClipboardCheck : LayoutDashboard;
+    if (view === '기타') return role === 'counselor' ? Activity : ClipboardCheck;
+    return navIconByView[view] || UserRound;
   };
   return (
     <header className="dashboardHeader">
@@ -123,30 +131,35 @@ function DashboardHeader({ role, activeView, onViewChange, onLogout, currentUser
           const Icon = navIcon(item);
           const isNotification = item.view === '알림';
           return (
+            <React.Fragment key={item.view}>
+            {/* 업무 메뉴와 개인 메뉴(알림·내 정보) 사이를 세로선 하나로 끊어 줍니다. */}
+            {isNotification ? <span className="navGroupDivider" aria-hidden="true" /> : null}
             <button
               className={activeView === item.view ? 'navText active' : 'navText'}
               type="button"
-              key={item.view}
               // 현재 화면을 색만으로 알리면 화면낭독기 사용자는 알 수 없어 aria-current를 함께 둡니다.
               aria-current={activeView === item.view ? 'page' : undefined}
               onClick={() => onViewChange(item.view)}
             >
               <Icon size={14} strokeWidth={2.2} />
               <span>{item.label}</span>
-              {isNotification && unreadCount ? <em aria-label={`읽지 않은 알림 ${unreadCount}건`}>{unreadCount}</em> : null}
+              {isNotification && unreadCount ? (
+                <em aria-label={`읽지 않은 알림 ${unreadCount}건`}>{unreadCount > 9 ? '9+' : unreadCount}</em>
+              ) : null}
             </button>
+            </React.Fragment>
           );
         })}
         {(() => {
           const identity = formatIdentityBadge(currentUser, active);
           return (
-            <span className="navPill">
+            <span className="navPill" title={identity.secondary ? `${identity.primary} · ${identity.secondary}` : identity.primary}>
               <strong>{identity.primary}</strong>
               {identity.secondary ? <small>{identity.secondary}</small> : null}
             </span>
           );
         })()}
-        <button className="smallButton dark" type="button" onClick={onLogout}>로그아웃</button>
+        <button className="smallButton light" type="button" onClick={onLogout}>로그아웃</button>
       </nav>
     </header>
   );
