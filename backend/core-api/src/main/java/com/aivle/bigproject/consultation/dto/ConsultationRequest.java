@@ -8,7 +8,9 @@ import java.util.List;
 // 생성(POST)과 수정(PUT) 요청에 공통으로 쓰는 DTO.
 // 수정 시엔 null이 아닌 필드만 반영됨 (ConsultationService.update 참고) — 즉 "부분 수정" 방식.
 // 생성 시엔 status를 보내도 무시되고 항상 RECEIVED로 시작함 (ConsultationService.create 참고).
-// attachments는 생성 시에만 반영됨 (PUT으로는 첨부파일을 갱신하지 않음 — 기존 설계 유지).
+// attachments는 생성(POST) 시에만 반영됨 — PUT(update)은 이 필드를 무시함. 이미 있는 상담에 자료를
+// "추가"할 때는 AttachmentController의 POST .../attachments/register를, "삭제"할 때는
+// DELETE .../attachments/{attachmentId}를 대신 쓴다(둘 다 attachmentService가 처리).
 //
 // @NotNull/@NotBlank는 ConsultationController.create()에서만 @Valid로 발동시킨다 — update()는
 // 부분 수정이라 필드가 비어있는 게 정상이라서 같은 DTO를 검증 없이 그대로 쓴다.

@@ -1,7 +1,9 @@
 package com.aivle.bigproject.attachment;
 
+import com.aivle.bigproject.attachment.dto.AttachmentRegistrationRequest;
 import com.aivle.bigproject.audit.AuditAction;
 import com.aivle.bigproject.audit.AuditLogService;
+import com.aivle.bigproject.common.exception.ConflictException;
 import com.aivle.bigproject.common.exception.NotFoundException;
 import com.aivle.bigproject.consultation.Consultation;
 import com.aivle.bigproject.consultation.ConsultationService;
@@ -44,6 +46,20 @@ public class AttachmentService {
                 new Attachment(consultation, originalName, fileType, fileUrl, bucket, storageKey, file.getContentType()));
     }
 
+    // 기존 상담에 "자료 추가"할 때 씀. 파일 바이트는 이미 presigned URL로 S3에 올라가 있고,
+    // 여기서는 그 위치(fileKey 등) 메타데이터만 DB(Attachment)에 기록한다.
+    // (상담을 새로 만들 때는 ConsultationService.create()가 같은 일을 상담 생성과 한 트랜잭션으로 처리하지만,
+    //  이미 있는 상담에 자료만 추가하는 경우엔 PUT /api/consultations/{id}가 attachments를 반영하지 않으므로
+    //  — ConsultationRequest 주석 참고 — 이 전용 엔드포인트가 필요하다.)
+    @Transactional
+    public Attachment register(Long consultationId, AttachmentRegistrationRequest request) {
+        Consultation consultation = consultationService.findById(consultationId);
+        String bucket = s3FileStorageService.getBucket();
+        Attachment attachment = new Attachment(consultation, request.fileName(), request.fileType(),
+                request.fileUrl(), bucket, request.fileKey(), request.contentType());
+        return attachmentRepository.save(attachment);
+    }
+
     // 다운로드/삭제 전에 "이 첨부파일이 진짜 이 상담 소속이 맞는지"까지 같이 검증하는 조회 메서드.
     // (다른 상담의 attachmentId를 URL에 넣어서 접근하는 걸 막기 위함)
     public Attachment findByIdForConsultation(Long consultationId, Long attachmentId) {
@@ -67,5 +83,20 @@ public class AttachmentService {
         Attachment attachment = findByIdForConsultation(consultationId, attachmentId);
         s3FileStorageService.delete(attachment.getStorageKey()); // S3 오브젝트 삭제
         attachmentRepository.delete(attachment);                  // DB row 삭제
+    }
+
+    // 아직 어떤 상담에도 등록되지 않은(=Attachment DB row가 없는) S3 오브젝트를 지운다.
+    // "새 상담 만들기" 화면에서 파일을 골라 presigned URL로 S3까지 올렸지만, 아직 상담을 만들기
+    // 전(=등록할 consultationId가 없음)에 사용자가 "삭제"를 누른 경우가 유일한 대상이다.
+    // 이미 다른 Attachment가 같은 key를 쓰고 있으면(=이미 정식 등록됨) 실수로 지우지 않도록 거부한다.
+    @Transactional
+    public void deleteUnregistered(String fileKey) {
+        if (fileKey == null || fileKey.isBlank()) {
+            return;
+        }
+        if (attachmentRepository.existsByStorageKey(fileKey)) {
+            throw new ConflictException("이미 상담에 등록된 파일은 이 경로로 삭제할 수 없습니다: " + fileKey);
+        }
+        s3FileStorageService.delete(fileKey);
     }
 }
