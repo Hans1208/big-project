@@ -21,7 +21,7 @@ import {
   mapCoreAnalysisResponse,
   timelineEmptyMessage,
 } from '../services/coreApiClientV2.js';
-import { hydrateDraftDocument, rememberDraftDocumentSnapshot } from '../services/draftDocumentStore.js';
+import { cacheFormRecommendations, hydrateDraftDocument, readCachedFormRecommendations, rememberDraftDocumentSnapshot } from '../services/draftDocumentStore.js';
 import { readLawyerDraftEdit, saveLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { createClientHwpxDraft } from '../services/clientHwpxGenerator.js';
 import { isHwpxTemplateAlias, resolveHwpxTemplateName } from '../services/formTemplateResolver.js';
@@ -43,6 +43,18 @@ async function fetchAnalysisWithFallback(selectedCase) {
   } catch {
     return localFallback;
   }
+}
+
+// 저장된 분석(core-api 응답)을 화면이 쓸 수 있는 모양으로 되살립니다.
+//
+// 분석을 방금 돌린 경로(fetchAnalysisWithFallback)와 같은 병합을 거치게 해서, 새로고침 후
+// 복원한 분석도 같은 모양이 되게 합니다. 이 병합을 건너뛰면 화면이 그리는 값 중 계약에 없는
+// 것들(modalities, extractionDetail, sttPreview, verification)이 undefined로 남아
+// `analysis.modalities.map(...)`에서 터집니다.
+//
+// buildAnalysisResult는 이 파일 내부 구현이라 밖으로 내보내지 않고, 복원용 입구만 엽니다.
+export function hydrateAnalysisForDisplay(contractResult, consultation) {
+  return mergeContractAnalysisResponse(buildAnalysisResult(consultation || {}), contractResult);
 }
 
 function mergeContractAnalysisResponse(baseAnalysis, contractResult, extra = {}) {
@@ -1028,9 +1040,27 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
           </>
         ) : selectedCase ? (
           <>
+            {/* 이름은 읽기 전용이 아니라 고칠 수 있어야 합니다. AI가 통화에서 찾아 채우는데
+                잘못 들었을 수 있고, 이 화면에서 발견해도 실시간 상담 화면까지 가야 고칠 수
+                있으면 그냥 넘어가게 됩니다. 여기서 고친 것도 사람이 확정한 값으로 표시합니다. */}
             <div className="analysisCaseMeta">
               <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
-              <span>상담받은 사람 <strong>{selectedCase.name || '미입력'}</strong></span>
+              <label className={`analysisCaseMetaEdit${selectedCase.name ? '' : ' missing'}`}>
+                <span>
+                  상담받은 사람
+                  {selectedCase.name && selectedCase.nameSource === 'ai'
+                    ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em>
+                    : null}
+                </span>
+                <input
+                  value={selectedCase.name || ''}
+                  onChange={(event) => onUpdateConsultation(selectedCase.id, {
+                    name: event.target.value,
+                    nameSource: 'counselor',
+                  })}
+                  placeholder="이름 입력"
+                />
+              </label>
               <span>상담 제목 <strong>{selectedCase.title}</strong></span>
             </div>
             <EligibilityAndFilesSection
@@ -1117,6 +1147,34 @@ function maskSensitiveText(text = '') {
     .replace(/\d{6}\s*-\s*\d{7}/g, '[RRN]') // 주민등록번호
     .replace(/01[016789]\s*-?\s*\d{3,4}\s*-?\s*\d{4}/g, '[PHONE]') // 휴대전화
     .replace(/\d{2,4}\s*-\s*\d{3,4}\s*-\s*\d{4}/g, '[PHONE]'); // 유선전화
+}
+
+// 분석 결과에서 '상담을 받으러 온 사람'의 이름을 고릅니다.
+//
+// extracted_json.당사자는 [{역할, 이름}] 목록이고 상대방·피상속인까지 함께 들어 있어서,
+// 아무거나 집으면 상대방 이름이 상담자 자리에 들어갑니다. 역할을 보고 골라야 합니다.
+// '미상'처럼 확인 못 했다는 표시는 이름이 아니므로 거릅니다 — 그걸 채우면 화면에
+// "상담받은 사람: 미상"이 뜨고, 서식에도 그대로 실려 나갑니다.
+const CLIENT_ROLE_ORDER = ['청구인', '신청인', '내담자', '원고', '상속인'];
+const UNKNOWN_NAME_MARKS = ['미상', '불명', '확인불가', '확인 불가', '알 수 없음', '없음'];
+
+export function pickClientName(analysis) {
+  const parties = analysis?.extractedJson?.당사자;
+  if (!Array.isArray(parties) || !parties.length) return '';
+
+  const usable = parties.filter((party) => {
+    const name = (party?.이름 || '').trim();
+    if (!name) return false;
+    return !UNKNOWN_NAME_MARKS.some((mark) => name.includes(mark));
+  });
+  if (!usable.length) return '';
+
+  for (const role of CLIENT_ROLE_ORDER) {
+    const matched = usable.find((party) => (party?.역할 || '').includes(role));
+    if (matched) return matched.이름.trim();
+  }
+  // 역할명이 예상 밖이면(예: '신고인') 첫 당사자를 씁니다. 상담자가 먼저 언급되는 게 보통입니다.
+  return usable[0].이름.trim();
 }
 
 function buildAnalysisResult(selectedCase) {
@@ -1368,22 +1426,62 @@ function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus,
 // 넘어가게 합니다(예전엔 메뉴를 옮겨 사건을 다시 골라야 했습니다).
 // coreId·분석id가 있으면 실제 ai-api 추천(recommendCoreForms)을, 없으면 로컬 휴리스틱
 // (recommendTemplates, DraftWorkbench와 같은 함수)을 그대로 재사용합니다.
-function RecommendedFormsPanel({ selectedCase, onOpenDraft }) {
-  const draftCaseType = resolveConfirmedCaseType(selectedCase);
-  const canUseCoreApi = Boolean(selectedCase?.coreId && selectedCase?.coreAnalysisId);
-  const [aiRecommendations, setAiRecommendations] = useState([]);
+// 서식 추천을 가져옵니다. 실시간 상담 분석 화면과 서식 생성 화면이 같이 씁니다.
+//
+// 예전엔 두 화면이 각자 recommendCoreForms를 불러서, 분석 화면에서 추천을 본 뒤
+// 초안 만들기로 넘어가면 같은 상담·같은 분석인데도 처음부터 다시 돌렸습니다
+// (ai-api 임베딩 검색 + GPT 재랭킹이라 몇 초 걸립니다).
+//
+// 순서대로 찾습니다.
+//   1) 저장된 분석의 recommendation_json — 새로고침해도 남아 있는 유일한 자리
+//   2) 이번 세션 메모리 캐시 — 아직 저장 전이라도 화면 사이를 오갈 때 재사용
+//   3) 없으면 API 호출 후 두 곳에 모두 남김
+function useFormRecommendations(selectedCase) {
+  const coreId = selectedCase?.coreId;
+  const analysisId = selectedCase?.coreAnalysisId;
+  const canUseCoreApi = Boolean(coreId && analysisId);
+  // 저장된 분석에 이미 추천이 들어 있으면 그걸 그대로 씁니다.
+  const savedRecommendations = selectedCase?.analysis?.recommendation?.recommendations;
+
+  const initial = (Array.isArray(savedRecommendations) && savedRecommendations.length)
+    ? savedRecommendations
+    : (readCachedFormRecommendations(coreId, analysisId) || []);
+
+  const [aiRecommendations, setAiRecommendations] = useState(initial);
   const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    setAiRecommendations([]);
-    if (!canUseCoreApi) return undefined;
+    if (!canUseCoreApi) { setAiRecommendations([]); return undefined; }
+
+    if (Array.isArray(savedRecommendations) && savedRecommendations.length) {
+      cacheFormRecommendations(coreId, analysisId, savedRecommendations);
+      setAiRecommendations(savedRecommendations);
+      return undefined;
+    }
+    const cached = readCachedFormRecommendations(coreId, analysisId);
+    if (cached) { setAiRecommendations(cached); return undefined; }
+
     let cancelled = false;
+    setAiRecommendations([]);
     setLoading(true);
-    recommendCoreForms(selectedCase.coreId, selectedCase.coreAnalysisId)
-      .then((response) => { if (!cancelled) setAiRecommendations(response?.recommendations || []); })
+    recommendCoreForms(coreId, analysisId)
+      .then((response) => {
+        const list = response?.recommendations || [];
+        cacheFormRecommendations(coreId, analysisId, list);
+        if (!cancelled) setAiRecommendations(list);
+      })
       .catch(() => { if (!cancelled) setAiRecommendations([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [canUseCoreApi, selectedCase?.coreId, selectedCase?.coreAnalysisId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canUseCoreApi, coreId, analysisId, savedRecommendations]);
+
+  return { aiRecommendations, loading };
+}
+
+function RecommendedFormsPanel({ selectedCase, onOpenDraft, onSaveBeforeOpen, saving }) {
+  const draftCaseType = resolveConfirmedCaseType(selectedCase);
+  const { aiRecommendations, loading } = useFormRecommendations(selectedCase);
 
   // 실제 ai-api 추천이 있으면 'AI 추천' 배지를, 없어 로컬 휴리스틱으로 대체한 경우는
   // '추천' 배지로 구분해 어떤 근거로 골랐는지 헷갈리지 않게 합니다.
@@ -1411,8 +1509,17 @@ function RecommendedFormsPanel({ selectedCase, onOpenDraft }) {
                 {name}
                 <em className="tmplRowBadge">{usingAiRecommendations ? 'AI 추천' : '추천'}</em>
               </span>
-              <button type="button" className="secondaryActionButton compactAction" onClick={() => onOpenDraft?.(selectedCase.id)} disabled={!onOpenDraft}>
-                이 서식으로 초안 만들기
+              {/* 넘어가기 전에 저장까지 합니다. 예전엔 저장을 따로 눌러야 했고, 안 누르고
+                  넘어가면 서식 화면에서 분석 결과 없이 시작해 추천이 로컬 휴리스틱으로
+                  떨어졌습니다. 저장 버튼과 같은 함수(performSaveAnalysis)를 부르므로
+                  저장 경로가 둘로 갈리지 않습니다. */}
+              <button
+                type="button"
+                className="secondaryActionButton compactAction"
+                onClick={() => onSaveBeforeOpen?.(selectedCase.id)}
+                disabled={!onSaveBeforeOpen || saving}
+              >
+                {saving ? '저장하는 중...' : '저장하고 초안 만들기'}
               </button>
             </div>
           ))}
@@ -1490,6 +1597,29 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       await runWithLoading(async () => {
         const nextAnalysis = await fetchAnalysisWithFallback(selectedCase);
         setAnalysis(nextAnalysis);
+        // 통화에서 확인된 상담자 이름을 AI가 채웁니다. 통화 시작 시점에는 이름을 모르고
+        // 시작하므로(전화를 받자마자 상담이 만들어짐), 분석이 끝나야 알 수 있습니다.
+        //
+        // 상담원이 이미 직접 입력·수정한 이름은 덮어쓰지 않습니다. Whisper가 '이도영'을
+        // '이도형'으로 듣는 일이 있는데, 사람이 확인해 고쳐둔 값을 기계가 되돌리면 안 됩니다.
+        const aiName = pickClientName(nextAnalysis);
+
+        // /analyze는 core-api에 분석 행을 만들고 analysis_id를 돌려줍니다. 그동안 이 값을
+        // 버리고 있었고, coreAnalysisId는 '저장'을 눌러야만 채워졌습니다.
+        //
+        // 그래서 분석만 하고 서식 초안으로 넘어가면 추천이 로컬 휴리스틱으로 떨어졌습니다
+        // (RecommendedFormsPanel의 canUseCoreApi가 coreId와 coreAnalysisId를 둘 다 요구).
+        // 서식 추천·초안 생성 API가 이 id를 필요로 하므로 분석 직후에 바로 받아둡니다.
+        const patch = {};
+        if (nextAnalysis.analysisId && nextAnalysis.analysisId !== selectedCase.coreAnalysisId) {
+          patch.coreAnalysisId = nextAnalysis.analysisId;
+        }
+        if (aiName && !selectedCase.name && selectedCase.nameSource !== 'counselor') {
+          patch.name = aiName;
+          patch.nameSource = 'ai';
+        }
+        if (Object.keys(patch).length) onUpdateConsultation(selectedCase.id, patch);
+
         setAnalyzed(true);
         setAnalysisSaved(false);
         setSavedMessage('');
@@ -1612,9 +1742,19 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       .map((item) => item.fileKey || item.fileUrl || item.fileName)
       .filter(Boolean);
 
+    // 이번에 받아둔 서식 추천도 함께 저장합니다. recommendation_json 컬럼이 계속 비어 있어서,
+    // 화면을 옮기거나 새로고침할 때마다 같은 추천을 처음부터 다시 계산하고 있었습니다.
+    // 저장해두면 다음에 열 때 바로 뜹니다.
+    const cachedRecommendations = readCachedFormRecommendations(
+      selectedCase?.coreId, selectedCase?.coreAnalysisId,
+    );
+
     return {
       ...analysis,
       sourceAttachments,
+      recommendation: cachedRecommendations?.length
+        ? { recommendations: cachedRecommendations }
+        : (analysis?.recommendation || {}),
       extractedJson: {
         ...(analysis?.extractedJson || {}),
         attachment_links: sourceAttachments,
@@ -1673,6 +1813,26 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       return;
     }
     setPendingHitlAction({ type: 'save' });
+  };
+
+  // 추천 서식에서 '저장하고 초안 만들기'를 눌렀을 때.
+  //
+  // 저장을 따로 구현하지 않고 저장 버튼과 같은 performSaveAnalysis를 부릅니다. 저장 경로가
+  // 둘로 갈리면 한쪽만 고쳐지는 일이 생깁니다(감사 로그, 처리 단계 반영, core-api 동기화가
+  // 전부 저 함수 안에 있습니다).
+  //
+  // 저장을 기다린 뒤에 넘어가야 하는 이유: 서식 화면은 coreAnalysisId로 추천·초안 API를
+  // 부르는데, 저장이 끝나기 전에 넘어가면 그 값이 아직 없어 로컬 휴리스틱으로 떨어집니다.
+  const [savingBeforeDraft, setSavingBeforeDraft] = useState(false);
+  const saveThenOpenDraft = async (caseId) => {
+    if (!selectedCase || !analysis || savingBeforeDraft) return;
+    setSavingBeforeDraft(true);
+    try {
+      if (!analysisSaved) await performSaveAnalysis();
+      onOpenDraft?.(caseId);
+    } finally {
+      setSavingBeforeDraft(false);
+    }
   };
 
   // 분석 결과가 core-api에 저장돼 있으면(coreId+coreAnalysisId) 실제 검토 상태(AnalysisReviewStatus)도
@@ -1746,14 +1906,29 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         {selectedCase ? (
           <div className="analysisCaseMeta">
             <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
+            {/* 이름은 통화 시작 시점에 모릅니다(전화를 받자마자 상담이 만들어짐).
+                분석이 끝나면 AI가 통화 내용에서 찾아 채우고, 비었거나 다르면 상담원이 고칩니다.
+                상담원이 한 번 고치면 nameSource가 'counselor'가 되어 이후 재분석에도
+                덮어쓰지 않습니다 — 사람이 확인한 값을 기계가 되돌리면 안 됩니다. */}
             <label className={`analysisCaseMetaEdit realtimeRequiredNameField${selectedCase.name ? '' : ' missing'}`}>
-              <span>상담받은 사람 <em>필수 입력</em></span>
+              <span>
+                상담받은 사람
+                {selectedCase.name
+                  ? (selectedCase.nameSource === 'ai' ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em> : null)
+                  : <em>필수 입력</em>}
+              </span>
               <input
                 value={selectedCase.name || ''}
-                onChange={(event) => onUpdateConsultation(selectedCase.id, { name: event.target.value })}
-                placeholder="통화 중 확인되는 대로 입력"
+                onChange={(event) => onUpdateConsultation(selectedCase.id, {
+                  name: event.target.value,
+                  nameSource: 'counselor',
+                })}
+                placeholder="통화 중 확인되는 대로 입력 (분석 후 AI가 채웁니다)"
               />
               {!selectedCase.name ? <small>이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요.</small> : null}
+              {selectedCase.name && selectedCase.nameSource === 'ai'
+                ? <small>통화 내용에서 찾은 이름입니다. 잘못 들었을 수 있으니 맞는지 봐주세요.</small>
+                : null}
             </label>
             <label className="analysisCaseMetaEdit">
               <span>상담 제목</span>
@@ -1896,6 +2071,8 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
               <h3>멀티모달 입력 분석</h3>
               <div className="resultCard">
+                {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
+                    병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
                 {(analysis.modalities || []).map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
               </div>
               <h3>첨부파일 추출 처리 상태</h3>
@@ -1959,7 +2136,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               </div>
               <h3>체크리스트</h3>
               <div className="resultCard checklistBox">
-                {analysis.checklist.map((item, index) => (
+                {(analysis.checklist || []).map((item, index) => (
                   <label key={item.label}><input type="checkbox" checked={item.checked} onChange={() => updateChecklist(index)} />{item.label}</label>
                 ))}
               </div>
@@ -1979,7 +2156,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   {analysis.aiLinked?.missing ? (
                     <p className="fieldSyncNotice compactNotice"><strong>누락자료 반영됨</strong><span>보완 자료 목록 갱신</span></p>
                   ) : null}
-                  {analysis.missingInfo.length ? analysis.missingInfo.map((item) => {
+                  {(analysis.missingInfo || []).length ? analysis.missingInfo.map((item) => {
                     const submitted = analysis.evidenceStatus?.[item] === 'submitted';
                     return (
                       <button type="button" key={item} className={`evidenceItem ${submitted ? 'submitted' : 'missing'}`} onClick={() => toggleEvidenceStatus(item)} aria-pressed={submitted}>
@@ -2008,7 +2185,9 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <section className="railSection">
                 <h3>사실관계 타임라인</h3>
                 <div className="scrollBox small">
-                  {analysis.timeline.length
+                  {/* 없을 때 안내를 보여주는 건 master 쪽 동작을 그대로 살리고,
+                      timeline이 아예 undefined인 경우(복원 경로)에도 죽지 않게 감쌉니다. */}
+                  {(analysis.timeline || []).length
                     ? analysis.timeline.map((item, index) => <button type="button" key={`${item.date}-${index}`}>{item.date} - {item.text}</button>)
                     : <InlineEmptyNotice>{timelineEmptyMessage(analysis.timelineIssue)}</InlineEmptyNotice>}
                 </div>
@@ -2016,7 +2195,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   <input value={timelineText} onChange={(event) => setTimelineText(event.target.value)} placeholder="타임라인 항목" />
                   <button type="button" onClick={() => {
                     if (!timelineText.trim()) return;
-                    setAnalysis({ ...analysis, timeline: [...analysis.timeline, { date: today, text: timelineText }] });
+                    setAnalysis({ ...analysis, timeline: [...(analysis.timeline || []), { date: today, text: timelineText }] });
                     setTimelineText('');
                   }}>추가</button>
                 </div>
@@ -2033,7 +2212,14 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
             </div>
           </div>
         )}
-        {analyzed ? <RecommendedFormsPanel selectedCase={selectedCase} onOpenDraft={onOpenDraft} /> : null}
+        {analyzed ? (
+          <RecommendedFormsPanel
+            selectedCase={selectedCase}
+            onOpenDraft={onOpenDraft}
+            onSaveBeforeOpen={saveThenOpenDraft}
+            saving={savingBeforeDraft}
+          />
+        ) : null}
         {analyzed ? (
           <div className="analysisFinalActions">
             <button className="primaryButton compactAction" type="button" onClick={saveAnalysis}>분석 내용 저장</button>
@@ -2069,7 +2255,11 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
 function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation, onNotify, focusedConsultationId }) {
   const showToast = useToast();
   const [step, setStep] = useState('select');
-  const [caseId, setCaseId] = useState(caseOptions(consultations)[0].id);
+  // 분석 화면에서 '초안 만들기'로 넘어오면 focusedConsultationId가 그 사건을 가리킵니다.
+  // 처음에 목록 첫 사건으로 시작한 뒤 아래 useEffect가 교정하는 방식이었는데, 그러면
+  // 첫 렌더에서 엉뚱한 사건으로 추천 API를 한 번 부르고 나서 다시 부릅니다.
+  // 넘어올 때마다 추천이 다시 도는 것처럼 보이던 게 이것 때문입니다.
+  const [caseId, setCaseId] = useState(() => focusedConsultationId || caseOptions(consultations)[0].id);
   const [template, setTemplate] = useState(null);
   const [draft, setDraft] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
@@ -2121,26 +2311,9 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
 
   // ── 서식 추천 실연동: coreId·분석id가 있는 사건은 core-api → ai-api 추천 결과를 받아옵니다.
   // 없으면(로컬 상담이거나 core-api 저장 실패) 기존 로컬 휴리스틱(recommendTemplates)으로 조용히 대체합니다.
-  const [aiRecommendations, setAiRecommendations] = useState([]);
-  const [recommendLoading, setRecommendLoading] = useState(false);
-  useEffect(() => {
-    setAiRecommendations([]);
-    if (!canUseCoreApi) return;
-    let cancelled = false;
-    setRecommendLoading(true);
-    recommendCoreForms(selectedCase.coreId, selectedCase.coreAnalysisId)
-      .then((response) => {
-        if (!cancelled) setAiRecommendations(response?.recommendations || []);
-      })
-      .catch(() => {
-        // 실패해도 화면을 막지 않습니다 — 아래 로컬 추천으로 계속 진행됩니다.
-        if (!cancelled) setAiRecommendations([]);
-      })
-      .finally(() => {
-        if (!cancelled) setRecommendLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [canUseCoreApi, selectedCase?.coreId, selectedCase?.coreAnalysisId]);
+  // 분석 화면과 같은 훅을 씁니다. 저장된 recommendation_json이 있으면 그걸 쓰고,
+  // 없으면 이번 세션 캐시를, 그것도 없으면 API를 부릅니다.
+  const { aiRecommendations, loading: recommendLoading } = useFormRecommendations(selectedCase);
 
   // ── 생성된 초안의 core-api 문서 상태(초안 생성 → 검토 요청 → 승인/반려)입니다.
   // 사건이나 서식을 바꾸면 이전 초안의 id가 지금 화면과 안 맞으니 초기화합니다.

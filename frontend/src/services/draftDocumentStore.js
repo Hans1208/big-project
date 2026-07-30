@@ -70,6 +70,31 @@ function findDraftDocumentSnapshot(document = {}, context = {}) {
   )) || null;
 }
 
+// ── 서식 추천 결과 캐시 ──
+//
+// 실시간 상담 분석 화면과 서식 생성 화면이 각각 recommendCoreForms를 부릅니다.
+// 그래서 분석 화면에서 추천을 본 뒤 '초안 만들기'로 넘어가면, 같은 상담·같은 분석인데도
+// 서식 화면이 처음부터 다시 추천을 돌렸습니다(ai-api 임베딩 검색 + GPT 재랭킹이라 몇 초 걸리고
+// 결과가 미묘하게 달라질 수도 있습니다).
+//
+// 분석 id가 같으면 추천 결과도 같으므로 한 번 받은 것을 재사용합니다.
+// 분석을 다시 돌리면 analysisId가 바뀌어 자연히 새로 받습니다.
+const formRecommendationCache = new Map();
+
+function recommendationKey(consultationId, analysisId) {
+  return `${consultationId}:${analysisId}`;
+}
+
+export function readCachedFormRecommendations(consultationId, analysisId) {
+  if (!consultationId || !analysisId) return null;
+  return formRecommendationCache.get(recommendationKey(consultationId, analysisId)) || null;
+}
+
+export function cacheFormRecommendations(consultationId, analysisId, recommendations) {
+  if (!consultationId || !analysisId || !Array.isArray(recommendations)) return;
+  formRecommendationCache.set(recommendationKey(consultationId, analysisId), recommendations);
+}
+
 export function hydrateDraftDocument(document = {}, context = {}) {
   const snapshot = findDraftDocumentSnapshot(document, context);
   if (!snapshot) return document;

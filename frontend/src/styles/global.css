@@ -10071,6 +10071,28 @@ button:disabled,
   box-shadow: inset 4px 0 0 var(--warn-solid);
 }
 
+/* AI가 채운 이름은 '아직 확인 안 된 값'이라 주의(주황)가 아니라 안내(파랑) 톤으로 둡니다.
+   빠진 것도 잘못된 것도 아니고, 사람이 한 번 봐주기만 하면 되는 상태입니다.
+   상담원이 고치면 nameSource가 counselor로 바뀌어 이 배지가 사라집니다. */
+.analysisCaseMetaEdit .nameSourceAi {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.analysisCaseMetaEdit .nameSourceAi + input,
+.realtimeRequiredNameField .nameSourceAi ~ input {
+  border-color: var(--accent-soft);
+}
+
 .realtimeRequiredNameField.missing input {
   border-color: var(--warn-border);
   background: #fffdf8;
