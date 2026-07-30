@@ -18,6 +18,7 @@ import {
   fetchCoreUsers,
   loginCoreUser,
   mapCoreAnalysisResponse,
+  mapCoreAttachmentsToLocal,
   mapCoreUserToLocal,
   normalizeAuthResponse,
   registerCoreUser,
@@ -57,25 +58,6 @@ function buildHydratedAnalysis(row) {
     coreAnalysisId: coreAnalysisIdOf(row),
     analysis: mapCoreAnalysisResponse(row),
   };
-}
-
-function mapCoreAttachmentToLocal(item = {}) {
-  return {
-    category: item.fileType || item.category || '첨부자료',
-    name: item.fileName || item.name || item.fileKey || '첨부파일',
-    size: item.size || 0,
-    mimeType: item.contentType || item.mimeType || '',
-    storageBucket: item.storageBucket || '',
-    fileKey: item.fileKey || '',
-    uploadedUrl: item.fileUrl || item.downloadUrl || item.uploadedUrl || '',
-    status: item.fileKey || item.fileUrl ? '서버 저장' : '',
-  };
-}
-
-function mapCoreAttachmentsToLocal(row = {}) {
-  return (row.attachments || row.coreAttachments || [])
-    .map(mapCoreAttachmentToLocal)
-    .filter((item) => item.name || item.fileKey || item.uploadedUrl);
 }
 
 // 로그인한 역할에 따라 상담원/변호사/관리자 대시보드를 분기합니다.
@@ -135,11 +117,15 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         if (cancelled || !Array.isArray(serverRows)) return;
         setConsultations((items) => {
           const serverByCoreId = new Map(serverRows.map((row) => [row.id, row]));
+          // 첨부파일은 다른 필드(메모·법률구조 대상 등)와 달리 로컬 전용 값이 없습니다 — 추가/삭제가
+          // 항상 core-api(Attachment 테이블)를 거쳐 확정되므로, 서버 응답이 항상 진실입니다.
+          // 그래서 다른 필드는 로컬 값을 지키되(덮어쓰지 않음), attachments만은 서버 목록으로 완전히
+          // 맞춰씁니다 — 그래야 이미 삭제된 파일이 새로고침 후 되살아나 보이는 문제가 재발하지 않습니다.
           const mergedItems = items.map((item) => {
-            if (!item.coreId || item.attachments?.length) return item;
+            if (!item.coreId) return item;
             const serverRow = serverByCoreId.get(item.coreId);
-            const serverAttachments = mapCoreAttachmentsToLocal(serverRow);
-            return serverAttachments.length ? { ...item, attachments: serverAttachments } : item;
+            if (!serverRow) return item;
+            return { ...item, attachments: mapCoreAttachmentsToLocal(serverRow) };
           });
           const knownCoreIds = new Set(items.map((item) => item.coreId).filter(Boolean));
           const missingRows = serverRows.filter((row) => !knownCoreIds.has(row.id));
@@ -388,6 +374,10 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       logs: [{ status: '상담 접수', createdAt: today }],
       analysis: null,
       ...form,
+      // form.attachments는 아직 서버가 확정하지 않은 클라이언트 쪽 echo(첨부파일 DB row id가 없음)라
+      // "삭제" 버튼이 지울 대상을 특정할 수 없습니다. 방금 생성 응답(coreSync.attachments)에 서버가
+      // 실제로 저장을 확정한 목록(attachmentId 포함)이 있으면 그걸 우선합니다.
+      attachments: coreSync?.attachments?.length ? coreSync.attachments : (form.attachments || []),
     };
     setConsultations((items) => [nextConsultation, ...items]);
     appendAuditLog({

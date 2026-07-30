@@ -299,6 +299,9 @@ function normalizeCoreConsultation(row = {}) {
     createdAt: row.createdAt || '',
     updatedAt: row.updatedAt || '',
     coreAttachments: row.attachments || [],
+    // 서버가 실제로 저장을 확정한 첨부파일 목록(각 항목에 DB row id=attachmentId 포함).
+    // 상담 생성 직후 이 값을 쓰면, 방금 만든 상담의 첨부파일도 곧바로 "삭제" 가능한 상태로 화면에 반영됩니다.
+    attachments: mapCoreAttachmentsToLocal(row),
   };
 }
 
@@ -496,6 +499,57 @@ export function uploadCoreAttachment(consultationId, file, fileType) {
     method: 'POST',
     body: formData,
   });
+}
+
+// 이미 presigned URL로 S3에 올라간 파일의 메타데이터를 "기존" 상담에 등록합니다(DB에만 기록,
+// 재업로드 없음). 상담원이 "기존 상담에 자료 추가 → 자료 저장"을 눌렀을 때 새로 고른 파일마다 호출됩니다.
+// (상담을 새로 만들 때는 createCoreConsultation의 attachments 필드로 한 번에 같이 등록되므로 이 호출이 필요 없음.)
+export function registerCoreAttachment(consultationId, item) {
+  if (!consultationId) return Promise.reject(new Error('등록할 상담(consultationId)이 없습니다.'));
+  return requestCoreJson(`/api/consultations/${consultationId}/attachments/register`, {
+    method: 'POST',
+    body: JSON.stringify(toCoreAttachmentRegistration(item)),
+  });
+}
+
+// 첨부파일을 DB row + S3 오브젝트까지 실제로 지웁니다(AttachmentService.delete 참고).
+export function deleteCoreAttachment(consultationId, attachmentId) {
+  if (!consultationId || !attachmentId) return Promise.reject(new Error('삭제할 첨부파일을 특정할 수 없습니다.'));
+  return requestCoreJson(`/api/consultations/${consultationId}/attachments/${attachmentId}`, {
+    method: 'DELETE',
+  });
+}
+
+// 아직 어떤 상담에도 등록되지 않은(=DB에 Attachment row가 없는) S3 오브젝트를 지웁니다.
+// "새 상담 만들기" 화면에서 파일을 S3까지 올려놓고 상담을 만들기 전에 "삭제"를 누른 경우처럼,
+// deleteCoreAttachment가 못 지우는(consultationId·attachmentId가 아직 없는) 파일을 지울 때 씁니다.
+export function deleteUnregisteredCoreAttachment(fileKey) {
+  if (!fileKey) return Promise.reject(new Error('삭제할 파일 키(fileKey)가 없습니다.'));
+  return requestCoreJson(`/api/attachments/unregistered?fileKey=${encodeURIComponent(fileKey)}`, {
+    method: 'DELETE',
+  });
+}
+
+// core-api AttachmentResponse(id/fileName/fileType/downloadUrl 등)를 화면이 쓰는 첨부파일 모양으로 바꿉니다.
+// attachmentId(=DB row id)가 있어야 삭제 API를 호출할 수 있으므로 반드시 같이 넘겨줍니다.
+export function mapCoreAttachmentToLocal(item = {}) {
+  return {
+    attachmentId: item.id ?? null,
+    category: item.fileType || item.category || '첨부자료',
+    name: item.fileName || item.name || item.fileKey || '첨부파일',
+    size: item.size || 0,
+    mimeType: item.contentType || item.mimeType || '',
+    storageBucket: item.storageBucket || '',
+    fileKey: item.fileKey || '',
+    uploadedUrl: item.fileUrl || item.downloadUrl || item.uploadedUrl || '',
+    status: item.id != null ? '서버 저장' : (item.fileKey || item.fileUrl) ? 'S3 업로드 완료' : '',
+  };
+}
+
+export function mapCoreAttachmentsToLocal(row = {}) {
+  return (row.attachments || row.coreAttachments || [])
+    .map(mapCoreAttachmentToLocal)
+    .filter((item) => item.name || item.fileKey || item.uploadedUrl);
 }
 
 export function recommendCoreForms(consultationId, analysisId) {

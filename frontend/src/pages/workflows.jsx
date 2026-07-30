@@ -9,9 +9,12 @@ import {
   buildCoreDocumentDownloadUrl,
   createCoreAnalysis,
   createCoreConsultation,
+  deleteCoreAttachment,
+  deleteUnregisteredCoreAttachment,
   fetchCoreDocuments,
   generateCoreDraft,
   recommendCoreForms,
+  registerCoreAttachment,
   submitCoreAnalysisForReview,
   submitCoreDocumentForReview,
   triggerCoreAnalysis,
@@ -760,7 +763,54 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     setFilesState((items) => [...items, ...staged]);
     setMessage(`${label} ${staged.length}개 추가 · 저장 시 업로드됩니다`);
   };
-  const removeFileAt = (setFilesState, index) => setFilesState((items) => items.filter((_, itemIndex) => itemIndex !== index));
+  // "삭제"는 그 파일이 실제로 어디까지 저장돼 있는지에 따라 다르게 처리합니다.
+  //  - DB(Attachment)에 이미 등록됨(attachmentId 있음) → 백엔드가 DB row + S3 오브젝트를 함께 지웁니다.
+  //  - 아직 등록 전이지만 S3에는 이미 올라가 있음(fileKey만 있음 — 예: "새 상담 만들기"에서 상담을
+  //    만들기 전에 지우는 경우) → 등록되지 않은 S3 오브젝트 전용 삭제 경로로 지웁니다.
+  //  - 둘 다 없으면(로컬에서 방금 고르기만 함) 지울 서버 실체가 없으므로 목록에서만 뺍니다.
+  // 실패하면 목록에서 빼지 않습니다 — "지웠는데 서버·S3엔 그대로 남아있는" 불일치를 막기 위함입니다.
+  // draftKey를 주면(=아직 상담이 없는 새 상담 만들기 초안) 로컬스토리지 draft도 같이 갱신해서,
+  // "임시저장"을 다시 누르지 않아도 지운 파일이 새로고침 후 되살아나지 않게 합니다.
+  const removeFileAt = async (setFilesState, files, index, coreId, draftKey) => {
+    const target = files[index];
+    if (!target) return undefined;
+    try {
+      if (target.attachmentId && coreId) {
+        await deleteCoreAttachment(coreId, target.attachmentId);
+      } else if (target.fileKey) {
+        await deleteUnregisteredCoreAttachment(target.fileKey);
+      }
+    } catch (error) {
+      showToast(`삭제 실패: ${error.message}`, 'warn');
+      return undefined;
+    }
+    const nextFiles = files.filter((_, itemIndex) => itemIndex !== index);
+    setFilesState(nextFiles);
+    if (draftKey) {
+      const savedDraft = readStorage(draftKey, null);
+      if (savedDraft) writeStorage(draftKey, { ...savedDraft, files: nextFiles });
+    }
+    return nextFiles;
+  };
+
+  // 업로드는 됐지만(fileKey 있음) 아직 이 상담의 DB에 등록되지 않은 파일(attachmentId 없음)을
+  // 등록합니다. coreId가 없으면(=아직 core-api에 없는 상담, 예: 새 상담 만들기 흐름) 등록할 곳이
+  // 없어 건너뜁니다 — 그 흐름은 상담 생성 자체가 attachments를 함께 등록하므로 이 호출이 필요 없습니다.
+  const registerNewAttachments = async (files, coreId) => {
+    if (!coreId) return files;
+    const unregistered = files.filter((item) => item.fileKey && !item.attachmentId);
+    if (!unregistered.length) return files;
+    let result = files;
+    for (const item of unregistered) {
+      try {
+        const saved = await registerCoreAttachment(coreId, item);
+        result = result.map((file) => file.id === item.id ? { ...file, attachmentId: saved.id, status: '서버 저장' } : file);
+      } catch (error) {
+        showToast(`${item.name} 등록 실패: ${error.message}`, 'warn');
+      }
+    }
+    return result;
+  };
 
   // 저장 동작(임시저장·자료 저장)에서 호출해, 그때까지 S3에 올라가지 않은 파일(fileKey 없음 —
   // 신규 선택분뿐 아니라 이전 시도에서 실패했거나 백엔드 미지원으로 로컬 보관 중이던 파일도 포함)을
@@ -805,15 +855,32 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     writeStorage(storageKeys.uploadDraft, { form: newForm, files: uploadedFiles, savedAt: new Date().toISOString() });
     setMessage('임시저장 완료');
   };
-  const clearDraft = () => {
+  // "비우기"도 "삭제"와 같은 이유로 정리가 필요합니다 — 임시저장 단계에서 이미 S3에 올라간 파일
+  // (fileKey는 있지만 아직 어떤 상담에도 등록되지 않아 attachmentId가 없는 파일)을 먼저 지우지 않으면,
+  // 로컬 목록·draft만 비워질 뿐 S3에는 그 파일이 그대로 남습니다.
+  const clearDraft = async () => {
+    const orphaned = newFiles.filter((item) => item.fileKey && !item.attachmentId);
+    let failedCount = 0;
+    for (const item of orphaned) {
+      try {
+        await deleteUnregisteredCoreAttachment(item.fileKey);
+      } catch (error) {
+        failedCount += 1;
+      }
+    }
     writeStorage(storageKeys.uploadDraft, null);
     setNewForm(emptyNewForm);
     setNewFiles([]);
-    setMessage('임시저장 비움');
+    if (failedCount) {
+      showToast(`S3에 남은 파일 ${failedCount}건을 정리하지 못했습니다.`, 'warn');
+      setMessage(`임시저장 비움 · S3 파일 ${failedCount}건 정리 실패`);
+    } else {
+      setMessage('임시저장 비움');
+    }
   };
 
-  const buildAttachmentPayload = (files) => files.map(({ category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => (
-    { category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }
+  const buildAttachmentPayload = (files) => files.map(({ attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => (
+    { attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }
   ));
   const buildEligibilityPayload = ({ legalAidType, eligibilityEvidenceSubmitted }) => {
     const selectedApplicantType = legalAidApplicantTypes.find((item) => item.key === legalAidType) || legalAidApplicantTypes[0];
@@ -870,9 +937,13 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     });
     if (!accepted) return;
     const uploadedFiles = await uploadPendingFiles(existingFiles, setExistingFiles);
+    // S3까지는 올라갔어도 아직 이 상담의 Attachment DB row가 없는 파일(방금 새로 고른 파일)을
+    // 여기서 등록합니다 — 이걸 하지 않으면 화면에는 보이지만 DB에는 없는 파일이 생깁니다.
+    const registeredFiles = await registerNewAttachments(uploadedFiles, selectedCase.coreId);
+    setExistingFiles(registeredFiles);
     onUpdateConsultation(selectedCase.id, {
       eligibilityCheck: buildEligibilityPayload(existingEligibility),
-      attachments: buildAttachmentPayload(uploadedFiles),
+      attachments: buildAttachmentPayload(registeredFiles),
     });
     setMessage('');
     showToast('자료 저장 완료 · 검토 요청 시 함께 전달', 'success');
@@ -945,7 +1016,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
               onChangeEvidenceSubmitted={(checked) => setNewForm({ ...newForm, eligibilityEvidenceSubmitted: checked })}
               files={newFiles}
               onAddFiles={(label, files) => addFilesTo(setNewFiles, label, files)}
-              onRemoveFile={(index) => removeFileAt(setNewFiles, index)}
+              onRemoveFile={(index) => removeFileAt(setNewFiles, newFiles, index, null, storageKeys.uploadDraft)}
             />
             <div className="uploadActionRow">
               <div className="uploadSecondaryActions">
@@ -969,7 +1040,10 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
               onChangeEvidenceSubmitted={(checked) => setExistingEligibility((current) => ({ ...current, eligibilityEvidenceSubmitted: checked }))}
               files={existingFiles}
               onAddFiles={(label, files) => addFilesTo(setExistingFiles, label, files)}
-              onRemoveFile={(index) => removeFileAt(setExistingFiles, index)}
+              onRemoveFile={async (index) => {
+                const nextFiles = await removeFileAt(setExistingFiles, existingFiles, index, selectedCase?.coreId, null);
+                if (nextFiles) onUpdateConsultation(selectedCase.id, { attachments: buildAttachmentPayload(nextFiles) });
+              }}
             />
             <div className="uploadActionRow">
               <button className="primaryButton uploadSubmitButton" type="button" onClick={submitExistingCase}>자료 저장</button>
