@@ -247,6 +247,29 @@ function normalizeIncomingTimelineItem(item) {
   };
 }
 
+// "타임라인이 안 보인다"는 문의가 실제로는 서로 다른 원인일 수 있어(같은 상담을 재분석했을 때
+// 이번 회차의 ai-api 구조화 분석 단계만 실패해 timeline_json이 비어 저장되는 경우가 실제로 있었음),
+// 상담원이 원인을 구분할 수 있도록 코드를 매긴다.
+// 001: timeline_json 자체가 없음(null) 또는 빈 배열 — 이번 분석 결과에 타임라인이 없는 정상적인 빈 상태
+// 002: 배열은 있지만 항목이 {date,text}/{날짜,내용} 어느 쪽으로도 정규화되지 않음 — 저장 형식 문제
+// 003: 배열이 아닌 예상 밖 구조 등 그 외
+export const TIMELINE_ISSUE = { EMPTY: '001', SHAPE_MISMATCH: '002', OTHER: '003' };
+
+function classifyTimelineIssue(rawTimelineJson) {
+  if (rawTimelineJson == null) return TIMELINE_ISSUE.EMPTY;
+  if (!Array.isArray(rawTimelineJson)) return TIMELINE_ISSUE.OTHER;
+  if (rawTimelineJson.length === 0) return TIMELINE_ISSUE.EMPTY;
+  const hasUsableItem = rawTimelineJson.some((item) => {
+    const normalized = normalizeIncomingTimelineItem(item);
+    return Boolean(normalized.date || normalized.text);
+  });
+  return hasUsableItem ? null : TIMELINE_ISSUE.SHAPE_MISMATCH;
+}
+
+export function timelineEmptyMessage(issueCode) {
+  return `확인된 타임라인 자료가 없습니다_${issueCode || TIMELINE_ISSUE.OTHER}`;
+}
+
 function toCoreAnalysisPayload(analysis = {}) {
   return {
     summary: analysis.summary || '',
@@ -449,6 +472,7 @@ export function mapCoreAnalysisResponse(coreAnalysis = {}) {
     checklist: mapCoreChecklist(coreAnalysis.checklist_json),
     recommendation: coreAnalysis.recommendation_json || {},
     timeline: (coreAnalysis.timeline_json || []).map(normalizeIncomingTimelineItem),
+    timelineIssue: classifyTimelineIssue(coreAnalysis.timeline_json),
     clusterResult: coreAnalysis.cluster_result_json || [],
     extractedJson,
     status: coreAnalysis.status || '',

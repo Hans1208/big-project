@@ -16,6 +16,7 @@ import {
   submitCoreDocumentForReview,
   triggerCoreAnalysis,
   mapCoreAnalysisResponse,
+  timelineEmptyMessage,
 } from '../services/coreApiClientV2.js';
 import { hydrateDraftDocument, rememberDraftDocumentSnapshot } from '../services/draftDocumentStore.js';
 import { readLawyerDraftEdit, saveLawyerDraftEdit } from '../services/documentReviewStore.js';
@@ -1797,7 +1798,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
               <h3>멀티모달 입력 분석</h3>
               <div className="resultCard">
-                {analysis.modalities.map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
+                {(analysis.modalities || []).map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
               </div>
               <h3>첨부파일 추출 처리 상태</h3>
               <div className="resultCard">
@@ -1909,7 +1910,9 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <section className="railSection">
                 <h3>사실관계 타임라인</h3>
                 <div className="scrollBox small">
-                  {analysis.timeline.map((item, index) => <button type="button" key={`${item.date}-${index}`}>{item.date} - {item.text}</button>)}
+                  {analysis.timeline.length
+                    ? analysis.timeline.map((item, index) => <button type="button" key={`${item.date}-${index}`}>{item.date} - {item.text}</button>)
+                    : <InlineEmptyNotice>{timelineEmptyMessage(analysis.timelineIssue)}</InlineEmptyNotice>}
                 </div>
                 <div className="inlineControls compactInline">
                   <input value={timelineText} onChange={(event) => setTimelineText(event.target.value)} placeholder="타임라인 항목" />

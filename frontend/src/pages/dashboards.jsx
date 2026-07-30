@@ -7,7 +7,7 @@ import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatu
 import { appendAuditLog, getAuditLogs } from '../services/storage.js';
 import { checkTemplateRevision, simulateBackendLatency } from '../services/legalAidApi.js';
 import { checkAiApiHealth } from '../services/aiApiClient.js';
-import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, requestCoreAnalysisRevision, verifyCoreAuditLogChain } from '../services/coreApiClientV2.js';
+import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, requestCoreAnalysisRevision, verifyCoreAuditLogChain, timelineEmptyMessage } from '../services/coreApiClientV2.js';
 import { readSubmittedLocalDocumentReviews, updateLocalDocumentReview, removeLocalDocumentReview, dismissDocumentReview, isDocumentReviewDismissed, saveLawyerDraftEdit, readLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { hydrateDraftDocument } from '../services/draftDocumentStore.js';
 import { caseCategories, getCaseCategory } from '../data/domain.js';
@@ -836,7 +836,7 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   const selectedDecision = hitlDecisions.find((item) => item.key === decision);
   const analysis = review.analysis || {};
   const adoptedItems = formatAnalysisList(analysis.adoptedItems, '상담원이 채택한 검토 반영 항목 없음');
-  const timelineItems = formatAnalysisList(analysis.timeline, { date: '-', text: '정리된 사실관계 타임라인 없음' });
+  const timelineItems = formatAnalysisList(analysis.timeline, { date: '-', text: timelineEmptyMessage(analysis.timelineIssue) });
   const extractedItems = formatAnalysisList(analysis.extractionDetail, { status: '', fileLink: '', note: '첨부파일 추출 정보 없음' });
   const attachmentItems = formatAnalysisList(analysis.sourceAttachments?.length ? analysis.sourceAttachments : analysis.extractedJson?.attachment_links, { fileName: '첨부 링크 정보 없음', fileKey: '', fileUrl: '' });
   const modalityItems = formatAnalysisList(analysis.modalities, { key: '입력자료', count: 0 });
