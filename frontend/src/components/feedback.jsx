@@ -103,7 +103,14 @@ function FeedbackProvider({ children }) {
   }, [dismissToast]);
 
   const confirm = useCallback((request) => new Promise((resolve) => {
-    setConfirmState({ request: typeof request === 'string' ? { title: request } : request, resolve });
+    // 이미 답변을 기다리는 확인창이 있는데 또 confirm()이 호출되면(중복 클릭 등),
+    // 뒤 호출이 앞 호출의 confirmState를 그대로 덮어써서 앞 Promise의 resolve가 유실되고
+    // 그 호출부는 영원히 await에서 멈춰 있었습니다. 새 확인창을 띄우기 전에 먼저
+    // 이전 확인창을 "취소"로 정리해 그 Promise부터 풀어줍니다.
+    setConfirmState((current) => {
+      current?.resolve(false);
+      return { request: typeof request === 'string' ? { title: request } : request, resolve };
+    });
   }), []);
 
   const answerConfirm = useCallback((answer) => {

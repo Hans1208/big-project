@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, ClipboardList, ChevronDown, ChevronRight, Search, Check, FileAudio2, Mic, PhoneCall, Radio } from 'lucide-react';
+import { ShieldCheck, ClipboardList, ChevronDown, ChevronRight, FileText, Info, Search, Check, FileAudio2, Mic, PhoneCall, Radio } from 'lucide-react';
 import { today } from '../constants.jsx';
+import { formatDateTimeLabel } from '../utils/date.js';
 import { createAttachmentMetadata, generateDraftText, recommendTemplates, searchReferenceCandidates, validateAnalysisResult } from '../services/legalAidApi.js';
 import { appendAuditLog, getFavoriteTemplates, readStorage, storageKeys, toggleFavoriteTemplate, writeStorage } from '../services/storage.js';
-import { generateAiDraft } from '../services/aiApiClient.js';
 import {
   approveCoreDocument,
   buildCoreDocumentDownloadUrl,
@@ -12,19 +12,18 @@ import {
   fetchCoreDocuments,
   generateCoreDraft,
   recommendCoreForms,
-  requestCoreDocumentRevision,
   submitCoreAnalysisForReview,
   submitCoreDocumentForReview,
   triggerCoreAnalysis,
   mapCoreAnalysisResponse,
 } from '../services/coreApiClientV2.js';
-import { saveLocalDocumentReviewRequest } from '../services/documentReviewStore.js';
 import { hydrateDraftDocument, rememberDraftDocumentSnapshot } from '../services/draftDocumentStore.js';
-import { isHwpxTemplateAlias, resolveHwpxTemplateName } from '../services/formTemplateResolver.js';
+import { readLawyerDraftEdit, saveLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { createClientHwpxDraft } from '../services/clientHwpxGenerator.js';
+import { isHwpxTemplateAlias, resolveHwpxTemplateName } from '../services/formTemplateResolver.js';
 import { uploadFileToS3, S3UploadUnavailableError } from '../services/s3UploadClient.js';
 import { caseCategories, isKnownCaseType, legalTemplateSeed } from '../data/domain.js';
-import { HitlConfirmModal } from '../components/common.jsx';
+import { HitlConfirmModal, InlineEmptyNotice, WorkPageHeader } from '../components/common.jsx';
 import { useAsyncAction } from '../components/loading.jsx';
 import { useConfirm, useToast } from '../components/feedback.jsx';
 
@@ -64,6 +63,29 @@ function mergeContractAnalysisResponse(baseAnalysis, contractResult, extra = {})
       ...(extra.extractedJson || {}),
     },
   };
+}
+
+// 코치 피드백: "줄글이 아닌 개요 형식의 짧게 요약". AI 요약이 문장 여러 개로 이어진 줄글로
+// 오더라도, 문장 단위(마침표·줄바꿈)로 쪼개 개요(bullet) 목록으로 보여줍니다.
+function splitSummaryIntoBullets(summaryText = '') {
+  // 문장으로 끊어 쓴 요약은 마침표 기준으로, "사건 유형: 이혼 / 긴급도: 중"처럼 슬래시로
+  // 항목을 나열한 요약(core-api 응답 형식)은 슬래시 기준으로 쪼갭니다.
+  return summaryText
+    .split(/(?<=[.!?다요])\s+|\n+|\s+\/\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function SummaryBulletList({ text, emptyText = '요약 없음' }) {
+  const bullets = splitSummaryIntoBullets(text);
+  if (!bullets.length) return <p>{emptyText}</p>;
+  // 문장이 하나뿐이면 목록으로 쪼갤 이유가 없어(오히려 산만해 보임) 마커 없는 한 줄로 둡니다.
+  const isSingleLine = bullets.length === 1;
+  return (
+    <ul className={`summaryBulletList${isSingleLine ? ' singleLine' : ''}`}>
+      {bullets.map((sentence, index) => <li key={`${index}-${sentence.slice(0, 12)}`}>{sentence}</li>)}
+    </ul>
+  );
 }
 
 function normalizeMissingInfoItems(items = []) {
@@ -174,7 +196,7 @@ function buildAiResultSummary(kind, result) {
       items: [
         `구조대상 판정: ${result.eligibility || '검토 필요'}`,
         `증빙서류: ${result.eligibilityCheck?.evidenceSubmitted ? '제출 확인됨' : `미제출${result.eligibilityCheck?.requiredEvidence ? ` (${result.eligibilityCheck.requiredEvidence})` : ''}`}`,
-        `긴급도 근거: ${result.emergency?.reason || '산출된 근거가 없습니다.'}`,
+        `긴급도 근거: ${result.emergency?.reason || '근거 없음'}`,
       ],
     };
   }
@@ -287,7 +309,7 @@ async function requestMissingDataCandidate(selectedCase, analysis) {
 }
 
 function caseOptions(consultations) {
-  return consultations.length ? consultations : [{ id: 'empty', caseNo: '상담 선택', title: '등록된 상담이 없습니다.' }];
+  return consultations.length ? consultations : [{ id: 'empty', caseNo: '상담 선택', title: '등록된 상담 없음' }];
 }
 
 // 서식 추천(legalTemplateSeed)과 법령·판례 검색은 소분류(caseSubtype) 단위로 데이터가 연결돼 있습니다.
@@ -349,7 +371,7 @@ function CasePicker({ consultations, value, onChange, placeholder = '사건을 �
       >
         <span className="casePickerButtonText">
           <strong>{hasSelectableCase ? selected.caseNo : placeholder}</strong>
-          <span>{hasSelectableCase ? `${selected.name || '상담자 미지정'} · ${selected.title || '상담 제목 미입력'}` : selected?.title || '등록된 상담이 없습니다.'}</span>
+          <span>{hasSelectableCase ? `${selected.name || '상담자 미지정'} · ${selected.title || '상담 제목 미입력'}` : selected?.title || '등록된 상담 없음'}</span>
           {hasSelectableCase ? <small>{casePickerDateLabel(selected)}</small> : null}
         </span>
         <ChevronDown size={18} aria-hidden="true" />
@@ -381,7 +403,7 @@ function CasePicker({ consultations, value, onChange, placeholder = '사건을 �
                 <em>{item.id === 'empty' ? '없음' : casePickerDateLabel(item)}</em>
               </button>
             )) : (
-              <p className="casePickerEmpty">검색 결과가 없습니다.</p>
+              <p className="casePickerEmpty">검색 결과 없음</p>
             )}
           </div>
         </div>
@@ -451,7 +473,7 @@ function ChoicePicker({ options, value, onChange, placeholder = '선택하세요
                 {option.description ? <small>{option.description}</small> : null}
               </button>
             )) : (
-              <p className="choicePickerEmpty">검색 결과가 없습니다.</p>
+              <p className="choicePickerEmpty">검색 결과 없음</p>
             )}
           </div>
         </div>
@@ -493,7 +515,7 @@ function getEligibilityHelperText(isApplicant, evidenceSubmitted) {
 
 // 업로드 상태 문자열을 상태 칩 색 톤으로 매핑합니다.
 function uploadStatusTone(status) {
-  if (status === 'S3 업로드 완료') return 'tone-success';
+  if (status === 'S3 업로드 완료' || status === '서버 저장') return 'tone-success';
   if (status === '업로드 실패') return 'tone-danger';
   if (status === '업로드 중') return 'tone-info';
   return 'tone-warn'; // 로컬 보관 (S3 대기) 등
@@ -502,19 +524,21 @@ function uploadStatusTone(status) {
 // 오른쪽 2단계 카드는 예전엔 왼쪽 문단이 말로 설명하는 내용을 그림으로 다시 보여주기만 해서
 // 있으나 마나 했습니다. 지금은 '지금 여기' 표시뿐 아니라, 지금 있지 않은 단계를 눌러 바로
 // 넘어갈 수 있는 작은 스텝 네비게이션으로 씁니다(상단 메뉴까지 갈 필요 없이 화면 안에서 전환).
-function CounselorFlowStage({ current = 'upload', onNavigate }) {
+function CounselorFlowStage({ current = 'realtime', onNavigate }) {
+  // 통화를 받으면서 곧바로 진행하는 실시간 상담이 먼저이고, 문서 업로드는 통화가 끝난 뒤
+  // 자료를 정리해 변호사 검토로 넘기는 후처리 단계입니다. (코치 피드백: 실시간 중심으로 순서 변경)
   const stages = [
-    {
-      key: 'upload',
-      icon: FileAudio2,
-      title: '상담 문서 업로드',
-      detail: '문서, 녹취, 이미지 정리',
-    },
     {
       key: 'realtime',
       icon: Radio,
-      title: '실시간 분석 AI',
-      detail: '통화, STT, 분석 보조',
+      title: '실시간 상담',
+      detail: '통화 시작 · 메모 · AI 분석',
+    },
+    {
+      key: 'upload',
+      icon: FileAudio2,
+      title: '상담 자료 업로드',
+      detail: '통화 후 자료 정리 · 변호사 검토 전달',
     },
   ];
 
@@ -522,12 +546,8 @@ function CounselorFlowStage({ current = 'upload', onNavigate }) {
     <section className="flowStageBanner" aria-label="상담원 업무 단계">
       <div className="flowStageCopy">
         <span className="flowStageEyebrow">상담원 업무 흐름</span>
-        <strong>{current === 'upload' ? '상담 접수 자료를 먼저 정리합니다.' : '통화와 STT를 보며 실시간 분석을 진행합니다.'}</strong>
-        <p>
-          {current === 'upload'
-            ? '상담 문서 업로드 화면에서 사건 정보와 첨부자료를 정리한 뒤, 다음 단계에서 실시간 텍스트와 AI 분석 보조를 이어서 확인합니다.'
-            : '전화를 받으면서 바로 진행할 때는 아래 ‘새 실시간 상담 바로 시작’으로 곧장 시작하세요. 이름·상담 내용 같은 세부 정보는 통화 중이나 통화 후에 채우면 됩니다.'}
-        </p>
+        <strong>{current === 'upload' ? '통화 후 자료를 정리합니다.' : '통화 중 바로 기록합니다.'}</strong>
+        <p>{current === 'upload' ? '상담 선택 · 자료 첨부 · 검토 전달' : '통화 시작 · 메모 작성 · AI 분석'}</p>
       </div>
       <div className="flowStageSteps">
         {stages.map((stage, index) => {
@@ -560,45 +580,194 @@ function CounselorFlowStage({ current = 'upload', onNavigate }) {
   );
 }
 
-function UploadWorkbench({ onCreateConsultation, onGoToRealtimeAnalysis }) {
+// 상담 검토 요청에 이미 담긴 법률구조 대상 정보(사람이 읽는 라벨)를, 이 화면의 select가 쓰는
+// key 값으로 되돌립니다. 기존 상담을 골랐을 때 폼을 그 상담의 현재 값으로 채우는 데 씁니다.
+function resolveLegalAidTypeKey(applicantTypeLabel) {
+  const matched = legalAidApplicantTypes.find((item) => item.label === applicantTypeLabel);
+  return matched ? matched.key : 'none';
+}
+
+function buildEligibilityDraftFromCase(selectedCase) {
+  const check = selectedCase?.eligibilityCheck;
+  return {
+    legalAidType: check ? resolveLegalAidTypeKey(check.applicantType) : 'none',
+    eligibilityEvidenceSubmitted: Boolean(check?.evidenceSubmitted),
+  };
+}
+
+// 통화 전에 자료부터 올려두는 드문 경우를 위한 자동 제목입니다. 상담자 이름·제목은
+// 실시간 상담 화면에서 통화 중에 채우므로 여기서는 입력받지 않습니다. (코치 피드백)
+function buildAutoUploadTitle() {
+  const now = new Date();
+  const label = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  return `상담 자료 업로드 (${label} 등록)`;
+}
+
+// 업로드 자료 종류(녹취록/신분증/증빙자료)는 드롭존 옆 select로 고르고, 실제 파일 받기는
+// 드롭존 하나로 통일합니다. 버튼 세 개를 늘어놓던 이전 방식보다 화면이 훨씬 단순해집니다.
+const uploadCategoryOptions = ['녹취록', '신분증', '증빙자료'];
+
+function FileDropzone({ category, onCategoryChange, onAddFiles }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const inputId = React.useId();
+  const handleFiles = (fileList) => {
+    if (!fileList || !fileList.length) return;
+    onAddFiles(category, fileList);
+  };
+  return (
+    <div
+      className={isDragOver ? 'fileDropzone dragOver' : 'fileDropzone'}
+      onDragOver={(event) => { event.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        setIsDragOver(false);
+        handleFiles(event.dataTransfer.files);
+      }}
+    >
+      <p className="fileDropzoneHint">자료 종류 선택 · 파일 추가</p>
+      <div className="fileDropzoneControls">
+        <select value={category} onChange={(event) => onCategoryChange(event.target.value)}>
+          {uploadCategoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <label className="fileBtn" htmlFor={inputId}>
+          파일 선택
+          <input
+            id={inputId}
+            type="file"
+            multiple
+            accept=".mp3,.wav,.m4a,.txt,.pdf,.jpg,.jpeg,.png,.hwpx,.doc,.docx"
+            onChange={(event) => {
+              handleFiles(event.target.files);
+              event.target.value = '';
+            }}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+// 법률구조 대상 확인 + 파일 업로드는 '새 상담 만들기'와 '기존 상담에 자료 추가' 두 경로에서
+// 완전히 같은 모양으로 쓰이므로, 한 군데(SRP)에 모아 두 곳에서 재사용합니다.
+function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSubmitted, onChangeLegalAidType, onChangeEvidenceSubmitted, files, onAddFiles, onRemoveFile }) {
+  const [dropzoneCategory, setDropzoneCategory] = useState(uploadCategoryOptions[2]);
+  const selectedApplicantType = legalAidApplicantTypes.find((item) => item.key === legalAidType) || legalAidApplicantTypes[0];
+  const isLegalAidApplicant = legalAidType !== 'none';
+  const eligibilityBadgeText = getEligibilityBadgeText(isLegalAidApplicant, eligibilityEvidenceSubmitted);
+  const eligibilityHelperText = getEligibilityHelperText(isLegalAidApplicant, eligibilityEvidenceSubmitted);
+  return (
+    <>
+      <section className="eligibilityPanel">
+        <div className="eligibilityHeader">
+          <div>
+            <h3>법률구조 대상자 확인</h3>
+            <p>대상 유형 · 증빙 제출 여부</p>
+          </div>
+          <span className={isLegalAidApplicant ? 'eligibilityBadge active' : 'eligibilityBadge'}>{eligibilityBadgeText}</span>
+        </div>
+        <div className="formGrid">
+          <label className="field">
+            <span>대상자 유형</span>
+            <select className="eligibilitySelect highlighted" value={legalAidType} onChange={(event) => onChangeLegalAidType(event.target.value)}>
+              {legalAidApplicantTypes.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+            </select>
+          </label>
+          <div className="evidenceBox">
+            <span>필요 증빙서류</span>
+            <strong>{selectedApplicantType.evidence}</strong>
+            <label>
+              <input
+                type="checkbox"
+                checked={eligibilityEvidenceSubmitted}
+                disabled={!isLegalAidApplicant}
+                onChange={(event) => onChangeEvidenceSubmitted(event.target.checked)}
+              />
+              증빙서류 제출 확인
+              {isLegalAidApplicant ? (
+                <em className={eligibilityEvidenceSubmitted ? 'evidenceStatus submitted' : 'evidenceStatus missing'}>
+                  {eligibilityEvidenceSubmitted ? '제출 확인' : '미제출'}
+                </em>
+              ) : null}
+            </label>
+          </div>
+        </div>
+        <p className={isLegalAidApplicant && !eligibilityEvidenceSubmitted ? 'eligibilityWarning' : 'helperText'}>
+          {eligibilityHelperText}
+        </p>
+      </section>
+      <div className="workflowColumns">
+        <div>
+          <h3>파일 업로드 (멀티모달 분석 대상)</h3>
+          <p className="helperText">녹취 · 이미지 · 문서 함께 분석</p>
+          <FileDropzone category={dropzoneCategory} onCategoryChange={setDropzoneCategory} onAddFiles={onAddFiles} />
+        </div>
+        <div>
+          <h3>업로드 목록</h3>
+          <div className="scrollBox">
+            {files.length ? files.map((file, index) => (
+              <button type="button" className="uploadItem" key={file.id || file.fileKey || `${file.name}-${index}`} onClick={() => onRemoveFile(index)}>
+                {/* 서버에 이미 저장된 첨부는 core-api가 파일 크기를 내려주지 않아 file.size가 없습니다.
+                    0KB로 표시하면 빈 파일처럼 보이므로, 크기를 알 때만 괄호를 붙입니다. */}
+                <span className="uploadItemName">[{file.category}] {file.name}{file.size ? ` (${Math.ceil(file.size / 1024)}KB)` : ''}</span>
+                <span className={`uploadItemStatus ${uploadStatusTone(file.status)}`}>{file.status || '대기'}</span>
+                <span className="uploadItemRemove">삭제</span>
+              </button>
+            )) : <p>업로드 파일 없음</p>}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// 코치 피드백: 상담자 이름·상담 제목 입력은 없애고, 상담을 '선택'해서 통화가 끝난 뒤
+// 후처리로 자료를 올려 변호사가 검토하도록 재구성합니다. 아직 상담이 하나도 없을 때만
+// (드문 경우) 최소 정보로 새 상담을 만드는 경로를 남겨둡니다.
+function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateConsultation, onGoToRealtimeAnalysis }) {
   const showToast = useToast();
   const confirm = useConfirm();
-  const emptyUploadForm = { name: '', category: caseCategories[0].key, type: caseCategories[0].subTypes[0], title: '', memo: '', legalAidType: 'none', eligibilityEvidenceSubmitted: false };
-  const savedDraft = readStorage(storageKeys.uploadDraft, null);
-  const [form, setForm] = useState(savedDraft?.form || emptyUploadForm);
-  const [files, setFiles] = useState(savedDraft?.files || []);
+  const hasExistingCase = consultations.length > 0;
+  const [creatingNew, setCreatingNew] = useState(!hasExistingCase);
+  const [selectedId, setSelectedId] = useState(hasExistingCase ? consultations[0].id : null);
+  const selectedCase = !creatingNew ? consultations.find((item) => String(item.id) === String(selectedId)) : null;
   const [message, setMessage] = useState('');
-  // 면담 내용 외에 녹취(mp3 등), 이미지, 문서를 함께 받아 AI가 멀티모달로 분석할 수 있도록 업로드 종류를 구분합니다.
-  const uploadTypes = [
-    { key: 'transcript', label: '녹취록', accept: '.mp3,.wav,.m4a,.txt,.pdf' },
-    { key: 'idCard', label: '신분증', accept: '.jpg,.jpeg,.png,.pdf' },
-    { key: 'evidence', label: '증빙자료', accept: '.jpg,.jpeg,.png,.pdf,.hwpx,.doc,.docx' },
-  ];
-  const activeCategory = caseCategories.find((category) => category.key === form.category) || caseCategories[0];
-  const selectedApplicantType = legalAidApplicantTypes.find((item) => item.key === form.legalAidType) || legalAidApplicantTypes[0];
-  const isLegalAidApplicant = form.legalAidType !== 'none';
-  const eligibilityBadgeText = getEligibilityBadgeText(isLegalAidApplicant, form.eligibilityEvidenceSubmitted);
-  const eligibilityHelperText = getEligibilityHelperText(isLegalAidApplicant, form.eligibilityEvidenceSubmitted);
+
+  const emptyNewForm = { category: caseCategories[0].key, type: caseCategories[0].subTypes[0], memo: '', legalAidType: 'none', eligibilityEvidenceSubmitted: false };
+  const savedDraft = readStorage(storageKeys.uploadDraft, null);
+  const [newForm, setNewForm] = useState(savedDraft?.form || emptyNewForm);
+  const [newFiles, setNewFiles] = useState(savedDraft?.files || []);
+  const newActiveCategory = caseCategories.find((category) => category.key === newForm.category) || caseCategories[0];
+
+  // 기존 상담을 고르면 그 상담에 이미 저장된 법률구조 대상 정보·첨부자료를 바로 이어서 편집합니다.
+  const [existingFiles, setExistingFiles] = useState(selectedCase?.attachments || []);
+  const [existingEligibility, setExistingEligibility] = useState(() => buildEligibilityDraftFromCase(selectedCase));
+  useEffect(() => {
+    if (creatingNew) return;
+    setExistingFiles(selectedCase?.attachments || []);
+    setExistingEligibility(buildEligibilityDraftFromCase(selectedCase));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, creatingNew]);
+
   const saveDraft = () => {
-    writeStorage(storageKeys.uploadDraft, { form, files, savedAt: new Date().toISOString() });
-    setMessage('임시저장되었습니다. 상담 등록 전까지 이 화면에서 다시 불러올 수 있습니다.');
+    writeStorage(storageKeys.uploadDraft, { form: newForm, files: newFiles, savedAt: new Date().toISOString() });
+    setMessage('임시저장 완료');
   };
   const clearDraft = () => {
     writeStorage(storageKeys.uploadDraft, null);
-    setForm(emptyUploadForm);
-    setFiles([]);
-    setMessage('임시저장 내용을 비웠습니다.');
+    setNewForm(emptyNewForm);
+    setNewFiles([]);
+    setMessage('임시저장 비움');
   };
+
   // 파일을 고르면 브라우저에서 곧장 S3로 올립니다(파일 바이트는 백엔드를 거치지 않음).
   // 백엔드에 presigned 업로드 엔드포인트가 아직 없으면 로컬에 임시 보관하고 개발을 계속할 수 있게 폴백합니다.
-  const addFiles = async (label, selectedFiles) => {
+  const addFilesTo = async (setFilesState, label, selectedFiles) => {
     const staged = Array.from(selectedFiles).map((file) => createAttachmentMetadata(file, label));
     if (!staged.length) return;
-    // 먼저 '업로드 중'으로 즉시 목록에 표시해 사용자가 진행 상황을 알 수 있게 합니다.
-    setFiles((items) => [...items, ...staged.map((meta) => ({ ...meta, status: '업로드 중' }))]);
-    setMessage(`${label} 파일 ${staged.length}개를 S3에 업로드하고 있습니다…`);
-
-    const patchFile = (id, changes) => setFiles((items) => items.map((item) => item.id === id ? { ...item, ...changes } : item));
+    setFilesState((items) => [...items, ...staged.map((meta) => ({ ...meta, status: '업로드 중' }))]);
+    setMessage(`${label} ${staged.length}개 업로드 중…`);
+    const patchFile = (id, changes) => setFilesState((items) => items.map((item) => item.id === id ? { ...item, ...changes } : item));
     let fellBackToLocal = false;
     for (const meta of staged) {
       try {
@@ -606,173 +775,184 @@ function UploadWorkbench({ onCreateConsultation, onGoToRealtimeAnalysis }) {
         patchFile(meta.id, { fileKey, uploadedUrl: fileUrl, status: 'S3 업로드 완료' });
       } catch (error) {
         if (error instanceof S3UploadUnavailableError) {
-          // 백엔드 미지원 → 로컬 임시 보관. 상담 등록 자체는 그대로 가능합니다.
           fellBackToLocal = true;
           patchFile(meta.id, { status: '로컬 보관 (S3 대기)' });
         } else {
-          // CORS 등 실제 업로드 실패는 사용자에게 알립니다.
           patchFile(meta.id, { status: '업로드 실패' });
           showToast(`${meta.name} 업로드 실패: ${error.message}`, 'warn');
         }
       }
     }
     setMessage(fellBackToLocal
-      ? `${label} 파일을 추가했습니다. (S3 직접 업로드 준비 전이라 로컬에 임시 보관합니다)`
-      : `${label} 파일 ${staged.length}개를 업로드했습니다.`);
+      ? `${label} 추가 완료 · 로컬 임시 보관`
+      : `${label} ${staged.length}개 업로드 완료`);
   };
-  const submit = async () => {
-    if (!form.name || !form.title) {
-      setMessage('상담자 이름과 상담 제목을 입력해주세요.');
-      return;
-    }
+  const removeFileAt = (setFilesState, index) => setFilesState((items) => items.filter((_, itemIndex) => itemIndex !== index));
+
+  const buildAttachmentPayload = (files) => files.map(({ category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => (
+    { category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }
+  ));
+  const buildEligibilityPayload = ({ legalAidType, eligibilityEvidenceSubmitted }) => {
+    const selectedApplicantType = legalAidApplicantTypes.find((item) => item.key === legalAidType) || legalAidApplicantTypes[0];
+    const isLegalAidApplicant = legalAidType !== 'none';
+    return {
+      applicantType: selectedApplicantType.label,
+      requiredEvidence: selectedApplicantType.evidence,
+      isTargetCandidate: isLegalAidApplicant,
+      evidenceSubmitted: isLegalAidApplicant ? eligibilityEvidenceSubmitted : false,
+    };
+  };
+
+  const submitNewCase = async () => {
     const accepted = await confirm({
-      title: '상담을 등록할까요?',
-      message: `${form.name}님 상담 「${form.title}」을 등록합니다. 상담 내용, 사건 유형, 법률구조 대상 여부와 증빙 제출 상태를 다시 확인해주세요.`,
-      confirmLabel: '등록',
+      title: '자료를 저장할 상담을 만들까요?',
+      message: '최소 정보로 상담을 만듭니다.\n이름·제목은 실시간 상담에서 채워주세요.',
+      confirmLabel: '만들기',
       cancelLabel: '다시 확인',
       tone: 'info',
     });
     if (!accepted) return;
     const result = await onCreateConsultation({
-      ...form,
+      name: '',
+      title: buildAutoUploadTitle(),
+      category: newForm.category,
+      type: newForm.type,
+      memo: newForm.memo,
       status: '진행 중',
-      eligibilityCheck: {
-        applicantType: selectedApplicantType.label,
-        requiredEvidence: selectedApplicantType.evidence,
-        isTargetCandidate: isLegalAidApplicant,
-        evidenceSubmitted: isLegalAidApplicant ? form.eligibilityEvidenceSubmitted : false,
-      },
-      // 파일 바이트가 아니라 'S3에 올린 위치(fileKey)'와 열람 URL만 백엔드로 보냅니다.
-      attachments: files.map(({ category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => ({ category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText })),
+      eligibilityCheck: buildEligibilityPayload(newForm),
+      attachments: buildAttachmentPayload(newFiles),
+    }, { skipNavigation: true });
+    if (result?.id == null) {
+      showToast('상담을 만들지 못했습니다. 다시 시도해주세요.', 'warn');
+      return;
+    }
+    writeStorage(storageKeys.uploadDraft, null);
+    setNewForm(emptyNewForm);
+    setNewFiles([]);
+    setMessage('');
+    setCreatingNew(false);
+    setSelectedId(result.id);
+    showToast(result?.message || '자료 저장 완료 · 실시간 상담에서 이어서 진행', result?.coreSynced === false ? 'warn' : 'success');
+  };
+
+  const submitExistingCase = async () => {
+    if (!selectedCase) return;
+    const accepted = await confirm({
+      title: '자료를 저장할까요?',
+      message: `${selectedCase.caseNo} 「${selectedCase.title}」\n첨부자료와 구조대상 확인 내용을 저장합니다.`,
+      confirmLabel: '저장',
+      cancelLabel: '다시 확인',
+      tone: 'info',
+    });
+    if (!accepted) return;
+    onUpdateConsultation(selectedCase.id, {
+      eligibilityCheck: buildEligibilityPayload(existingEligibility),
+      attachments: buildAttachmentPayload(existingFiles),
     });
     setMessage('');
-    writeStorage(storageKeys.uploadDraft, null);
-    setForm(emptyUploadForm);
-    setFiles([]);
-    // 등록되면 화면이 대시보드로 넘어갑니다. 넘어간 화면에서도 결과가 보이도록
-    // OS 확인창 대신 앱 안에서 잠깐 떠 있는 알림으로 알려, 등록 여부를 헷갈려 중복 클릭하는 일을 막습니다.
-    // Core API 동기화까지 됐는지에 따라 성공/주의 색을 다르게 씁니다.
-    showToast(result?.message || '상담이 등록되었습니다.', result?.coreSynced === false ? 'warn' : 'success');
+    showToast('자료 저장 완료 · 검토 요청 시 함께 전달', 'success');
   };
 
   return (
     <main className="workspacePage">
+      <div className="workflowIntro uploadWorkflowIntro">
+        <h1>상담 자료 업로드</h1>
+        <p>상담 선택 · 자료 정리 · 검토 단계 전달</p>
+      </div>
       <section className="workflowPanel uploadPanel">
-        <h2>상담 문서 업로드</h2>
         <CounselorFlowStage current="upload" onNavigate={onGoToRealtimeAnalysis ? () => onGoToRealtimeAnalysis() : undefined} />
-        <div className="formGrid">
-          <label className="field"><span>상담자 이름</span><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="이름 입력" /></label>
-          <label className="field"><span>상담 제목</span><input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="상담 제목 입력" /></label>
-          <label className="field">
-            <span>사건 대분류</span>
-            <ChoicePicker
-              value={form.category}
-              options={caseCategories.map((category) => ({
-                value: category.key,
-                label: category.key,
-              }))}
-              onChange={(nextValue) => {
-                const nextCategory = caseCategories.find((category) => category.key === nextValue) || caseCategories[0];
-                setForm({ ...form, category: nextCategory.key, type: nextCategory.subTypes[0] });
-              }}
-              placeholder="사건 대분류 선택"
-            />
-          </label>
-          <label className="field">
-            <span>사건 소분류</span>
-            <ChoicePicker
-              value={form.type}
-              options={activeCategory.subTypes.map((type) => ({
-                value: type,
-                label: type,
-              }))}
-              onChange={(nextValue) => setForm({ ...form, type: nextValue })}
-              placeholder="사건 소분류 선택"
-            />
-          </label>
-        </div>
-        <label className="field"><span>상담 내용 입력</span><textarea value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} placeholder="상담 내용을 입력하세요." /></label>
-        <section className="eligibilityPanel">
-          <div className="eligibilityHeader">
-            <div>
-              <h3>법률구조 대상자 확인</h3>
-              <p>민원인이 해당하는 대상 유형과 증빙서류 제출 여부를 상담 접수 단계에서 확인합니다.</p>
-            </div>
-            <span className={isLegalAidApplicant ? 'eligibilityBadge active' : 'eligibilityBadge'}>{eligibilityBadgeText}</span>
+        {hasExistingCase ? (
+          <div className="seg" role="tablist" aria-label="자료 업로드 방식">
+            <button type="button" role="tab" aria-selected={!creatingNew} className={!creatingNew ? 'active' : ''} onClick={() => { setCreatingNew(false); setMessage(''); }}>
+              기존 상담에 자료 추가
+            </button>
+            <button type="button" role="tab" aria-selected={creatingNew} className={creatingNew ? 'active' : ''} onClick={() => { setCreatingNew(true); setMessage(''); }}>
+              새 상담 만들기
+            </button>
           </div>
-          <div className="formGrid">
-            <label className="field">
-              <span>대상자 유형</span>
-              <select
-                className="eligibilitySelect highlighted"
-                value={form.legalAidType}
-                onChange={(event) => setForm({ ...form, legalAidType: event.target.value, eligibilityEvidenceSubmitted: false })}
-              >
-                {legalAidApplicantTypes.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-              </select>
-            </label>
-            <div className="evidenceBox">
-              <span>필요 증빙서류</span>
-              <strong>{selectedApplicantType.evidence}</strong>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.eligibilityEvidenceSubmitted}
-                  disabled={!isLegalAidApplicant}
-                  onChange={(event) => setForm({ ...form, eligibilityEvidenceSubmitted: event.target.checked })}
-                />
-                증빙서류 제출 확인
-                {isLegalAidApplicant ? (
-                  <em className={form.eligibilityEvidenceSubmitted ? 'evidenceStatus submitted' : 'evidenceStatus missing'}>
-                    {form.eligibilityEvidenceSubmitted ? '제출 확인' : '미제출'}
-                  </em>
-                ) : null}
-              </label>
-            </div>
-          </div>
-          <p className={isLegalAidApplicant && !form.eligibilityEvidenceSubmitted ? 'eligibilityWarning' : 'helperText'}>
-            {eligibilityHelperText}
-          </p>
-        </section>
-        <div className="workflowColumns">
-          <div>
-            <h3>파일 업로드 (멀티모달 분석 대상)</h3>
-            <p className="helperText">면담 내용 외에 녹취(mp3 등), 이미지(png/jpg), 문서(pdf/hwpx) 등 첨부자료를 함께 올리면 AI가 함께 분석합니다.</p>
-            {uploadTypes.map((item) => (
-              <label className="fileButton" key={item.key}>
-                {item.label} 추가
-                <input
-                  type="file"
-                  accept={item.accept}
-                  multiple={item.key !== 'idCard'}
-                  onChange={(event) => {
-                    addFiles(item.label, event.target.files);
-                    event.target.value = '';
+        ) : null}
+        {!creatingNew && hasExistingCase ? (
+          <label className="field">
+            <span>상담 선택</span>
+            <CasePicker consultations={consultations} value={selectedId} onChange={(id) => { setSelectedId(id); setMessage(''); }} />
+          </label>
+        ) : null}
+
+        {creatingNew ? (
+          <>
+            <p className="helperText">통화 전 자료 선등록용 · 이름과 제목은 실시간 상담에서 입력</p>
+            <div className="formGrid">
+              <label className="field">
+                <span>사건 대분류</span>
+                <ChoicePicker
+                  value={newForm.category}
+                  options={caseCategories.map((category) => ({ value: category.key, label: category.key }))}
+                  onChange={(nextValue) => {
+                    const nextCategory = caseCategories.find((category) => category.key === nextValue) || caseCategories[0];
+                    setNewForm({ ...newForm, category: nextCategory.key, type: nextCategory.subTypes[0] });
                   }}
+                  placeholder="사건 대분류 선택"
                 />
               </label>
-            ))}
-          </div>
-          <div>
-            <h3>업로드 목록</h3>
-            <div className="scrollBox">
-              {files.length ? files.map((file) => (
-                <button type="button" className="uploadItem" key={file.id} onClick={() => setFiles(files.filter((item) => item.id !== file.id))}>
-                  <span className="uploadItemName">[{file.category}] {file.name} ({Math.ceil(file.size / 1024)}KB)</span>
-                  <span className={`uploadItemStatus ${uploadStatusTone(file.status)}`}>{file.status || '대기'}</span>
-                  <span className="uploadItemRemove">삭제</span>
-                </button>
-              )) : <p>업로드된 파일이 없습니다.</p>}
+              <label className="field">
+                <span>사건 소분류</span>
+                <ChoicePicker
+                  value={newForm.type}
+                  options={newActiveCategory.subTypes.map((type) => ({ value: type, label: type }))}
+                  onChange={(nextValue) => setNewForm({ ...newForm, type: nextValue })}
+                  placeholder="사건 소분류 선택"
+                />
+              </label>
             </div>
-          </div>
-        </div>
-        <div className="uploadActionRow">
-          <div className="uploadSecondaryActions">
-            <button type="button" onClick={saveDraft}>임시저장</button>
-            <button type="button" onClick={clearDraft}>임시저장 비우기</button>
-          </div>
-          <button className="primaryButton uploadSubmitButton" type="button" onClick={submit} disabled={!form.name || !form.title}>상담 등록</button>
-        </div>
+            <label className="field">
+              <span>상담 내용 입력 <em className="charCount">{newForm.memo.length}자</em></span>
+              <textarea
+                className="tallTextarea"
+                value={newForm.memo}
+                onChange={(e) => setNewForm({ ...newForm, memo: e.target.value })}
+                placeholder="상담 내용을 입력하세요."
+              />
+            </label>
+            <EligibilityAndFilesSection
+              legalAidType={newForm.legalAidType}
+              eligibilityEvidenceSubmitted={newForm.eligibilityEvidenceSubmitted}
+              onChangeLegalAidType={(value) => setNewForm({ ...newForm, legalAidType: value, eligibilityEvidenceSubmitted: false })}
+              onChangeEvidenceSubmitted={(checked) => setNewForm({ ...newForm, eligibilityEvidenceSubmitted: checked })}
+              files={newFiles}
+              onAddFiles={(label, files) => addFilesTo(setNewFiles, label, files)}
+              onRemoveFile={(index) => removeFileAt(setNewFiles, index)}
+            />
+            <div className="uploadActionRow">
+              <div className="uploadSecondaryActions">
+                <button type="button" onClick={saveDraft}>임시저장</button>
+                <button type="button" onClick={clearDraft}>임시저장 비우기</button>
+              </div>
+              <button className="primaryButton uploadSubmitButton" type="button" onClick={submitNewCase}>상담 만들고 자료 저장</button>
+            </div>
+          </>
+        ) : selectedCase ? (
+          <>
+            <div className="analysisCaseMeta">
+              <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
+              <span>상담받은 사람 <strong>{selectedCase.name || '미입력'}</strong></span>
+              <span>상담 제목 <strong>{selectedCase.title}</strong></span>
+            </div>
+            <EligibilityAndFilesSection
+              legalAidType={existingEligibility.legalAidType}
+              eligibilityEvidenceSubmitted={existingEligibility.eligibilityEvidenceSubmitted}
+              onChangeLegalAidType={(value) => setExistingEligibility({ legalAidType: value, eligibilityEvidenceSubmitted: false })}
+              onChangeEvidenceSubmitted={(checked) => setExistingEligibility((current) => ({ ...current, eligibilityEvidenceSubmitted: checked }))}
+              files={existingFiles}
+              onAddFiles={(label, files) => addFilesTo(setExistingFiles, label, files)}
+              onRemoveFile={(index) => removeFileAt(setExistingFiles, index)}
+            />
+            <div className="uploadActionRow">
+              <button className="primaryButton uploadSubmitButton" type="button" onClick={submitExistingCase}>자료 저장</button>
+            </div>
+          </>
+        ) : (
+          <InlineEmptyNotice>등록된 상담 없음 · 새 상담 만들기</InlineEmptyNotice>
+        )}
         {message ? <p className="helperText">{message}</p> : null}
       </section>
     </main>
@@ -859,7 +1039,7 @@ function buildAnalysisResult(selectedCase) {
   return {
     summary: text
       ? `${selectedCase.title} 상담 내용${hasMultimodalEvidence ? '과 첨부자료(녹취/이미지/문서)' : ''}을 기준으로 사건 유형, 필요자료, 구조검토 항목을 정리했습니다.`
-      : '상담 내용이 부족하여 요약을 생성할 수 없습니다.',
+      : '상담 내용 부족 · 요약 불가',
     caseType: selectedCase?.type || '미분류',
     // 백본 CaseTypeResult.reason (분류 근거, 참고용 표현)
     caseTypeReason: text ? `상담 요약과 첨부자료 내용을 종합할 때 '${selectedCase?.type || '해당 유형'}'으로 보임 (참고용 분류).` : '분류 근거를 산출할 상담 내용이 부족합니다.',
@@ -902,16 +1082,56 @@ function buildAnalysisResult(selectedCase) {
   };
 }
 
-// 상담원이 실제로 이 화면을 쓸 때 가장 먼저 막히는 지점은 '지금 통화 중인 내용을 어디에 적지?'였습니다.
-// 이전 버전은 실시간 텍스트 영역이 화면 동작만 흉내 내는 가짜 재생 데모였고, 실제로 타이핑할 수 있는
-// 자리가 이 화면 어디에도 없어서 상담원이 아무것도 기록할 수 없었습니다. 지금은 그 자리를 실제로
-// 저장되는 메모 입력창으로 바꿔서, 통화 중 들은 내용을 바로 적고 그 메모가 곧 분석 대상 텍스트가 되도록
-// 합니다. 실시간 STT가 연동되면 사람이 타이핑하는 대신 STT가 이 칸을 채워주면 됩니다(같은 자리 재사용).
-function RealtimeStatusChips({ hasCase }) {
+// 변호사 검토 결과 배너의 좌측 색 바를 결정 종류에 맞게 고릅니다(승인=그린/반려=레드/그 외=옐로).
+function reviewActionTone(status) {
+  if (status === '승인') return 'success';
+  if (status === '반려') return 'danger';
+  return 'warn';
+}
+
+// 통화 시간을 "3:07"처럼 분:초로 보여줍니다. 실제 통화(텔레포니) 연동 전까지는 이 타이머가
+// 상담원에게 "지금 통화가 진행 중이다"를 보여주는 유일한 신호라 정확히 맞춰둡니다.
+function formatCallDuration(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+// 코치 피드백: "실시간 통화 버튼 누르면 시작되고, 종료 버튼 누르면 끝난 다음, 분석 시작을 누르면
+// 바로 분석을 시작하는 방식". 실제 전화 연동(WebRTC 등)은 백엔드 작업이 필요해 아직 없지만,
+// 상담원이 겪는 절차 자체(시작 → 통화 중 메모 → 종료 → 분석 시작)는 지금 화면에서 실제로 동작합니다.
+// 통화 중 경과 시간을 보여주는 라이브 인디케이터. 버튼 라벨에 시간을 붙이면 버튼이 매초
+// 넓이가 바뀌어 깜빡여 보이므로, 버튼과 분리해 깜빡이는 점 + 고정폭 숫자로만 보여줍니다.
+function CallLiveIndicator({ seconds }) {
+  return (
+    <span className="callLiveIndicator" role="status">
+      <span className="callLiveDot" aria-hidden="true" />
+      <span className="callLiveTime">{formatCallDuration(seconds)}</span>
+    </span>
+  );
+}
+
+function RealtimeCallControl({ hasCase, callStatus, callSeconds, onStartCall, onEndCall }) {
+  const sttChip = callStatus === 'ongoing'
+    ? { tone: 'tone-info', label: 'STT · 연동 대기 (메모로 대체 입력)' }
+    : { tone: 'tone-muted', label: 'STT · 연동 대기' };
   return (
     <div className="realtimeStatusChips">
-      <span className="statusChip tone-muted"><PhoneCall size={13} strokeWidth={2.4} /> 통화 · 연동 대기</span>
-      <span className="statusChip tone-muted"><Mic size={13} strokeWidth={2.4} /> STT · 연동 대기</span>
+      {callStatus === 'idle' ? (
+        <button type="button" className="callControlButton start" onClick={onStartCall} disabled={!hasCase}>
+          <PhoneCall size={14} strokeWidth={2.4} /> 통화 시작
+        </button>
+      ) : callStatus === 'ongoing' ? (
+        <>
+          <button type="button" className="callControlButton end" onClick={onEndCall}>
+            <PhoneCall size={14} strokeWidth={2.4} /> 통화 종료
+          </button>
+          <CallLiveIndicator seconds={callSeconds} />
+        </>
+      ) : (
+        <span className="statusChip tone-success"><Check size={13} strokeWidth={2.4} /> 통화 종료됨 · {formatCallDuration(callSeconds)}</span>
+      )}
+      <span className={`statusChip ${sttChip.tone}`}><Mic size={13} strokeWidth={2.4} /> {sttChip.label}</span>
       <span className={`statusChip ${hasCase ? 'tone-info' : 'tone-muted'}`}><Check size={13} strokeWidth={2.4} /> 메모 · {hasCase ? '입력 가능' : '사건 선택 필요'}</span>
     </div>
   );
@@ -927,7 +1147,6 @@ function RealtimeSessionCard({ selectedCase }) {
         <div><dt>상담 제목</dt><dd>{selectedCase?.title || '사건을 선택하면 표시됩니다.'}</dd></div>
         <div><dt>첨부자료</dt><dd>{attachmentCount}건</dd></div>
       </dl>
-      <p className="realtimeCallNotice">통화·실시간 STT 기능은 개발팀에서 연동 중입니다. 연동 전까지는 오른쪽 메모 칸에 직접 적어가며 상담을 진행하세요.</p>
     </article>
   );
 }
@@ -951,10 +1170,10 @@ function RealtimeMemoCard({ selectedCase, onUpdateConsultation }) {
         disabled={!hasCase}
         onChange={(event) => onUpdateConsultation(selectedCase.id, { memo: event.target.value })}
         placeholder={hasCase
-          ? '통화 중 들은 내용을 여기에 바로 적어주세요. 실시간 STT가 연결되면 이 칸이 자동으로 채워집니다.'
-          : '사건을 선택하거나 위의 ‘새 실시간 상담 바로 시작’으로 세션을 먼저 만들어주세요.'}
+          ? '통화 내용을 바로 적어주세요.'
+          : '사건 선택 또는 새 상담 시작'}
       />
-      <p className="helperText">이 메모가 아래 ‘AI 분석 결과’의 분석 대상 텍스트로 그대로 사용됩니다. 통화 중간에도 자유롭게 이어 적을 수 있습니다.</p>
+      <p className="helperText">AI 분석 기준 메모</p>
     </article>
   );
 }
@@ -997,7 +1216,7 @@ function RealtimeSuggestedQuestions({ memoText }) {
         <h3>AI 추천 추가 질문</h3>
         <span className="statusChip tone-info">통화 중 참고용</span>
       </div>
-      <p className="helperText">지금까지 적은 메모를 바탕으로, 상담자에게 바로 물어보면 좋을 질문을 제안합니다. 실제로 무엇을 물을지는 상담원이 판단해 진행해주세요.</p>
+      <p className="helperText">메모 기반 질문 후보 · 상담원이 선택</p>
       <div className="realtimeQuestionList">
         {suggestions.map((question) => {
           const asked = askedQuestions.includes(question);
@@ -1019,17 +1238,22 @@ function RealtimeSuggestedQuestions({ memoText }) {
   );
 }
 
-function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation }) {
+function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, onStartCall, onEndCall }) {
   const hasCase = Boolean(selectedCase);
+  const headline = callStatus === 'ongoing'
+    ? '통화 중입니다. 들은 내용을 바로 적으면서 진행하세요.'
+    : callStatus === 'ended'
+      ? '통화를 마쳤습니다. 메모를 다듬은 뒤 분석을 시작하세요.'
+      : '전화를 받으면 위 ‘통화 시작’을 눌러 진행하세요.';
   return (
     <section className="realtimeWorkbenchPanel" aria-label="실시간 상담 메모">
       <div className="realtimeWorkbenchHeader">
         <div>
           <span className="flowStageEyebrow">실시간 상담</span>
-          <strong>통화 중 들은 내용을 바로 적으면서 진행하세요.</strong>
-          <p>통화 기능과 STT는 개발팀에서 연동 중입니다. 연동 전까지는 아래 메모 칸에 직접 기록하면, 그 내용이 곧바로 AI 분석 대상이 됩니다.</p>
+          <strong>{headline}</strong>
+          <p>STT 연동 준비 중 · 현재는 메모 기준 분석</p>
         </div>
-        <RealtimeStatusChips hasCase={hasCase} />
+        <RealtimeCallControl hasCase={hasCase} callStatus={callStatus} callSeconds={callSeconds} onStartCall={onStartCall} onEndCall={onEndCall} />
       </div>
       <div className="realtimeWorkbenchGrid">
         <RealtimeSessionCard selectedCase={selectedCase} />
@@ -1040,10 +1264,90 @@ function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation }) {
   );
 }
 
-function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, currentUser, onGoToDashboard, focusedConsultationId, onGoToUpload }) {
+// 코치 피드백: "실시간 상담 때 서식을 추천 및 초안 작성을 해주고". 분석이 끝나면 곧바로
+// 이 화면 안에서 추천 서식을 보여주고, 한 번의 클릭으로 사건이 선택된 채 서식 생성 화면으로
+// 넘어가게 합니다(예전엔 메뉴를 옮겨 사건을 다시 골라야 했습니다).
+// coreId·분석id가 있으면 실제 ai-api 추천(recommendCoreForms)을, 없으면 로컬 휴리스틱
+// (recommendTemplates, DraftWorkbench와 같은 함수)을 그대로 재사용합니다.
+function RecommendedFormsPanel({ selectedCase, onOpenDraft }) {
+  const draftCaseType = resolveConfirmedCaseType(selectedCase);
+  const canUseCoreApi = Boolean(selectedCase?.coreId && selectedCase?.coreAnalysisId);
+  const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    setAiRecommendations([]);
+    if (!canUseCoreApi) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    recommendCoreForms(selectedCase.coreId, selectedCase.coreAnalysisId)
+      .then((response) => { if (!cancelled) setAiRecommendations(response?.recommendations || []); })
+      .catch(() => { if (!cancelled) setAiRecommendations([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [canUseCoreApi, selectedCase?.coreId, selectedCase?.coreAnalysisId]);
+
+  // 실제 ai-api 추천이 있으면 'AI 추천' 배지를, 없어 로컬 휴리스틱으로 대체한 경우는
+  // '추천' 배지로 구분해 어떤 근거로 골랐는지 헷갈리지 않게 합니다.
+  const usingAiRecommendations = Boolean(aiRecommendations.length);
+  const localTemplateNames = draftCaseType ? recommendTemplates(draftCaseType).map((item) => item.templateName) : [];
+  const templateNames = (usingAiRecommendations
+    ? aiRecommendations.map((item) => item.form_name).filter(Boolean)
+    : localTemplateNames
+  ).slice(0, 3);
+
+  return (
+    <section className="recommendedFormsPanel">
+      <div className="recommendedFormsHeader">
+        <div>
+          <h3>추천 서식</h3>
+          <p>{draftCaseType ? `${draftCaseType} 기준 추천` : '사건 유형 확정 후 추천'}</p>
+        </div>
+      </div>
+      {loading ? <p className="helperText">추천 서식을 불러오는 중…</p> : null}
+      {templateNames.length ? (
+        <div className="recommendedFormsList">
+          {templateNames.map((name) => (
+            <div className="tmplRow" key={name}>
+              <span className="tmplRowName">
+                {name}
+                <em className="tmplRowBadge">{usingAiRecommendations ? 'AI 추천' : '추천'}</em>
+              </span>
+              <button type="button" className="secondaryActionButton compactAction" onClick={() => onOpenDraft?.(selectedCase.id)} disabled={!onOpenDraft}>
+                이 서식으로 초안 만들기
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : <p className="helperText">분석 저장 후 추천 가능</p>}
+    </section>
+  );
+}
+
+function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, currentUser, onGoToDashboard, onGoToUpload, onOpenDraft, focusedConsultationId }) {
   const [selectedId, setSelectedId] = useState(focusedConsultationId || caseOptions(consultations)[0].id);
   const [analyzed, setAnalyzed] = useState(false);
   const selectedCase = consultations.find((item) => String(item.id) === String(selectedId));
+  // 통화 시작/종료 상태입니다. 실제 전화 연동 전까지는 상담원이 직접 누르는 버튼으로 관리하고,
+  // 사건을 바꾸면(다른 상담을 고르면) 이전 통화 상태가 남아있지 않도록 초기화합니다.
+  const [callStatus, setCallStatus] = useState('idle');
+  const [callSeconds, setCallSeconds] = useState(0);
+  useEffect(() => {
+    setCallStatus('idle');
+    setCallSeconds(0);
+  }, [selectedId]);
+  useEffect(() => {
+    if (callStatus !== 'ongoing') return undefined;
+    const timer = setInterval(() => setCallSeconds((seconds) => seconds + 1), 1000);
+    return () => clearInterval(timer);
+  }, [callStatus]);
+  const startCall = () => {
+    if (!selectedCase) return;
+    setCallStatus('ongoing');
+    setCallSeconds(0);
+  };
+  // 통화 종료 버튼을 누르면 곧바로 '분석 시작'을 누를 수 있는 상태가 됩니다(통화 중에는 분석을
+  // 막아 상담원이 먼저 통화를 마치도록 유도합니다).
+  const endCall = () => setCallStatus('ended');
   const [chosen, setChosen] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [timelineText, setTimelineText] = useState('');
@@ -1091,10 +1395,10 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         setAnalysisSaved(false);
         setSavedMessage('');
         setReviewMessage('');
-        setAiTaskMessage('AI 사건 분석 결과를 반영했습니다.');
+        setAiTaskMessage('AI 분석 반영 완료');
         setAiResultSummary({
           title: '사건 분석 AI 결과',
-          description: 'AI API 응답을 사건 유형, 긴급도, 구조검토 후보에 반영했습니다.',
+          description: '사건 유형 · 긴급도 · 구조검토 후보',
           metrics: [
             { label: '사건 유형', value: nextAnalysis.caseType || '미분류' },
             { label: '긴급도', value: nextAnalysis.urgency || '미확인' },
@@ -1149,7 +1453,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         return;
       }
       selectCase(result.id);
-      showToast('실시간 상담을 시작했습니다. 통화하면서 사건 정보를 채워주세요.', result.coreSynced === false ? 'warn' : 'success');
+      showToast('실시간 상담 시작 · 통화 중 사건 정보 입력', result.coreSynced === false ? 'warn' : 'success');
     } finally {
       setIsStartingQuickSession(false);
     }
@@ -1177,7 +1481,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         const result = await requestEligibilityCandidate(selectedCase, analysis);
         setAnalysis(result);
         setAnalysisSaved(false);
-        setAiTaskMessage('구조대상 판정을 완료했습니다. 대상 여부·증빙 제출·긴급도가 아래에 반영되었습니다.');
+        setAiTaskMessage('구조대상 판정 반영 완료');
         setAiResultSummary(buildAiResultSummary('eligibility', result));
       } catch (error) {
         setAiTaskMessage(error.message);
@@ -1193,7 +1497,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         const result = await requestMissingDataCandidate(selectedCase, analysis);
         setAnalysis(result);
         setAnalysisSaved(false);
-        setAiTaskMessage('누락자료 점검을 완료했습니다. 더 받아야 할 자료를 아래 목록에 추가했습니다.');
+        setAiTaskMessage('누락자료 점검 반영 완료');
         setAiResultSummary(buildAiResultSummary('missing', result));
       } catch (error) {
         setAiTaskMessage(error.message);
@@ -1313,20 +1617,32 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   return (
     <main className="workspacePage">
       <section className="workflowPanel analysisPanel">
-        <h2>실시간 분석 AI</h2>
-        <CounselorFlowStage current="realtime" onNavigate={onGoToUpload ? () => onGoToUpload() : undefined} />
+        <WorkPageHeader
+          title="실시간 상담 분석"
+          description="사건 유형 확인 · 긴급도 확인 · 누락자료 점검"
+        />
+        <CounselorFlowStage current="realtime" onNavigate={onGoToUpload} />
         <div className="inlineControls">
           <CasePicker consultations={consultations} value={selectedId} onChange={selectCase} />
           <button type="button" className="quickStartButton" onClick={startQuickRealtimeSession} disabled={isStartingQuickSession}>
             <PhoneCall size={15} strokeWidth={2.4} /> {isStartingQuickSession ? '시작하는 중...' : '새 실시간 상담 바로 시작'}
           </button>
-          <button type="button" onClick={startAnalysis} disabled={isAnalyzing || !selectedCase}>
-            {isAnalyzing ? (
-              '분석 중...'
-            ) : analyzed ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.6} /> 재분석 실행</span>
-            ) : '분석 시작'}
-          </button>
+          <div className="callAnalyzeButtonGroup">
+            <button
+              type="button"
+              className={`callAnalyzeButton${analyzed ? ' done' : ''}`}
+              onClick={startAnalysis}
+              disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing'}
+            >
+              {isAnalyzing ? (
+                '분석 중...'
+              ) : analyzed ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.6} /> 재분석 실행</span>
+              ) : '분석 시작'}
+            </button>
+            {/* 툴팁이 아니라 항상 보이는 캡션으로 둬서, 왜 눌리지 않는지 바로 알 수 있게 합니다. */}
+            {callStatus === 'ongoing' ? <small className="callAnalyzeCaption">통화 종료 후 분석 가능</small> : null}
+          </div>
         </div>
         {selectedCase ? (
           <div className="analysisCaseMeta">
@@ -1336,9 +1652,9 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <input
                 value={selectedCase.name || ''}
                 onChange={(event) => onUpdateConsultation(selectedCase.id, { name: event.target.value })}
-                placeholder="통화 중 확인 즉시 반드시 입력"
+                placeholder="통화 중 확인되는 대로 입력"
               />
-              {!selectedCase.name ? <small>이름은 서식 생성과 검토 요청에 사용되므로 놓치지 말고 입력하세요.</small> : null}
+              {!selectedCase.name ? <small>이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요.</small> : null}
             </label>
             <label className="analysisCaseMetaEdit">
               <span>상담 제목</span>
@@ -1351,11 +1667,18 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
             <span>작성 시간 <strong>{selectedCase.date || '-'}{selectedCase.registeredTime ? ` ${selectedCase.registeredTime}` : ''}</strong></span>
           </div>
         ) : null}
-        <RealtimeAnalysisPanel selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
+        <RealtimeAnalysisPanel
+          selectedCase={selectedCase}
+          onUpdateConsultation={onUpdateConsultation}
+          callStatus={callStatus}
+          callSeconds={callSeconds}
+          onStartCall={startCall}
+          onEndCall={endCall}
+        />
         {selectedCase ? (
           <div className="analysisSectionDivider">
             <span>AI 분석 결과</span>
-            <p>업로드된 상담 내용과 첨부자료를 기준으로 생성된 분석입니다. 통화·STT 연동 전에도 그대로 사용할 수 있습니다.</p>
+            <p>상담 메모 · 첨부자료 기준</p>
           </div>
         ) : null}
         {selectedCase ? (
@@ -1373,7 +1696,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
           <div className="analysisControlBar">
             <div>
               <strong>AI 자동 확인</strong>
-              <span>아래 두 가지를 AI가 대신 확인해 드립니다. 결과를 살펴본 뒤 저장하고, 필요하면 변호사 검토를 요청하세요.</span>
+              <span>결과 확인 · 저장 · 검토 요청</span>
             </div>
             <div className="analysisActions">
               {/* 두 버튼은 하는 일이 서로 다릅니다. 색만으로 구분되지 않도록 아이콘·제목·설명을 나눠 표시합니다. */}
@@ -1381,7 +1704,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 <ShieldCheck size={22} strokeWidth={2.2} />
                 <span>
                   <strong>구조대상 판정</strong>
-                  <small>대상여부 · 증빙 · 긴급도</small>
+                  <small>대상 · 증빙 · 긴급도</small>
                 </span>
                 {analysis?.aiLinked?.eligibility ? <em><Check size={13} strokeWidth={3} /> 완료</em> : null}
               </button>
@@ -1397,7 +1720,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
           </div>
         ) : null}
         {activeReviewAction ? (
-          <section className="reviewRequestBanner">
+          <section className={`reviewRequestBanner tone-${reviewActionTone(activeReviewAction.status)}`}>
             <div>
               <strong>{activeReviewAction.status}</strong>
               <span>{activeReviewAction.requestedAt}</span>
@@ -1410,7 +1733,15 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 {activeReviewAction.reviewer?.organization ? ` · ${activeReviewAction.reviewer.organization}` : ''}
               </dd>
             </dl>
-            <p>{activeReviewAction.reason}</p>
+            <SummaryBulletList text={activeReviewAction.reason} emptyText="사유 없음" />
+            {activeReviewAction.lawyerComment ? <div className="reasonText"><strong>변호사 코멘트</strong><SummaryBulletList text={activeReviewAction.lawyerComment} /></div> : null}
+          </section>
+        ) : null}
+        {/* 승인처럼 reviewAction이 남지 않는 결정에서도, 변호사가 남긴 코멘트는 계속 보이게 둡니다. */}
+        {!activeReviewAction && selectedCase?.lawyerComment ? (
+          <section className="reviewRequestBanner tone-success">
+            <div><strong>승인 · 변호사 코멘트</strong></div>
+            <SummaryBulletList text={selectedCase.lawyerComment} />
           </section>
         ) : null}
         {aiTaskMessage && (aiTaskMessage.includes('API') || aiTaskMessage.includes('실패') || aiTaskMessage.includes('연결')) ? (
@@ -1421,7 +1752,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
             {aiTaskMessage ? (
               <div className="aiResultNotice" role="status">
                 <strong>{aiTaskMessage}</strong>
-                <span>아래 결과를 확인한 뒤 필요한 항목을 상담 기록에 반영해주세요.</span>
+                <span>확인 후 필요한 항목만 반영</span>
               </div>
             ) : null}
             <div className="aiResultHeader">
@@ -1440,14 +1771,14 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <ul className="aiResultList">
                 {aiResultSummary.items.map((item) => <li key={item}>{item}</li>)}
               </ul>
-            ) : <p className="helperText">추가로 표시할 세부 항목은 없습니다.</p>}
+            ) : <p className="helperText">추가 세부 항목 없음</p>}
           </section>
         ) : null}
         {!analyzed ? (
           <div className="emptyState">
             <ClipboardList size={22} strokeWidth={2} aria-hidden="true" />
-            <p>위 메모 칸에 통화 내용을 적은 뒤 분석을 시작하면 사건 유형, 긴급도, 필요 서류를 확인할 수 있습니다.</p>
-            <button type="button" className="emptyStateAction" onClick={startAnalysis} disabled={isAnalyzing || !selectedCase}>
+            <p>{callStatus === 'ongoing' ? '통화 종료 후 분석 가능' : '메모 작성 후 분석 시작'}</p>
+            <button type="button" className="emptyStateAction callAnalyzeButton" onClick={startAnalysis} disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing'}>
               {isAnalyzing ? '분석 중...' : '지금 분석 시작'}
             </button>
           </div>
@@ -1455,9 +1786,15 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
           <div className="workflowColumns">
             <div>
               {/* AI 출력은 참고용이며 최종 확정은 담당자가 수행합니다. (사람이 검토·확정하는 원칙) */}
-              <div className="hitlBanner">AI가 정리한 내용은 참고용이에요. 사건 유형·긴급도·구조대상 여부는 상담원과 변호사가 직접 확인한 뒤 확정합니다.</div>
+              <div className="hitlBanner">
+                <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
+                <span>
+                  <strong>AI가 정리한 내용은 참고용이에요.</strong>
+                  <small>분류 · 긴급도 · 구조대상은 사람이 확정</small>
+                </span>
+              </div>
               <h3>인공지능 분석 요약</h3>
-              <div className="resultCard">{analysis.summary}</div>
+              <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
               <h3>멀티모달 입력 분석</h3>
               <div className="resultCard">
                 {analysis.modalities.map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
@@ -1470,7 +1807,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     <span className="extractName">{item.fileLink || '(파일명 없음)'}</span>
                     <span className="extractNote">{item.note}</span>
                   </div>
-                )) : <p>첨부파일이 없습니다. (면담 텍스트만으로 분석)</p>}
+                )) : <p>첨부파일 없음 · 메모만 분석</p>}
               </div>
               <h3>STT 개인정보 마스킹</h3>
               <div className="resultCard">
@@ -1478,9 +1815,9 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   <button type="button" className={showMaskedStt ? 'active' : ''} onClick={() => setShowMaskedStt(true)}>마스킹본</button>
                   <button type="button" className={!showMaskedStt ? 'active' : ''} onClick={() => setShowMaskedStt(false)}>원문</button>
                 </div>
-                {!showMaskedStt ? <p className="sensitiveSourceNotice">원문에는 주민등록번호·연락처 등 민감정보가 포함될 수 있습니다. 검증 목적일 때만 확인하세요.</p> : null}
+                {!showMaskedStt ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
                 <p className="sttPreviewText">{showMaskedStt ? analysis.sttPreview?.masked : analysis.sttPreview?.original}</p>
-                <p className="helperText">기본 검토 화면은 마스킹본을 기준으로 사용합니다. 원문은 STT 오류나 과도한 마스킹 여부를 확인할 때만 참고합니다.</p>
+                <p className="helperText">기본값: 마스킹본 · 원문: 오류 확인용</p>
               </div>
               <h3>AI 응답 검증</h3>
               <div className="resultCard">
@@ -1493,7 +1830,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 {analysis.aiLinked?.eligibility ? (
                   <div className="fieldSyncNotice">
                     <strong>구조대상 판정 반영됨</strong>
-                    <span>구조대상 여부, 증빙 제출 여부, 긴급도 등급과 체크리스트가 판정 결과에 맞춰 갱신되었습니다.</span>
+                    <span>대상 · 증빙 · 긴급도 · 체크리스트 갱신</span>
                   </div>
                 ) : null}
                 <label className="miniField">사건 유형<input value={analysis.caseType} onChange={(event) => setAnalysis({ ...analysis, caseType: event.target.value })} /></label>
@@ -1502,8 +1839,14 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   <select value={analysis.urgency} onChange={(event) => setAnalysis({ ...analysis, urgency: event.target.value, emergency: { ...analysis.emergency, level: event.target.value } })}><option>상</option><option>중</option><option>하</option></select>
                 </label>
                 <div className="urgencyGauge">
-                  <div className="urgencyGaugeTrack"><div className={`urgencyGaugeFill level-${analysis.emergency?.level}`} style={{ width: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} /></div>
-                  <span className="urgencyGaugeValue">긴급도 점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}%</span>
+                  {/* 트랙 전체를 하(초록)~중(주황)~상(빨강) 그라디언트로 항상 보여주고, 지금
+                      점수 이후 구간만 회색으로 덮어 '전체 스펙트럼 중 지금 어디쯤인지'가
+                      한눈에 들어오게 합니다. 등급과 점수를 한 줄로 같이 표시합니다. */}
+                  <div className="urgencyGaugeTrack">
+                    <div className="urgencyGaugeMask" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                    <div className="urgencyGaugeMarker" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                  </div>
+                  <span className="urgencyGaugeValue">긴급도 {analysis.emergency?.level || '미확인'} 등급 · 점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}%</span>
                 </div>
                 <p className="reasonText">긴급도 근거: {analysis.emergency?.reason}</p>
                 <label className="miniField">구조대상 여부<select value={analysis.eligibility} onChange={(event) => setAnalysis({ ...analysis, eligibility: event.target.value })}><option>검토 필요</option><option>구조 가능</option><option>부적합</option><option>보류</option></select></label>
@@ -1525,54 +1868,71 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
             <div className="analysisActionRail">
               <div className="railIntro">
                 <strong>검토 조치 패널</strong>
-                <span>AI 제안을 확인하고 실제 검토에 반영할 항목만 채택합니다.</span>
+                <span>필요 항목만 채택</span>
               </div>
-              <h3>누락 자료 확인</h3>
-              <p className="railHint">상담자에게 받아야 할 자료입니다. 받은 자료는 눌러서 <b>제출</b>로 바꾸면, 아직 안 받은 자료만 <b>미제출</b>로 남습니다.</p>
-              <div className={analysis.aiLinked?.missing ? 'scrollBox small aiLinkedList' : 'scrollBox small'}>
-                {analysis.aiLinked?.missing ? (
-                  <p className="fieldSyncNotice compactNotice"><strong>누락자료 점검 반영됨</strong><span>AI가 더 받아야 할 자료를 목록에 추가했습니다.</span></p>
-                ) : null}
-                {analysis.missingInfo.length ? analysis.missingInfo.map((item) => {
-                  const submitted = analysis.evidenceStatus?.[item] === 'submitted';
-                  return (
-                    <button type="button" key={item} className={`evidenceItem ${submitted ? 'submitted' : 'missing'}`} onClick={() => toggleEvidenceStatus(item)} aria-pressed={submitted}>
-                      <span className="evidenceItemName">{item}</span>
-                      <span className="evidenceItemState">{submitted ? '제출' : '미제출'}</span>
-                    </button>
-                  );
-                }) : <p>확인할 누락 자료가 없습니다.</p>}
-              </div>
-              <h3>AI 추천 후속 작업</h3>
-              <p className="railHint">이 상담을 진행할 때 도움이 될 작업을 AI가 제안합니다. 필요한 것만 채택하면 아래 ‘검토 반영 항목’에 담깁니다.</p>
-              <div className="scrollBox">
-                {suggestions.map((item) => {
-                  const picked = chosen.includes(item.label);
-                  return (
-                    <button className={`adoptButton${picked ? ' picked' : ''}`} type="button" key={item.label} onClick={() => setChosen((current) => current.includes(item.label) ? current : [...current, item.label])} disabled={picked}>
-                      <span className="adoptText"><strong>{item.label}</strong><small>{item.description}</small></span>
-                      <strong className="adoptAction">{picked ? '채택됨' : '채택'}</strong>
-                    </button>
-                  );
-                })}
-              </div>
-              <h3>사실관계 타임라인</h3>
-              <div className="scrollBox small">
-                {analysis.timeline.map((item, index) => <button type="button" key={`${item.date}-${index}`}>{item.date} - {item.text}</button>)}
-              </div>
-              <div className="inlineControls compactInline">
-                <input value={timelineText} onChange={(event) => setTimelineText(event.target.value)} placeholder="타임라인 항목" />
-                <button type="button" onClick={() => {
-                  if (!timelineText.trim()) return;
-                  setAnalysis({ ...analysis, timeline: [...analysis.timeline, { date: today, text: timelineText }] });
-                  setTimelineText('');
-                }}>추가</button>
-              </div>
-              <h3>검토 반영 항목</h3>
-              <div className="scrollBox small chosenBox">{chosen.length ? chosen.map((item) => <button type="button" key={item} onClick={() => setChosen(chosen.filter((value) => value !== item))}>{item} · 제외</button>) : <p>아직 채택한 항목이 없습니다. 추천 항목에서 필요한 내용만 채택하세요.</p>}</div>
+              {/* 누락자료 확인 → AI 추천 채택 → 반영 항목의 3단계가 구분선 없이 이어지면
+                  하나의 목록처럼 섞여 보여서, 단계마다 소제목 아래 구분선을 둬 눈으로도
+                  단계가 갈라지게 합니다. */}
+              <section className="railSection">
+                <h3>누락 자료 확인</h3>
+                <p className="railHint">자료를 받으면 ‘제출’로 변경</p>
+                <div className={analysis.aiLinked?.missing ? 'scrollBox small aiLinkedList' : 'scrollBox small'}>
+                  {analysis.aiLinked?.missing ? (
+                    <p className="fieldSyncNotice compactNotice"><strong>누락자료 반영됨</strong><span>보완 자료 목록 갱신</span></p>
+                  ) : null}
+                  {analysis.missingInfo.length ? analysis.missingInfo.map((item) => {
+                    const submitted = analysis.evidenceStatus?.[item] === 'submitted';
+                    return (
+                      <button type="button" key={item} className={`evidenceItem ${submitted ? 'submitted' : 'missing'}`} onClick={() => toggleEvidenceStatus(item)} aria-pressed={submitted}>
+                        <span className="evidenceItemName">{item}</span>
+                        <span className="evidenceItemState">{submitted ? '제출' : '미제출'}</span>
+                      </button>
+                    );
+                  }) : <p>누락 자료 없음</p>}
+                </div>
+              </section>
+              <section className="railSection">
+                <h3>AI 추천 후속 작업</h3>
+                <p className="railHint">채택한 항목만 검토에 반영</p>
+                <div className="scrollBox">
+                  {suggestions.map((item) => {
+                    const picked = chosen.includes(item.label);
+                    return (
+                      <button className={`adoptButton${picked ? ' picked' : ''}`} type="button" key={item.label} onClick={() => setChosen((current) => current.includes(item.label) ? current : [...current, item.label])} disabled={picked}>
+                        <span className="adoptText"><strong>{item.label}</strong><small>{item.description}</small></span>
+                        <strong className="adoptAction">{picked ? '채택됨' : '채택'}</strong>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+              <section className="railSection">
+                <h3>사실관계 타임라인</h3>
+                <div className="scrollBox small">
+                  {analysis.timeline.map((item, index) => <button type="button" key={`${item.date}-${index}`}>{item.date} - {item.text}</button>)}
+                </div>
+                <div className="inlineControls compactInline">
+                  <input value={timelineText} onChange={(event) => setTimelineText(event.target.value)} placeholder="타임라인 항목" />
+                  <button type="button" onClick={() => {
+                    if (!timelineText.trim()) return;
+                    setAnalysis({ ...analysis, timeline: [...analysis.timeline, { date: today, text: timelineText }] });
+                    setTimelineText('');
+                  }}>추가</button>
+                </div>
+              </section>
+              <section className="railSection">
+                <h3>검토 반영 항목</h3>
+                <div className="scrollBox small chosenBox">{chosen.length ? chosen.map((item) => (
+                  <button type="button" key={item} onClick={() => setChosen(chosen.filter((value) => value !== item))}>
+                    <span className="chosenItemName">{item}</span>
+                    <em className="chosenItemDrop">제외</em>
+                  </button>
+                )) : <p>채택 항목 없음</p>}</div>
+              </section>
             </div>
           </div>
         )}
+        {analyzed ? <RecommendedFormsPanel selectedCase={selectedCase} onOpenDraft={onOpenDraft} /> : null}
         {analyzed ? (
           <div className="analysisFinalActions">
             <button className="primaryButton compactAction" type="button" onClick={saveAnalysis}>분석 내용 저장</button>
@@ -1605,7 +1965,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   );
 }
 
-function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation, onNotify, onDocumentReviewDecision, focusedConsultationId }) {
+function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation, onNotify, focusedConsultationId }) {
   const showToast = useToast();
   const [step, setStep] = useState('select');
   const [caseId, setCaseId] = useState(caseOptions(consultations)[0].id);
@@ -1689,12 +2049,13 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
     setDraftDocument(null);
   }, [caseId, template]);
 
-  // ── 변호사 전용: 선택한 사건에 제출된 서식 초안 목록(승인/반려 대상)입니다.
+  // 사건에 제출된 서식 초안 목록입니다. 변호사는 이 목록으로 내부 검토를 하고, 상담원은
+  // 같은 목록을 읽기 전용으로 보며 검토 상태·변호사 코멘트·수정본 여부를 확인합니다.
   const isLawyerReviewer = role === 'lawyer';
   const [caseDocuments, setCaseDocuments] = useState([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const reloadCaseDocuments = () => {
-    if (!isLawyerReviewer || !selectedCase?.coreId) {
+    if (!selectedCase?.coreId) {
       setCaseDocuments([]);
       return;
     }
@@ -1710,62 +2071,35 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
   useEffect(() => {
     reloadCaseDocuments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLawyerReviewer, selectedCase?.coreId]);
+  }, [selectedCase?.coreId]);
 
-  // 변호사 승인/반려 인라인 폼 상태. 한 번에 하나의 문서만 검토 폼을 열어둡니다.
+  // 변호사 내부 검토 인라인 폼 상태. 한 번에 하나의 문서만 검토 폼을 열어둡니다.
   const [reviewingDocumentId, setReviewingDocumentId] = useState(null);
-  const [reviewAction, setReviewAction] = useState('approve');
   const [reviewNoteText, setReviewNoteText] = useState('');
-  const [reviewMaterialsText, setReviewMaterialsText] = useState('');
   const [reviewPending, setReviewPending] = useState(false);
-  const startDocumentReview = (documentId, action) => {
-    setReviewingDocumentId(documentId);
-    setReviewAction(action);
+  // 서식 초안 직접 편집. core-api 문서는 서버 원본을 다시 만들 API가 없어, 편집 결과는
+  // 이 브라우저에 '변호사 수정본'으로 남겨 상담원 화면에도 함께 보여줍니다.
+  const [reviewContentDraft, setReviewContentDraft] = useState('');
+  const startDocumentReview = (doc) => {
+    setReviewingDocumentId(doc.document_id);
     setReviewNoteText('');
-    setReviewMaterialsText('');
+    setReviewContentDraft(readLawyerDraftEdit(doc.document_id)?.content || doc.draft_content || '');
   };
-  const cancelDocumentReview = () => setReviewingDocumentId(null);
-  const confirmDocumentReview = async () => {
+  const cancelDocumentReview = () => {
+    setReviewingDocumentId(null);
+  };
+  const confirmDocumentReview = async (doc) => {
     if (!selectedCase?.coreId || !reviewingDocumentId) return;
-    // 반려는 사유가 없으면 상담원이 뭘 고쳐야 할지 알 수 없으므로 필수로 막습니다. (백엔드 RequestRevisionRequest.note도 필수)
-    if (reviewAction === 'revision' && !reviewNoteText.trim()) {
-      showToast('반려 사유를 입력해주세요.', 'warn');
-      return;
-    }
     setReviewPending(true);
     try {
-      const token = currentUser?.token;
-      const reviewedDocument = caseDocuments.find((doc) => doc.document_id === reviewingDocumentId);
-      const reviewerInfo = {
-        name: currentUser?.name || '변호사',
-        email: currentUser?.email || '',
-        organization: currentUser?.organization || '',
-      };
-      const materials = reviewMaterialsText.split(',').map((item) => item.trim()).filter(Boolean);
-      if (reviewAction === 'approve') {
-        await approveCoreDocument(selectedCase.coreId, reviewingDocumentId, reviewNoteText, token);
-        showToast('서식 초안을 승인했습니다.', 'success');
-      } else {
-        await requestCoreDocumentRevision(selectedCase.coreId, reviewingDocumentId, reviewNoteText, materials, token);
-        showToast('서식 초안에 수정을 요청했습니다.', 'success');
+      // 승인 요청이 실패해도(예: 권한 없음) 변호사가 고친 내용은 이 브라우저에 먼저 남겨
+      // 작업이 사라지지 않게 합니다.
+      if (reviewContentDraft.trim() !== (doc.draft_content || '').trim()) {
+        saveLawyerDraftEdit(reviewingDocumentId, reviewContentDraft);
       }
-      onDocumentReviewDecision?.({
-        caseNo: selectedCase.caseNo,
-        action: reviewAction === 'approve' ? 'approve' : 'revision',
-        reason: reviewNoteText || '',
-        reviewer: reviewerInfo,
-        recipientEmail: selectedCase.counselor?.email || '',
-        formName: reviewedDocument?.requested_form_name || reviewedDocument?.form_name || '',
-        requestedMaterials: reviewAction === 'revision' ? materials : [],
-      });
-      onNotify?.({
-        roles: 'counselor',
-        title: reviewAction === 'approve' ? '서식 초안 승인' : '서식 보완 요청',
-        message: `${selectedCase.caseNo} · ${reviewedDocument?.form_name || '서식 초안'}${reviewNoteText ? ` / ${reviewNoteText}` : ''}`,
-        target: selectedCase.caseNo,
-        recipientEmail: selectedCase.counselor?.email || '',
-        view: '서식 생성',
-      });
+      const token = currentUser?.token;
+      await approveCoreDocument(selectedCase.coreId, reviewingDocumentId, reviewNoteText, token);
+      showToast('서식 초안 내부 검토를 완료했습니다.', 'success');
       setReviewingDocumentId(null);
       reloadCaseDocuments();
     } catch (error) {
@@ -1848,41 +2182,21 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
     setFavorites(toggleFavoriteTemplate(templateName));
   };
 
-  // 실제 초안 생성: core-api(→ai-api)로 먼저 시도하고, 실패하면 ai-api를 직접 불러 로컬 검토용
-  // 문서로 만듭니다. 그마저 안 되면 지금 화면의 초안 본문으로 브라우저에서 즉석 HWPX를 만들어
-  // 검토 요청 흐름이 끊기지 않게 합니다(생성 자체가 막혀도 변호사 검토까지는 진행할 수 있도록).
+  // 실제 HWPX 초안은 core-api가 생성한 GeneratedDocument만 사용합니다.
   const generateDraftDocument = async (draftContent) => {
-    const analysis = selectedCase.analysis || buildAnalysisResult(selectedCase);
     const hwpxTemplateName = resolveHwpxTemplateName(selectedTemplate.templateName);
-    try {
-      const coreContext = canUseCoreApi
-        ? { coreId: selectedCase.coreId, coreAnalysisId: selectedCase.coreAnalysisId }
-        : await syncCaseForDraftGeneration();
-      if (!coreContext) throw new Error('상담 또는 분석 결과를 Core API에 저장하지 못했습니다.');
-      const created = await generateCoreDraft(coreContext.coreId, coreContext.coreAnalysisId, hwpxTemplateName);
-      // core-api 응답(GeneratedDocumentResponse)에는 draft_content가 없고 서버 로컬 경로(draftFilePath)만
-      // 내려옵니다. 그 경로는 브라우저가 접근할 수 없어 다운로드 링크를 만들 수 없으므로, 지금 화면에
-      // 이미 만들어 둔 초안 본문(draftContent)을 함께 실어 보내 GeneratedFileBox/GeneratedFileLink가
-      // 브라우저에서 즉석 HWPX를 만들어 다운로드할 수 있게 합니다(백엔드에 다운로드 엔드포인트가
-      // 생기기 전까지의 대체 경로).
-      return { ...normalizeGeneratedDocument(created), draftContent };
-    } catch (coreError) {
-      console.warn('[서식 생성] core-api 초안 생성 실패, ai-api 직접 생성으로 대체합니다:', coreError.message);
-      try {
-        await generateAiDraft(buildAiDraftPayload({
-          templateName: selectedTemplate.templateName,
-          consultation: selectedCase,
-          analysis,
-        }));
-      } catch (aiError) {
-        console.warn('[서식 생성] ai-api 초안 생성 실패, 브라우저에서 HWPX를 만듭니다.', aiError.message);
-      }
-      return createClientHwpxReviewDocument({
-        consultation: selectedCase,
-        templateName: selectedTemplate.templateName,
-        draftContent,
-      });
+    const coreContext = canUseCoreApi
+      ? { coreId: selectedCase.coreId, coreAnalysisId: selectedCase.coreAnalysisId }
+      : await syncCaseForDraftGeneration();
+
+    if (!coreContext) throw new Error('상담 또는 분석 결과를 Core API에 저장하지 못했습니다.');
+
+    const created = await generateCoreDraft(coreContext.coreId, coreContext.coreAnalysisId, hwpxTemplateName);
+    const document = normalizeGeneratedDocument(created);
+    if (!document.documentId || !document.consultationId) {
+      throw new Error('Core API 응답에 다운로드용 문서 ID가 없습니다.');
     }
+    return { ...document, draftContent };
   };
 
   const goToPreview = async () => {
@@ -1896,23 +2210,16 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
         const document = await generateDraftDocument(nextDraft);
         setDraftDocument(document);
         syncDraftSnapshot(document, nextDraft);
-        setGeneratedFileMessage(document.draftFilePath
+        setGeneratedFileMessage(document.documentId
           ? isHwpxTemplateAlias(selectedTemplate.templateName)
-            ? `ai-api 원본명 「${resolveHwpxTemplateName(selectedTemplate.templateName)}」으로 HWPX 초안을 생성했습니다. 아래 생성 파일 영역에서 확인하세요.`
-            : 'HWPX 초안이 생성되었습니다. 아래 생성 파일 영역에서 확인하세요.'
-          : 'HWPX 초안 문서가 생성되었지만 파일 경로가 응답에 포함되지 않았습니다.');
+            ? `HWPX 생성 완료 · 원본명 ${resolveHwpxTemplateName(selectedTemplate.templateName)}`
+            : 'HWPX 생성 완료'
+          : 'HWPX 생성 완료 · 파일 경로 없음');
       } catch (error) {
-        const fallbackDraft = nextDraft;
-        const fallbackDocument = createClientHwpxReviewDocument({
-          consultation: selectedCase,
-          templateName: selectedTemplate.templateName,
-          draftContent: fallbackDraft,
-        });
-        setDraftDocument(fallbackDocument);
-        syncDraftSnapshot(fallbackDocument, fallbackDraft);
-        const message = draftGenerationFallbackMessage(error);
+        setDraftDocument(null);
+        const message = draftGenerationErrorMessage(error);
         setGeneratedFileMessage(message);
-        showToast(message, 'success');
+        showToast(message, 'warn');
       }
       setDraft(nextDraft);
       setSavedMessage('');
@@ -1928,24 +2235,17 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
         const document = await generateDraftDocument(nextDraft);
         setDraftDocument(document);
         syncDraftSnapshot(document, nextDraft);
-        setGeneratedFileMessage(document.draftFilePath
+        setGeneratedFileMessage(document.documentId
           ? isHwpxTemplateAlias(selectedTemplate.templateName)
-            ? `ai-api 원본명 「${resolveHwpxTemplateName(selectedTemplate.templateName)}」으로 HWPX 초안을 다시 생성했습니다.`
-            : 'HWPX 초안을 다시 생성했습니다. 아래 생성 파일 영역에서 확인하세요.'
-          : 'HWPX 초안 문서를 다시 생성했지만 파일 경로가 응답에 포함되지 않았습니다.');
-        showToast('HWPX 초안을 다시 생성했습니다.', 'success');
+            ? `HWPX 재생성 완료 · 원본명 ${resolveHwpxTemplateName(selectedTemplate.templateName)}`
+            : 'HWPX 재생성 완료'
+          : 'HWPX 재생성 완료 · 파일 경로 없음');
+        showToast('HWPX 재생성 완료', 'success');
       } catch (error) {
-        const fallbackDraft = nextDraft;
-        const fallbackDocument = createClientHwpxReviewDocument({
-          consultation: selectedCase,
-          templateName: selectedTemplate.templateName,
-          draftContent: fallbackDraft,
-        });
-        setDraftDocument(fallbackDocument);
-        syncDraftSnapshot(fallbackDocument, fallbackDraft);
-        const message = draftGenerationFallbackMessage(error);
+        setDraftDocument(null);
+        const message = draftGenerationErrorMessage(error);
         setGeneratedFileMessage(message);
-        showToast(message, 'success');
+        showToast(message, 'warn');
       }
     }, 'HWPX 초안을 다시 생성하고 있습니다');
   };
@@ -1957,20 +2257,8 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
     if (submitReviewPending) return;
     setSubmitReviewPending(true);
     try {
-      if (draftDocument.source === 'ai-api-local' || draftDocument.source === 'text-local' || draftDocument.source === 'client-hwpx') {
-        const submitted = saveLocalDocumentReviewRequest({ consultation: selectedCase, document: draftDocument });
-        const normalized = normalizeGeneratedDocument(submitted);
-        setDraftDocument(normalized);
-        syncDraftSnapshot(normalized, draft);
-        onNotify?.({
-          roles: 'lawyer',
-          title: '서식 검토 요청',
-          message: `${selectedCase.caseNo} · ${draftDocument.formName || selectedTemplate?.templateName || '서식 초안'}`,
-          target: selectedCase.caseNo,
-          view: '대시보드',
-        });
-        showToast('변호사에게 검토를 요청했습니다.', 'success');
-        return;
+      if (draftDocument.source !== 'core-api') {
+        throw new Error('서버에 저장된 HWPX 초안만 검토 요청할 수 있습니다.');
       }
       const updated = await submitCoreDocumentForReview(consultationId, draftDocument.documentId);
       const normalized = normalizeGeneratedDocument(updated);
@@ -1983,7 +2271,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
         target: selectedCase.caseNo,
         view: '대시보드',
       });
-      showToast('변호사에게 검토를 요청했습니다.', 'success');
+      showToast('변호사 검토 요청 완료', 'success');
     } catch (error) {
       showToast(`검토 요청에 실패했습니다: ${error.message}`, 'warn');
     } finally {
@@ -1995,11 +2283,11 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
     && draftDocument.status !== 'SUBMITTED_FOR_REVIEW'
     && draftDocument.status !== 'APPROVED';
   const reviewRequestGuide = !draftDocument?.documentId
-    ? 'HWPX 초안이 서버에 생성된 뒤 변호사 검토를 요청할 수 있습니다.'
+    ? 'HWPX 생성 후 요청 가능'
     : draftDocument.status === 'SUBMITTED_FOR_REVIEW'
-      ? '이미 변호사에게 검토 요청된 서식입니다.'
+      ? '이미 검토 요청됨'
       : draftDocument.status === 'APPROVED'
-        ? '변호사가 이미 승인한 서식입니다.'
+        ? '이미 승인됨'
         : '';
 
   // 저장 버튼이 메시지만 띄우고 실제로는 아무것도 남기지 않으면,
@@ -2017,7 +2305,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
     const saved = readStorage(storageKeys.generatedDocuments, []);
     writeStorage(storageKeys.generatedDocuments, [entry, ...saved.filter((item) => item.id !== entry.id)]);
     syncDraftSnapshot(draftDocument, draft);
-    const message = `「${selectedTemplate.templateName}」 초안을 저장했습니다. 이 브라우저에서 다시 열 수 있습니다.`;
+    const message = `「${selectedTemplate.templateName}」 초안 저장 완료`;
     setSavedMessage(message);
     // 저장 버튼 아래 안내 문구는 스크롤 위치에 따라 안 보일 수 있습니다.
     // 눌렀다는 걸 바로 알 수 있도록 화면 우측 아래 토스트로도 같이 띄웁니다.
@@ -2075,13 +2363,21 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
   return (
     <main className="workspacePage">
       <section className="workflowPanel draftPanel">
-        <h2>{isLawyerReviewer ? '법률 서식 초안 검토' : '법률 서식 초안 생성'}</h2>
+        <WorkPageHeader
+          title={isLawyerReviewer ? '서식 초안 검토' : '서식 초안 생성'}
+          description={isLawyerReviewer
+            ? '제출 초안 확인 · 승인/반려'
+            : '사건 선택 · 서식 선택 · 초안 생성'}
+        />
         <div className="apiPendingBanner">
-          <strong>{isLawyerReviewer ? 'HWPX 서식 검토 연동' : 'HWPX 서식 생성 연동'}</strong>
-          <span>
-            {isLawyerReviewer
-              ? '상담원이 제출한 HWPX 초안을 확인하고 승인·반려 결과를 서버에 반영합니다.'
-              : '서식을 고르면 core-api/ai-api가 실제 HWPX 초안을 생성하고, 상담원의 검토 요청과 변호사의 승인·반려까지 서버에 그대로 반영됩니다.'}
+          <FileText className="apiPendingBannerIcon" size={18} strokeWidth={2.2} aria-hidden="true" />
+          <span className="apiPendingBannerText">
+            <strong>{isLawyerReviewer ? 'HWPX 서식 검토 연동' : 'HWPX 서식 생성 연동'}</strong>
+            <small>
+              {isLawyerReviewer
+                ? '초안 검토 · 결과 저장'
+                : 'HWPX 생성 · 검토 요청 · 승인 흐름'}
+            </small>
           </span>
         </div>
         <div className="inlineControls">
@@ -2094,75 +2390,95 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
             <span><small>첨부자료</small><strong>{selectedCase.attachments?.length || 0}건</strong></span>
           </div>
         ) : null}
-        {isLawyerReviewer && selectedCase ? (
+        {selectedCase ? (
           <section className="documentReviewPanel">
             <div className="panelTitleRow">
-              <h3>제출된 서식 검토</h3>
+              <h3>{isLawyerReviewer ? '제출된 서식 검토' : '제출한 서식 상태'}</h3>
               {documentsLoading ? <span className="helperText">불러오는 중…</span> : null}
             </div>
             {!selectedCase.coreId ? (
-              <p className="templateEmpty">이 상담은 core-api에 저장되지 않아(로컬 전용) 서식 검토를 불러올 수 없습니다.</p>
+              <InlineEmptyNotice>로컬 상담 · 서식 검토 불러오기 불가</InlineEmptyNotice>
             ) : caseDocuments.length ? (
               <div className="documentReviewList">
-                {caseDocuments.map((doc) => (
-                  <div className="documentReviewRow" key={doc.document_id}>
-                    <div className="documentReviewInfo">
-                      <strong>{doc.form_name}</strong>
-                      <span className={`statusChip tone-${documentStatusTone(doc.status)}`}>{DOCUMENT_STATUS_LABEL[doc.status] || doc.status}</span>
-                      <GeneratedFileLink
-                        path={doc.draft_file_path}
-                        consultationId={selectedCase.coreId}
-                        documentId={doc.document_id}
-                        content={doc.draft_content}
-                        downloadFileName={doc.download_file_name}
-                      />
-                      {doc.review_note ? <p className="reasonText">지난 검토 코멘트: {doc.review_note}</p> : null}
-                      {doc.requested_materials?.length ? <p className="reasonText">요청 자료: {doc.requested_materials.join(', ')}</p> : null}
-                    </div>
-                    {doc.status === 'SUBMITTED_FOR_REVIEW' ? (
-                      reviewingDocumentId === doc.document_id ? (
-                        <div className="documentReviewForm">
-                          <textarea
-                            value={reviewNoteText}
-                            onChange={(event) => setReviewNoteText(event.target.value)}
-                            placeholder={reviewAction === 'approve' ? '승인 코멘트 (선택)' : '반려 사유 (필수)'}
-                          />
-                          {reviewAction === 'revision' ? (
-                            <input
-                              value={reviewMaterialsText}
-                              onChange={(event) => setReviewMaterialsText(event.target.value)}
-                              placeholder="상담원에게 요청할 자료 (쉼표로 구분, 선택)"
+                {caseDocuments.map((doc) => {
+                  const lawyerEdit = readLawyerDraftEdit(doc.document_id);
+                  const isReviewingThis = reviewingDocumentId === doc.document_id;
+                  return (
+                    <div className="documentReviewRow" key={doc.document_id}>
+                      <div className="documentReviewInfo">
+                        <strong>{doc.form_name}</strong>
+                        <span className={`statusChip tone-${documentStatusTone(doc.status)}`}>{DOCUMENT_STATUS_LABEL[doc.status] || doc.status}</span>
+                        {lawyerEdit ? <span className="statusChip tone-warn">변호사 수정본</span> : null}
+                        <GeneratedFileLink
+                          path={doc.draft_file_path}
+                          consultationId={selectedCase.coreId}
+                          documentId={doc.document_id}
+                          content={lawyerEdit?.content || doc.draft_content}
+                          downloadFileName={doc.download_file_name}
+                        />
+                        {/* 서버에는 반영되지 않는 로컬 전용 수정본이라는 점을 항상 보이는 캡션으로
+                            남겨, 상담원이 이걸 서버에 저장된 최종본으로 오해하지 않게 합니다. */}
+                        {lawyerEdit ? <p className="localEditOnlyCaption">로컬 임시 저장 · 이 브라우저에서만 표시</p> : null}
+                        {lawyerEdit && !isReviewingThis ? <pre className="documentLawyerEditPreview">{lawyerEdit.content}</pre> : null}
+                        {doc.review_note ? <p className="reasonText">지난 검토 코멘트: {doc.review_note}</p> : null}
+                        {doc.requested_materials?.length ? <p className="reasonText">요청 자료: {doc.requested_materials.join(', ')}</p> : null}
+                      </div>
+                      {isLawyerReviewer && doc.status === 'SUBMITTED_FOR_REVIEW' ? (
+                        isReviewingThis ? (
+                          <div className="documentReviewForm">
+                            <div className="draftView">
+                              <div className="draftViewPane">
+                                <div className="draftViewPaneHeader"><strong>편집</strong></div>
+                                <textarea
+                                  className="documentReviewContentEditor"
+                                  value={reviewContentDraft}
+                                  onChange={(event) => setReviewContentDraft(event.target.value)}
+                                  placeholder="서식 초안 내용을 입력하거나 고치세요."
+                                />
+                              </div>
+                              <div className="draftViewPane">
+                                <div className="draftViewPaneHeader">
+                                  <strong>미리보기</strong>
+                                  <span className="statusChip tone-info">변호사 수정본</span>
+                                </div>
+                                {reviewContentDraft ? <pre>{reviewContentDraft}</pre> : <p className="helperText">입력 내용 없음</p>}
+                              </div>
+                            </div>
+                            <textarea
+                              value={reviewNoteText}
+                              onChange={(event) => setReviewNoteText(event.target.value)}
+                              placeholder="내부 검토 메모 (선택)"
                             />
-                          ) : null}
-                          <div className="inlineControls">
-                            <button type="button" onClick={cancelDocumentReview} disabled={reviewPending}>취소</button>
-                            <button
-                              className="primaryButton"
-                              type="button"
-                              onClick={confirmDocumentReview}
-                              disabled={reviewPending || (reviewAction === 'revision' && !reviewNoteText.trim())}
-                            >
-                              {reviewPending ? '처리하는 중…' : reviewAction === 'approve' ? '승인 확정' : '반려 확정'}
-                            </button>
+                            <div className="inlineControls">
+                              <button type="button" onClick={cancelDocumentReview} disabled={reviewPending}>취소</button>
+                              <button
+                                className="primaryButton"
+                                type="button"
+                                onClick={() => confirmDocumentReview(doc)}
+                                disabled={reviewPending}
+                              >
+                                {reviewPending ? '처리하는 중…' : '검토 완료'}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="inlineControls">
-                          <button className="secondaryActionButton" type="button" onClick={() => startDocumentReview(doc.document_id, 'approve')}>승인</button>
-                          <button className="ghostActionButton" type="button" onClick={() => startDocumentReview(doc.document_id, 'revision')}>반려</button>
-                        </div>
-                      )
-                    ) : null}
-                  </div>
-                ))}
+                        ) : (
+                          <div className="inlineControls">
+                            <button className="secondaryActionButton" type="button" onClick={() => startDocumentReview(doc)}>검토 완료</button>
+                          </div>
+                        )
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
-              <p className="templateEmpty">{documentsLoading ? '' : '이 사건에 제출된 서식 초안이 없습니다.'}</p>
+              !documentsLoading ? <InlineEmptyNotice>제출된 서식 초안 없음</InlineEmptyNotice> : null
             )}
           </section>
         ) : null}
         {!isLawyerReviewer ? (
-          <>
+          /* 시안: '서식 선택'과 '추출 필드 자동 채움', 그리고 생성 버튼까지 흰 카드 하나에 담깁니다. */
+          <div className="draftSelectCard">
             <div className="workflowColumns">
               <div>
                 <h3>서식 선택</h3>
@@ -2179,7 +2495,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                     {draftCaseType ? `'${draftCaseType}' 서식만 보기` : '사건을 먼저 선택하세요'}
                   </button>
                   {scopeToCase && !filteredTemplates.length ? (
-                    <span className="templateScopeEmpty">이 분류에 연결된 서식이 없습니다. 전체에서 찾아주세요.</span>
+                    <span className="templateScopeEmpty">연결 서식 없음 · 전체 검색</span>
                   ) : null}
                 </div>
                 {/* 1단계: 대분류 탭 (4개 + 전체) — 소분류 29개를 한꺼번에 늘어놓지 않고 단계적으로 좁힙니다. */}
@@ -2249,7 +2565,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                         </span>
                       </button>
                     );
-                  }) : <p className="templateEmpty">해당 조건의 서식이 없습니다.</p>}
+                  }) : <InlineEmptyNotice>조건 일치 서식 없음</InlineEmptyNotice>}
                 </div>
               </div>
               <div>
@@ -2274,14 +2590,14 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                         );
                       })}
                     </div>
-                  ) : <p>서식을 선택하면 필요한 항목이 표시됩니다.</p>}
+                  ) : <p>서식을 선택하면 항목 표시</p>}
                 </div>
               </div>
             </div>
             <div className="draftFinalActions">
               <button className="primaryButton compactAction" type="button" onClick={goToPreview} disabled={!selectedTemplate}>서식 초안 생성</button>
             </div>
-          </>
+          </div>
         ) : null}
       </section>
     </main>
@@ -2302,7 +2618,7 @@ function SearchWorkbench({ consultations }) {
   const selectedTitles = selected.map((item) => item.title);
   const runAiReferenceSearch = () => {
     setSearched(true);
-    setReferenceMessage('법령·판례 추천 API가 연결되면 상담 분석 요약과 사건 유형을 함께 전송합니다. 현재는 준비된 후보 목록을 기준으로 검토 흐름을 확인합니다.');
+    setReferenceMessage('추천 후보 표시 · API 연동 전 임시 목록');
   };
   const adoptReference = (item) => {
     setSelected((current) => current.some((value) => value.id === item.id) ? current : [...current, item]);
@@ -2311,11 +2627,10 @@ function SearchWorkbench({ consultations }) {
   return (
     <main className="workspacePage">
       <section className="workflowPanel searchPanel">
-        <h2>법령 및 판례 찾기</h2>
-        <div className="apiPendingBanner">
-          <strong>AI 추천 연동 준비</strong>
-          <span>상담 분석 결과를 기준으로 법령·판례·유사사례를 검토하고 채택하는 흐름입니다.</span>
-        </div>
+        <WorkPageHeader
+          title="법령·판례"
+          description="관련 근거 선택 · 검토 자료 반영"
+        />
         <div className="inlineControls">
           <CasePicker
             consultations={consultations}
@@ -2334,45 +2649,46 @@ function SearchWorkbench({ consultations }) {
             <span><small>구조대상</small><strong>{selectedCase.analysis?.eligibility || '검토 필요'}</strong></span>
           </div>
         ) : null}
-        <div className="segmented">
-          {[
-            { key: 'precedent', label: '판례' },
-            { key: 'statute', label: '법령' },
-            { key: 'similar', label: '유사 상담사례' },
-          ].map((item) => (
-            <button
-              className={referenceType === item.key ? 'active' : ''}
-              type="button"
-              key={item.key}
-              onClick={() => {
-                setReferenceType(item.key);
-                setSelected([]);
-                setSearched(mode === '추천');
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {/* 시안: 자료 종류(판례/법령/유사 상담사례)는 왼쪽, 추천/직접 검색 전환은 같은 줄 오른쪽. */}
         <div className="referenceToolbar">
-          <div className="segmented">
+          <div className="segmented referenceTypeTabs">
+            {[
+              { key: 'precedent', label: '판례' },
+              { key: 'statute', label: '법령' },
+              { key: 'similar', label: '유사 상담사례' },
+            ].map((item) => (
+              <button
+                className={referenceType === item.key ? 'active' : ''}
+                type="button"
+                key={item.key}
+                onClick={() => {
+                  setReferenceType(item.key);
+                  setSelected([]);
+                  setSearched(mode === '추천');
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="segmented referenceModeTabs">
             {['추천', '직접 검색'].map((item) => <button className={mode === item ? 'active' : ''} type="button" key={item} onClick={() => { setMode(item); setSearched(item === '추천'); }}>{item}</button>)}
           </div>
-          {mode === '직접 검색' ? (
-            <div className="referenceSearchBox">
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`${label} 검색어`} />
-              <button type="button" onClick={() => setSearched(true)}>검색</button>
-            </div>
-          ) : null}
         </div>
+        {mode === '직접 검색' ? (
+          <div className="referenceSearchBox">
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`${label} 검색어`} />
+            <button type="button" onClick={() => setSearched(true)}>검색</button>
+          </div>
+        ) : null}
         <div className="referenceActionBar">
           <div>
             <strong>{mode === '추천' ? '상담 분석 기반 추천' : '직접 검색 결과 검토'}</strong>
-            <span>{selected.length ? `${selected.length}개 항목을 검토 자료로 선택했습니다.` : '목록에서 실제 검토에 쓸 후보를 선택하세요.'}</span>
+            <span>{selected.length ? `${selected.length}개 선택됨` : '검토에 쓸 후보 선택'}</span>
           </div>
           <div className="referenceActionButtons">
             <button className="secondaryActionButton compactAction" type="button" onClick={runAiReferenceSearch}>AI 추천 실행</button>
-            <button className="primaryButton compactAction" type="button" onClick={() => setReferenceMessage('선택한 법령·판례·유사 상담사례를 상담 분석 검토 자료에 반영했습니다.')} disabled={!selected.length}>선택 항목 반영</button>
+            <button className="primaryButton compactAction" type="button" onClick={() => setReferenceMessage('선택 항목 반영 완료')} disabled={!selected.length}>선택 항목 반영</button>
           </div>
         </div>
         {referenceMessage ? <p className="apiPendingMessage" role="status">{referenceMessage}</p> : null}
@@ -2386,7 +2702,7 @@ function SearchWorkbench({ consultations }) {
                   <span className="referenceCardMeta">{item.source} · {item.caseType}</span>
                   <strong>{selectedTitles.includes(item.title) ? '선택됨' : '선택'}</strong>
                 </button>
-              )) : <p className="templateEmpty">조건에 맞는 {label} 후보가 없습니다.</p>}
+              )) : <InlineEmptyNotice>조건 일치 {label} 없음</InlineEmptyNotice>}
             </div>
           </div>
           <div>
@@ -2398,7 +2714,7 @@ function SearchWorkbench({ consultations }) {
                   <small>{item.source}</small>
                   <strong>빼기</strong>
                 </button>
-              )) : <p>선택된 {label}가 없습니다. 목록에서 실제 검토에 쓸 후보만 채택하세요.</p>}
+              )) : <p>선택된 {label} 없음</p>}
             </div>
           </div>
         </div>
@@ -2421,7 +2737,7 @@ function NotificationPanel({ role, currentUser, notifications = [], onReadNotifi
     if (unread) {
       const accepted = await confirm({
         title: '읽지 않은 알림을 삭제할까요?',
-        message: `「${item.title}」은 아직 확인하지 않은 알림입니다. 삭제하면 다시 볼 수 없습니다.`,
+        message: `「${item.title}」\n읽지 않은 알림이 삭제됩니다.`,
         confirmLabel: '삭제',
         tone: 'danger',
       });
@@ -2431,13 +2747,18 @@ function NotificationPanel({ role, currentUser, notifications = [], onReadNotifi
   };
   return (
     <section className="workPanel notificationPanel">
-      <div className="notificationHeader">
-        <div>
-          <h2>알림</h2>
-          <p>내가 처리해야 할 업무 알림을 확인합니다.</p>
-        </div>
-        <span className="notificationCount">새 알림 {unreadCount}건</span>
-      </div>
+      <WorkPageHeader
+        title="알림"
+        description="새 알림 확인 · 상담 화면 이동"
+        meta={(
+          <span className="notificationHeaderMeta">
+            <span className="notificationCount">새 알림 {unreadCount}건</span>
+            {/* 알림이 쌓일수록 이 버튼을 찾아 목록 맨 아래까지 내려야 했던 문제를 없애기 위해
+                목록 위(헤더 옆)로 옮겼습니다. */}
+            <button className="ghostActionButton compactAction" type="button" onClick={() => onReadNotifications?.(role, currentUser?.email)} disabled={!unreadCount}>전체 읽음 처리</button>
+          </span>
+        )}
+      />
       {roleNotifications.length ? (
         <div className="notificationList">
           {roleNotifications.map((item) => {
@@ -2454,20 +2775,22 @@ function NotificationPanel({ role, currentUser, notifications = [], onReadNotifi
                 }}
               >
                 <div className="notificationItemTop">
-                  <strong className="notificationItemTitle">{item.title}</strong>
-                  <span className="notificationItemTime">{new Date(item.createdAt).toLocaleString('ko-KR')}</span>
+                  <strong className="notificationItemTitle">
+                    <i className="notificationDot" aria-hidden="true" />
+                    {item.title}
+                  </strong>
+                  <span className="notificationItemTime">{formatDateTimeLabel(item.createdAt)}</span>
                 </div>
                 <p className="notificationItemMessage">{item.message}</p>
                 <div className="notificationActions">
-                  <span className="notificationState">{unread ? '바로 처리' : '내용 보기'}</span>
+                  <span className="notificationState">{unread ? '바로 처리 ›' : '내용 보기'}</span>
                   <button className="notificationDelete" type="button" onClick={(event) => handleDelete(event, item, unread)}>삭제</button>
                 </div>
               </article>
             );
           })}
         </div>
-      ) : <p className="notificationEmpty">확인할 알림이 없습니다.</p>}
-      <button className="primaryButton compactAction" type="button" onClick={() => onReadNotifications?.(role, currentUser?.email)} disabled={!unreadCount}>전체 읽음 처리</button>
+      ) : <InlineEmptyNotice>확인할 알림 없음</InlineEmptyNotice>}
     </section>
   );
 }
@@ -2516,8 +2839,11 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
 
   return (
     <section className="workPanel profilePanel">
-      <h2>프로필</h2>
-      <p>{roleLabel} 권한으로 로그인 중입니다.</p>
+      <WorkPageHeader
+        title="내 정보"
+        description={`${roleLabel} 권한 · 연락처/비밀번호 관리`}
+      />
+      <div className="profileFormCard">
       <label className="field">
         <span>이메일</span>
         <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} type="email" placeholder="이메일 입력" readOnly={lockContactFields} disabled={lockContactFields} />
@@ -2541,7 +2867,7 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
           <input value={form.organization} onChange={(event) => setForm({ ...form, organization: event.target.value })} placeholder="대한법률구조공단 / 전산" />
         </label>
       )}
-      {lockContactFields ? <p className="helperText">이메일과 소속기관·부서는 가입 시 등록된 정보로 고정되며 본인이 변경할 수 없습니다. 변경이 필요하면 관리자에게 문의해주세요.</p> : null}
+      {lockContactFields ? <p className="helperText">이메일·소속은 관리자에게 변경 요청</p> : null}
       <label className="field">
         <span>연락처</span>
         <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} type="tel" placeholder="010-0000-0000" />
@@ -2559,15 +2885,25 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
       {mismatch ? <p className="formError">비밀번호와 비밀번호 확인이 일치하지 않습니다.</p> : null}
       {message ? <p className={message.includes('저장') ? 'helperText success' : 'formError'}>{message}</p> : null}
       <button className="primaryButton" type="button" onClick={save}>프로필 수정 저장</button>
+      </div>
     </section>
   );
 }
 
-function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, onDocumentReviewDecision, focusedConsultationId, onOpenConsultationForm, onOpenAnalysis }) {
+function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, focusedConsultationId, onOpenAnalysis, onOpenConsultationForm, onOpenDraft }) {
   // '상담 등록'은 상담원 고유 업무입니다. 다른 역할에서 실수로 activeView가 넘어와도
   // 접수 화면이 열리지 않도록 역할을 한 번 더 확인합니다. (네비게이션 메뉴 구성과 이중 방어)
-  if (view === '상담 등록') return role === 'counselor' ? <UploadWorkbench onCreateConsultation={onCreateConsultation} onGoToRealtimeAnalysis={() => onOpenAnalysis?.()} /> : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
-  if (view === '법률, 판례') return <SearchWorkbench consultations={consultations} />;
+  if (view === '상담 등록') return role === 'counselor' ? (
+    <UploadWorkbench
+      consultations={consultations}
+      onCreateConsultation={onCreateConsultation}
+      onUpdateConsultation={onUpdateConsultation}
+      onGoToRealtimeAnalysis={() => onOpenAnalysis?.()}
+    />
+  ) : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
+  // 법령·판례 검색은 변호사 전용입니다. 메뉴에서 이미 뺐지만, 상담원 role로 이 화면에
+  // 들어오는 경로가 남아있을 수 있어 한 번 더 막습니다. (상담 등록과 같은 이중 방어 규칙)
+  if (view === '법률, 판례') return role === 'lawyer' ? <SearchWorkbench consultations={consultations} /> : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
   if (view === '서식 생성') return (
     <DraftWorkbench
       consultations={consultations}
@@ -2575,13 +2911,12 @@ function UtilityPanel({ view, role, consultations, onCreateConsultation, onReque
       role={role}
       onUpdateConsultation={onUpdateConsultation}
       onNotify={onNotify}
-      onDocumentReviewDecision={onDocumentReviewDecision}
       focusedConsultationId={focusedConsultationId}
     />
   );
   if (view === '알림') return <NotificationPanel role={role} currentUser={currentUser} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} />;
   if (view === '기타' && role === 'lawyer') return <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
-  if (view === '기타') return <AnalysisWorkbench consultations={consultations} onCreateConsultation={onCreateConsultation} onUpdateConsultation={onUpdateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} currentUser={currentUser} onGoToDashboard={onGoToDashboard} focusedConsultationId={focusedConsultationId} onGoToUpload={onOpenConsultationForm} />;
+  if (view === '기타') return <AnalysisWorkbench consultations={consultations} onCreateConsultation={onCreateConsultation} onUpdateConsultation={onUpdateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} currentUser={currentUser} onGoToDashboard={onGoToDashboard} onGoToUpload={() => onOpenConsultationForm?.()} onOpenDraft={onOpenDraft} focusedConsultationId={focusedConsultationId} />;
   return <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
 }
 
@@ -2633,25 +2968,10 @@ function documentStatusTone(status) {
   return 'muted';
 }
 
-function resolveGeneratedFileHref(path = '') {
-  if (!path) return '';
-  if (/^https?:\/\//i.test(path)) return path;
-  if (/^blob:/i.test(path)) return path;
-  if (path.startsWith('/')) return path;
-  return '';
-}
-
 function generatedFileName(path = '') {
   if (!path) return '';
   const normalized = path.replace(/\\/g, '/');
   return normalized.split('/').filter(Boolean).at(-1) || path;
-}
-
-function escapePreviewHtml(text = '') {
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 // label을 넘기면 그 문구를 표시 이름으로 쓰고(예: '조정신청서 초안 파일'), 안 넘기면 예전처럼
@@ -2660,81 +2980,6 @@ function escapePreviewHtml(text = '') {
 // consultationId+documentId를 넘기면(=core-api에 실제 저장된 문서) 새로 생긴 다운로드 API로
 // 진짜 파일을 받는 링크를 만듭니다. 없으면(로컬 전용 문서) 예전처럼 draft_file_path 자체를
 // 링크로 쓸 수 있는지만 확인합니다(blob: URL 등).
-function escapePreviewAttribute(text = '') {
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function buildDraftContentPreviewHtmlWithFile(content = '', title = '', options = {}) {
-  if (!content) return '';
-  const safeTitle = escapePreviewHtml(title || '서식 초안 미리보기');
-  const safeContent = escapePreviewHtml(content);
-  const safeFileName = escapePreviewHtml(options.fileName || '생성 파일');
-  const safeDownloadUrl = options.downloadUrl ? escapePreviewAttribute(options.downloadUrl) : '';
-  const safePreviewUrl = options.previewUrl ? escapePreviewAttribute(options.previewUrl) : '';
-  const fileActions = safeDownloadUrl || safePreviewUrl
-    ? `<section class="filebox"><div class="filebox-head"><strong>생성 파일</strong><span>${safeFileName}</span></div><div class="filebox-actions">${safePreviewUrl ? `<a class="ghost" href="${safePreviewUrl}" target="_blank" rel="noreferrer">미리보기</a>` : ''}${safeDownloadUrl ? `<a class="primary" href="${safeDownloadUrl}" download="${safeFileName}">다운로드</a>` : ''}</div></section>`
-    : '';
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${safeTitle}</title><style>body{margin:0;padding:32px;font-family:Apple SD Gothic Neo,Malgun Gothic,sans-serif;background:#f6f8fb;color:#1f2937}main{max-width:960px;margin:0 auto;background:#fff;border:1px solid #d8e1eb;border-radius:16px;padding:32px;box-shadow:0 12px 30px rgba(15,23,42,.08)}h1{margin:0 0 20px;font-size:24px}.filebox{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px 20px;margin:0 0 24px;border:1px solid #d8e1eb;border-radius:12px;background:#f8fbff}.filebox-head{display:flex;flex-direction:column;gap:6px}.filebox-actions{display:flex;gap:10px;flex-wrap:wrap}.filebox-actions a{text-decoration:none;padding:10px 16px;border-radius:10px;font-weight:700}.filebox-actions .ghost{border:1px solid #9fb7d3;color:#204d7a;background:#fff}.filebox-actions .primary{background:#204d7a;color:#fff}pre{white-space:pre-wrap;word-break:break-word;line-height:1.8;font-size:15px;margin:0}</style></head><body><main><h1>${safeTitle}</h1>${fileActions}<pre>${safeContent}</pre></main></body></html>`;
-}
-
-
-function parseDownloadFileName(headerValue = '') {
-  const encodedMatch = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
-  if (encodedMatch?.[1]) {
-    try {
-      return decodeURIComponent(encodedMatch[1]);
-    } catch {
-      return encodedMatch[1];
-    }
-  }
-
-  const quotedMatch = headerValue.match(/filename="([^"]+)"/i);
-  if (quotedMatch?.[1]) return quotedMatch[1];
-
-  const plainMatch = headerValue.match(/filename=([^;]+)/i);
-  return plainMatch?.[1]?.trim() || '';
-}
-
-function isFileDownloadResponse(response) {
-  const contentType = response.headers.get('content-type') || '';
-  return !contentType.includes('application/json') && !contentType.includes('text/json');
-}
-
-async function downloadServerDocument(url, fallbackFileName) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`다운로드 실패 (${response.status})`);
-  }
-  if (!isFileDownloadResponse(response)) {
-    throw new Error('서버가 파일 대신 오류 응답을 보냈습니다.');
-  }
-
-  const blob = await response.blob();
-  if (!blob.size) {
-    throw new Error('빈 파일 응답입니다.');
-  }
-
-  const fileName = parseDownloadFileName(response.headers.get('content-disposition') || '')
-    || fallbackFileName
-    || 'document.hwpx';
-  const objectUrl = window.URL.createObjectURL(blob);
-
-  try {
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-  } finally {
-    window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 300000);
-  }
-}
-
 function ServerDocumentDownloadButton({ url, fileName, className = '' }) {
   if (!url) return null;
   return (
@@ -2746,6 +2991,31 @@ function ServerDocumentDownloadButton({ url, fileName, className = '' }) {
       >
         다운로드
       </a>
+    </span>
+  );
+}
+
+// 서버에 저장된 파일이 없는 로컬 전용 초안(ai-api-local/text-local/client-hwpx 등)의 본문(draftText)으로
+// 그 자리에서 새 HWPX 파일을 만들어 내려받게 합니다. createClientHwpxDraft는 클릭 시점에 매번 새
+// blob: URL을 만들기 때문에(미리 만들어 저장해두지 않음), 세션이 바뀌어도 죽은 링크가 되지 않습니다.
+function ClientHwpxDownloadButton({ templateName, draftText }) {
+  const handleClick = () => {
+    const { fileName, url } = createClientHwpxDraft({ templateName, draftText });
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    // 다운로드는 클릭 이벤트 이후 브라우저가 비동기로 처리합니다. click() 직후 바로
+    // revokeObjectURL을 부르면 일부 브라우저(특히 Firefox)에서는 브라우저가 blob을 읽기도
+    // 전에 URL이 무효화되어 다운로드가 실패합니다. 링크를 문서에 잠깐 붙였다 떼고,
+    // revoke는 다음 tick으로 미뤄 다운로드가 실제로 시작된 뒤에 처리되게 합니다.
+    window.document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+  return (
+    <span className="serverDocumentDownload">
+      <button type="button" onClick={handleClick}>다운로드</button>
     </span>
   );
 }
@@ -2769,10 +3039,13 @@ function GeneratedFileLink({ path, label, consultationId, documentId, content, d
   }
 
   if (content) {
+    // 예전엔 여기가 "서버 파일 없음"이라는 읽기 전용 텍스트뿐이라, 로컬 전용 초안(서버에 실제
+    // 파일이 없는 ai-api-local/text-local/client-hwpx 검토 건)은 검토자가 내려받을 방법이
+    // 전혀 없었습니다. 본문(content)이 있으니 그걸로 바로 HWPX를 만들어 내려받게 합니다.
     return (
       <div className="generatedFileInline">
         <span>{safeFileName}</span>
-        <code>서버 파일 없음</code>
+        <ClientHwpxDownloadButton templateName={safeFileName} draftText={content} />
       </div>
     );
   }
@@ -2805,66 +3078,9 @@ function normalizeGeneratedDocument(response = {}) {
   };
 }
 
-// ai-api를 직접 호출해 만든 초안은 core-api에 저장된 documentId가 없으므로, 브라우저 쪽에서만
-// 통하는 로컬 키를 만들어 같은 카드/버튼 로직을 그대로 쓸 수 있게 합니다.
-function normalizeAiGeneratedDocument({ response, consultation, templateName }) {
-  const localKey = `ai-draft-${consultation?.id || 'case'}-${Date.now()}`;
-  return normalizeGeneratedDocument({
-    local_key: localKey,
-    document_id: localKey,
-    consultation_id: consultation?.id || '',
-    status: 'DRAFTED',
-    form_name: templateName,
-    requested_form_name: response?.requested_form_name || '',
-    draft_file_path: response?.file || '',
-    source: 'ai-api-local',
-  });
-}
-
-// core-api·ai-api 둘 다 응답을 못 주는 최후의 경우, 지금까지 화면에 쓰던 초안 본문 텍스트로
-// 브라우저에서 즉석 HWPX 미리보기 파일을 만들어 검토 요청 흐름이 끊기지 않게 합니다.
-function createClientHwpxReviewDocument({ consultation, templateName, draftContent }) {
-  const localKey = `client-hwpx-${consultation?.id || 'case'}-${Date.now()}`;
-  return normalizeGeneratedDocument({
-    local_key: localKey,
-    document_id: localKey,
-    consultation_id: consultation?.id || '',
-    status: 'DRAFTED',
-    form_name: templateName,
-    draft_file_path: '',
-    download_file_name: '',
-    draft_content: draftContent,
-    source: 'server-missing',
-  });
-}
-
 function draftGenerationErrorMessage(error) {
   const detail = error?.message ? ` (${error.message})` : '';
-  return `HWPX 초안 생성에 실패했습니다${detail}. ai-api 상태와 선택한 서식명을 확인해주세요.`;
-}
-
-function draftGenerationFallbackMessage(error) {
-  if (error?.message?.includes('서식 파일 없음')) {
-    return '원본 서식 파일을 찾지 못해 현재 초안 본문으로 HWPX 파일을 만들었습니다.';
-  }
-  return `${draftGenerationErrorMessage(error)} 현재 초안 본문으로 검토 요청을 계속할 수 있습니다.`;
-}
-
-function buildAiDraftPayload({ templateName, consultation, analysis }) {
-  const resolvedTemplateName = resolveHwpxTemplateName(templateName);
-  return {
-    form_name: resolvedTemplateName,
-    requested_form_name: templateName,
-    extracted: {
-      ...(analysis?.extractedJson || {}),
-      상담자: consultation?.name || '',
-      상대방: consultation?.opponentName || '',
-      사건명: consultation?.title || '',
-      사건유형: analysis?.caseSubtype || analysis?.caseType || consultation?.type || '',
-      누락자료: analysis?.missingInfo || [],
-    },
-    summary: analysis?.summary || consultation?.memo || consultation?.title || '',
-  };
+  return `HWPX 생성 실패${detail} · ai-api/서식명 확인`;
 }
 
 // consultationId를 넘기고 document가 core-api에 실제 저장된 것(source: 'core-api')이면 실제
@@ -2872,78 +3088,50 @@ function buildAiDraftPayload({ templateName, consultation, analysis }) {
 // 버튼을 보여줍니다. 이 경우는 항상 다운로드로 응답하도록 백엔드가 고정돼 있어
 // (Content-Disposition: attachment) '미리보기'는 의미가 없으므로 다운로드 버튼만 둡니다.
 //
-// 로컬 전용 문서(ai-api-local/text-local/client-hwpx)는 draftFilePath 자체가 브라우저 blob: URL인
 // 경우가 있는데, blob: URL은 그 blob을 만든 "이 페이지 세션"에서만 유효하고 새로고침하거나 나중에
 // 다시 열면(변호사 검토 요청 후 다른 시점에 다시 여는 경우 등) 이미 죽어 있어 다운로드가
 // "사이트에서 사용할 수 없는 파일" 오류로 항상 실패합니다. 그래서 draftContent(초안 본문 텍스트,
 // localStorage에 같이 저장돼 세션이 바뀌어도 남아있음)가 있으면 옛 blob을 재사용하지 않고 매번
-// 새로 HWPX를 만들어(createClientHwpxDraft) 항상 살아있는 다운로드 링크를 보장합니다.
 // draftContent조차 없을 때만(구버전에 저장된 문서 등) 예전 filePath를 그대로 시도합니다.
 function GeneratedFileBox({ document, consultationId }) {
   const filePath = document?.draftFilePath || '';
   const downloadUrl = document?.source === 'core-api' && consultationId && document?.documentId
     ? buildCoreDocumentDownloadUrl(consultationId, document.documentId)
     : '';
-  const fileName = document?.downloadFileName || generatedFileName(filePath);
-  const draftContent = '';
-
-  const [clientDraft, setClientDraft] = useState(null);
-  useEffect(() => {
-    if (downloadUrl || !draftContent) {
-      setClientDraft(null);
-      return undefined;
-    }
-    const templateName = (document?.formName || fileName || '서식초안').replace(/\.hwpx$/i, '');
-    const generated = createClientHwpxDraft({ templateName, draftText: draftContent });
-    setClientDraft(generated);
-    return () => window.URL.revokeObjectURL(generated.url);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [downloadUrl, draftContent, document?.formName]);
-
-  // 우선순위: 백엔드 실제 다운로드 URL > 방금 새로 만든 클라이언트 blob > (draftContent가 아예
-  // 없을 때만) 예전 filePath 그대로. staticHref는 blob:일 수도 있어 마지막 순위로만 씁니다.
-  const staticHref = resolveGeneratedFileHref(filePath);
-  const href = downloadUrl;
-  const effectiveHref = href || clientDraft?.url || '';
-  const effectiveFileName = fileName || clientDraft?.fileName || '';
+  const fileName = document?.downloadFileName || generatedFileName(filePath) || `${document?.formName || '서식초안'}.hwpx`;
 
   return (
     <div className="generatedFileBox">
       <div className="generatedFileHeader">
         <strong>생성 파일</strong>
-        {effectiveHref ? (
+        {downloadUrl ? (
           <div className="generatedFileActions">
             <ServerDocumentDownloadButton
               className="primaryButton compactAction"
-              url={effectiveHref}
-              fileName={effectiveFileName || 'document.hwpx'}
+              url={downloadUrl}
+              fileName={fileName || 'document.hwpx'}
             />
           </div>
         ) : null}
       </div>
-      {filePath ? (
+      {downloadUrl ? (
         <>
-          <span>
-            {effectiveFileName || '생성된 HWPX 파일'}
-            {href
-              ? '을 다운로드할 수 있습니다.'
-              : clientDraft
-                ? (filePath.startsWith('blob:')
-                  ? '은 브라우저에서 새로 만들어 다운로드할 수 있습니다.'
-                  : '은 백엔드 경로로 생성되었고, 브라우저에서 만든 사본을 다운로드할 수 있습니다.')
-                : '은 백엔드 경로로 생성되었습니다.'}
-          </span>
-          {!href && !clientDraft ? <button type="button" disabled>다운로드 URL 미제공</button> : null}
-          {!href && !filePath.startsWith('blob:') ? <code className="generatedFilePath">{filePath}</code> : null}
+          <span>{fileName}을 서버에서 다운로드할 수 있습니다.</span>
+          {filePath ? <code className="generatedFilePath">{filePath}</code> : null}
+        </>
+      ) : document?.draftContent ? (
+        <>
+          <span>서버 파일 없음 · 본문으로 임시 파일 생성</span>
+          <ClientHwpxDownloadButton templateName={document.formName || fileName} draftText={document.draftContent} />
         </>
       ) : (
         <>
-          <span>{document?.draftContent ? 'HWPX 파일 없이 화면의 초안 본문으로 검토 요청할 수 있습니다.' : '서식 생성 서버가 파일을 만들어 주면 여기에 다운로드 버튼이 나타납니다.'}</span>
-          <button type="button" disabled>아직 생성된 파일 없음</button>
+          <span>서버 HWPX 초안 없음</span>
+          <button type="button" disabled>서버 파일 없음</button>
         </>
       )}
     </div>
   );
 }
 
-export { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel };
+export { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList };

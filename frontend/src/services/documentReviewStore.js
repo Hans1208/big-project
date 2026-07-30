@@ -82,3 +82,23 @@ export function dismissDocumentReview(reviewKey) {
 export function isDocumentReviewDismissed(reviewKey) {
   return readDismissedKeys().includes(reviewKey);
 }
+
+// 변호사가 서식 초안을 직접 고친 내용입니다. core-api에서 온 문서는 실제 HWPX 파일을 다시
+// 만들어주는 API가 없어 서버 원본을 덮어쓸 수는 없지만, 화면에서 보여줄 '변호사 수정본'은
+// 이 브라우저에 남겨 상담원이 검토 결과를 열 때 함께 볼 수 있게 합니다.
+function readLawyerDraftEdits() {
+  return readStorage(storageKeys.lawyerDraftEdits, {});
+}
+
+export function saveLawyerDraftEdit(reviewKey, content) {
+  if (!reviewKey) return null;
+  const store = readLawyerDraftEdits();
+  const entry = { content, updatedAt: new Date().toISOString() };
+  writeStorage(storageKeys.lawyerDraftEdits, { ...store, [reviewKey]: entry });
+  return entry;
+}
+
+export function readLawyerDraftEdit(reviewKey) {
+  if (!reviewKey) return null;
+  return readLawyerDraftEdits()[reviewKey] || null;
+}

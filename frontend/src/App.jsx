@@ -32,6 +32,52 @@ function stripSensitiveUserFields(user) {
   return safeUser;
 }
 
+function coreAnalysisIdOf(row = {}) {
+  return row.analysis_id ?? row.analysisId ?? row.id ?? '';
+}
+
+function coreAnalysisUpdatedAt(row = {}) {
+  return row.updated_at || row.updatedAt || row.created_at || row.createdAt || '';
+}
+
+function coreAnalysisTime(row = {}) {
+  const time = new Date(coreAnalysisUpdatedAt(row)).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function pickLatestCoreAnalysis(rows = []) {
+  return [...rows]
+    .filter((row) => coreAnalysisIdOf(row))
+    .sort((left, right) => coreAnalysisTime(right) - coreAnalysisTime(left))[0] || null;
+}
+
+function buildHydratedAnalysis(row) {
+  if (!row) return null;
+  return {
+    coreAnalysisId: coreAnalysisIdOf(row),
+    analysis: mapCoreAnalysisResponse(row),
+  };
+}
+
+function mapCoreAttachmentToLocal(item = {}) {
+  return {
+    category: item.fileType || item.category || '첨부자료',
+    name: item.fileName || item.name || item.fileKey || '첨부파일',
+    size: item.size || 0,
+    mimeType: item.contentType || item.mimeType || '',
+    storageBucket: item.storageBucket || '',
+    fileKey: item.fileKey || '',
+    uploadedUrl: item.fileUrl || item.downloadUrl || item.uploadedUrl || '',
+    status: item.fileKey || item.fileUrl ? '서버 저장' : '',
+  };
+}
+
+function mapCoreAttachmentsToLocal(row = {}) {
+  return (row.attachments || row.coreAttachments || [])
+    .map(mapCoreAttachmentToLocal)
+    .filter((item) => item.name || item.fileKey || item.uploadedUrl);
+}
+
 // 로그인한 역할에 따라 상담원/변호사/관리자 대시보드를 분기합니다.
 function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, onUpdateUserStatus }) {
   const defaultView = '대시보드';
@@ -88,16 +134,24 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       .then((serverRows) => {
         if (cancelled || !Array.isArray(serverRows)) return;
         setConsultations((items) => {
+          const serverByCoreId = new Map(serverRows.map((row) => [row.id, row]));
+          const mergedItems = items.map((item) => {
+            if (!item.coreId || item.attachments?.length) return item;
+            const serverRow = serverByCoreId.get(item.coreId);
+            const serverAttachments = mapCoreAttachmentsToLocal(serverRow);
+            return serverAttachments.length ? { ...item, attachments: serverAttachments } : item;
+          });
           const knownCoreIds = new Set(items.map((item) => item.coreId).filter(Boolean));
           const missingRows = serverRows.filter((row) => !knownCoreIds.has(row.id));
-          if (!missingRows.length) return items;
-          let nextLocalId = items.length ? Math.max(...items.map((item) => item.id)) : 0;
+          if (!missingRows.length) return mergedItems;
+          let nextLocalId = mergedItems.length ? Math.max(...mergedItems.map((item) => item.id)) : 0;
           const additions = missingRows.map((row) => {
             nextLocalId += 1;
             return {
               id: nextLocalId,
               caseNo: `C-CORE-${row.id}`,
               coreId: row.id,
+              name: row.clientName || '이름 미입력',
               title: row.title || '제목 미입력',
               memo: row.inputText || '',
               opponentName: row.opponentName || '',
@@ -108,10 +162,10 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
               counselor: null,
               logs: [],
               analysis: null,
-              attachments: [],
+              attachments: mapCoreAttachmentsToLocal(row),
             };
           });
-          return [...additions, ...items];
+          return [...additions, ...mergedItems];
         });
       })
       .catch(() => {
@@ -120,6 +174,33 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const hydrateConsultationsWithCoreAnalyses = (analysisResults, candidateCases) => {
+    const analysisByCoreId = new Map();
+    analysisResults.forEach((result, index) => {
+      if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
+      const latest = pickLatestCoreAnalysis(result.value);
+      const hydrated = buildHydratedAnalysis(latest);
+      if (hydrated) analysisByCoreId.set(candidateCases[index].coreId, hydrated);
+    });
+    if (!analysisByCoreId.size) return;
+
+    setConsultations((items) => items.map((item) => {
+      const hydrated = analysisByCoreId.get(item.coreId);
+      if (!hydrated) return item;
+      const sameAnalysis = item.coreAnalysisId && String(item.coreAnalysisId) === String(hydrated.coreAnalysisId);
+      if (sameAnalysis && item.analysis?.summary === hydrated.analysis.summary) return item;
+      return {
+        ...item,
+        analysis: {
+          ...(item.analysis || {}),
+          ...hydrated.analysis,
+        },
+        coreAnalysisId: hydrated.coreAnalysisId,
+        workflowStatus: item.workflowStatus || '상담 분석',
+      };
+    }));
+  };
 
   // '법률구조 검토 요청'(reviews)은 상담원이 검토를 요청한 그 브라우저에만 즉시 반영되고,
   // 지금까지는 core-api에 실제로 남아있는 검토 요청을 다시 읽어오는 곳이 전혀 없었습니다.
@@ -136,25 +217,32 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     Promise.allSettled(candidateCases.map((item) => fetchCoreAnalyses(item.coreId)))
       .then((results) => {
         if (cancelled) return;
+        hydrateConsultationsWithCoreAnalyses(results, candidateCases);
         setReviews((currentReviews) => {
           const known = new Set(
             currentReviews
               .filter((item) => item.coreId && item.coreAnalysisId)
               .map((item) => `${item.coreId}:${item.coreAnalysisId}`),
           );
-          const additions = [];
+          // requestLegalReview는 상담(target.id) 하나당 review 행 하나만 유지합니다(재요청 시
+          // 새로 추가하지 않고 기존 행을 덮어씀). 여기서도 같은 규칙을 지켜야 합니다 — 그렇지 않으면
+          // 반려/수정 요청 후 상담원이 새 분석을 다시 제출했을 때, 이전 분석의 review 행을 그대로 둔 채
+          // id가 똑같은 새 행을 하나 더 추가하게 됩니다. reviews.find/map은 모두 id로 찾기 때문에,
+          // 이렇게 id가 중복되면 변호사가 새 검토를 승인/반려해도 옛 행까지 같이 바뀌거나
+          // (map이 id로 필터링), 옛 행이 먼저 잡혀 엉뚱한 coreAnalysisId로 승인 API가 불립니다.
+          const upsertsByConsultationId = new Map();
           results.forEach((result, index) => {
             if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
             const target = candidateCases[index];
             result.value
               .filter((row) => row.status === 'SUBMITTED_FOR_REVIEW')
               .forEach((row) => {
-                const coreAnalysisId = row.analysis_id ?? row.analysisId;
+                const coreAnalysisId = coreAnalysisIdOf(row);
                 const key = `${target.coreId}:${coreAnalysisId}`;
                 if (known.has(key)) return;
                 known.add(key);
                 const mapped = mapCoreAnalysisResponse(row);
-                additions.push({
+                upsertsByConsultationId.set(target.id, {
                   id: target.id,
                   caseNo: target.caseNo,
                   type: mapped.caseType || target.type,
@@ -176,8 +264,13 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
                 });
               });
           });
-          if (!additions.length) return currentReviews;
-          return [...additions, ...currentReviews];
+          if (!upsertsByConsultationId.size) return currentReviews;
+          const existingIds = new Set(currentReviews.map((item) => item.id));
+          const merged = currentReviews.map((item) => upsertsByConsultationId.get(item.id) || item);
+          const brandNew = Array.from(upsertsByConsultationId.entries())
+            .filter(([id]) => !existingIds.has(id))
+            .map(([, review]) => review);
+          return [...brandNew, ...merged];
         });
       })
       .catch(() => {
@@ -400,7 +493,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     return { ok: true, message: '변호사 검토 요청이 등록되었습니다.' };
   };
 
-  const applyReviewDecision = ({ id, status, reason, reviewer, recipientEmail }) => {
+  const applyReviewDecision = ({ id, status, reason, reviewer, recipientEmail, lawyerComment = '', editedSummary = '' }) => {
     const needsCounselorWork = ['수정 요청', '추가자료 요청', '반려', '보류'].includes(status);
     const nextLocalStatus = status === '승인' ? '완료' : status === '반려' || status === '보류' ? '보류' : '진행 중';
     setFocusedReviewCaseNo(null);
@@ -411,7 +504,11 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         status: nextLocalStatus,
         workflowStatus: needsCounselorWork ? status : '승인 완료',
         lawyer: reviewer || null,
-        reviewAction: needsCounselorWork ? { status, reason: reason || '', reviewer: reviewer || null, recipientEmail: recipientEmail || item.counselor?.email || '', requestedAt: today, resolved: false } : null,
+        // 변호사 코멘트는 결정 종류(승인 포함)와 무관하게 남길 수 있고, 편집한 요약이 있으면
+        // 상담원이 보는 분석 요약 자체를 변호사가 다듬은 문장으로 바꿔둡니다.
+        lawyerComment: lawyerComment || '',
+        analysis: editedSummary && item.analysis ? { ...item.analysis, summary: editedSummary } : item.analysis,
+        reviewAction: needsCounselorWork ? { status, reason: reason || '', reviewer: reviewer || null, recipientEmail: recipientEmail || item.counselor?.email || '', requestedAt: today, resolved: false, lawyerComment: lawyerComment || '' } : null,
         logs: [...(item.logs || []), { status: `변호사 검토 결과: ${status}`, reason: reason || '', createdAt: today }],
       };
     }));
@@ -423,42 +520,6 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     if (target?.coreId) {
       const backendStatus = nextLocalStatus === '완료' ? 'COMPLETED' : nextLocalStatus === '보류' ? 'HOLD' : 'ANALYZING';
       updateCoreConsultationStatus(target.coreId, backendStatus).catch(() => {});
-    }
-  };
-
-  const applyDocumentReviewDecision = ({ caseNo, action, reason, reviewer, recipientEmail, formName, requestedMaterials = [] }) => {
-    const needsCounselorWork = action === 'revision';
-    setConsultations((items) => items.map((item) => {
-      if (item.caseNo !== caseNo) return item;
-      return {
-        ...item,
-        status: needsCounselorWork ? '진행 중' : item.status,
-        workflowStatus: needsCounselorWork ? '서식 보완 요청' : '서식 승인 완료',
-        lawyer: reviewer || item.lawyer || null,
-        reviewAction: needsCounselorWork ? {
-          status: '서식 반려',
-          reason: reason || '반려 사유가 입력되지 않았습니다.',
-          reviewer: reviewer || null,
-          recipientEmail: recipientEmail || item.counselor?.email || '',
-          requestedAt: today,
-          resolved: false,
-          workbench: '서식 생성',
-          formName: formName || '',
-          requestedMaterials,
-        } : null,
-        logs: [...(item.logs || []), {
-          status: needsCounselorWork ? '서식 초안 반려' : '서식 초안 승인',
-          reason: reason || '',
-          createdAt: today,
-        }],
-      };
-    }));
-    // 서식이 반려돼 상담원이 다시 작업해야 하는 상태(진행 중)로 돌아갈 때도 core-api 상태를 맞춥니다.
-    if (needsCounselorWork) {
-      const target = consultations.find((item) => item.caseNo === caseNo);
-      if (target?.coreId) {
-        updateCoreConsultationStatus(target.coreId, 'ANALYZING').catch(() => {});
-      }
     }
   };
 
@@ -494,7 +555,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     <div className="dashboardScreen">
       <DashboardHeader role={role} activeView={activeView} onViewChange={changeActiveView} onLogout={onLogout} currentUser={currentUser} unreadCount={unreadCount} />
       {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} /> : null}
-      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onDocumentReviewDecision={applyDocumentReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
+      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} /> : null}
     </div>
   );
