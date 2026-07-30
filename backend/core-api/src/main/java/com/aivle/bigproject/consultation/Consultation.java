@@ -59,6 +59,12 @@ public class Consultation {
     // 우연히 정상 조회되어 눈치채기 어렵지만, DB를 직접 SELECT하면 숫자만 보임). Postgres text는 길이
     // 제한이 없어서 애초에 @Lob이 필요 없음.
     // @Lob은 쓰지 않는다 — AiAnalysis.summary 주석 참고.
+    //
+    // TODO(규제): 평문으로 저장되고 있음 — 암호화 필요.
+    //   상담 진술이라 주민번호·주소·가족관계가 그대로 들어간다. 정작 clientName은 암호화하면서
+    //   더 민감한 이쪽이 빠져 있어 기준이 뒤집혀 있다.
+    //   @Convert(converter = CryptoConverter.class) 한 줄이면 되지만, 이미 저장된 평문 행은
+    //   복호화가 깨진다. 팀원 각자의 로컬 DB를 함께 초기화해야 하므로 합의 후 적용할 것.
     @Column(name = "input_text", columnDefinition = "TEXT")
     private String inputText;
 

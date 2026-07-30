@@ -7,6 +7,31 @@ function formatDotDate(isoDate) {
   return isoDate.replaceAll('-', '.');
 }
 
+// ── 비밀번호 작성규칙 ──
+//
+// "개인정보의 기술적·관리적 보호조치 기준" 제4조 ⑧항이 요구하는 구성입니다.
+//   1. 영문·숫자·특수문자 중 2종류 이상 조합 시 10자리 이상
+//      3종류 이상 조합 시 8자리 이상
+//   2. 아이디와 비슷한 비밀번호는 사용하지 않을 것
+//
+// 같은 규칙을 core-api(AuthService)에서도 검사합니다. 화면 검사만 두면 API를 직접 부르는
+// 경로로 규칙을 지나칠 수 있어, 안내는 여기서 하고 실제 차단은 서버에서 합니다.
+export const PASSWORD_RULE_TEXT = '영문·숫자·특수문자 중 2종류 이상 10자리, 또는 3종류를 모두 섞어 8자리 이상';
+
+export function validatePassword(password = '', email = '') {
+  if (!password) return '';
+  const kindCount = [/[A-Za-z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((pattern) => pattern.test(password)).length;
+  const longEnough = (kindCount >= 3 && password.length >= 8) || (kindCount >= 2 && password.length >= 10);
+  if (!longEnough) return `${PASSWORD_RULE_TEXT}으로 만들어주세요.`;
+
+  // 아이디(이메일 앞부분)를 그대로 넣은 비밀번호는 추측이 쉬워 규칙 2항에서 막습니다.
+  const localPart = (email.split('@')[0] || '').trim();
+  if (localPart.length >= 3 && password.toLowerCase().includes(localPart.toLowerCase())) {
+    return '이메일 아이디가 그대로 들어간 비밀번호는 사용할 수 없습니다.';
+  }
+  return '';
+}
+
 // 지부와 부서를 하나의 소속 문자열로 합칩니다. 회원가입·비밀번호 찾기·프로필이 모두 이 규칙을 따라야
 // 관리자가 가입 기록과 대조할 때 표기가 어긋나지 않습니다.
 function buildOrganization(branch, department) {
@@ -138,13 +163,20 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
 function RegisterPage({ onComplete, onBack, registerError = '', registerPending = false }) {
   const [role, setRole] = useState('counselor');
   const [form, setForm] = useState({ name: '', organization: '', department: '', phone: '', branch: legalAidBranchOffices[0], email: '', password: '', confirmPassword: '' });
+  // 개인정보 보호법 제15조 제2항 — 수집·이용에 대한 동의는 받아야 가입을 진행할 수 있습니다.
+  //
+  // TODO(규제): 동의한 사실 자체는 아직 저장하지 않습니다. 화면에서 받기만 합니다.
+  //   분쟁이 생기면 동의를 받았다는 증빙이 없으므로, User에 privacy_agreed_at 컬럼을 두고
+  //   가입 시각과 함께 남겨야 합니다. 스키마 변경이 필요해 이번 범위에서 뺐습니다.
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const emailInvalid = form.email.length > 0 && !form.email.includes('@');
   const passwordsMismatch = form.confirmPassword && form.password !== form.confirmPassword;
+  const passwordRuleError = validatePassword(form.password, form.email);
   // 관리자는 본부 소속이라 지부 선택이 필요 없고, 상담원/변호사는 자유롭게 소속기관을 입력하는 대신
   // 반드시 실제 지부 목록 중에서만 소속을 고르도록 합니다(오타·허위 소속 입력 방지).
   // 지부 안에서 어느 부서인지는 목록으로 못 박기 어려워 직접 입력받습니다.
   const requiresBranch = role !== 'admin';
-  const isSubmitDisabled = !form.name || (requiresBranch ? (!form.branch || !form.department) : !form.organization) || !form.phone || !form.email || emailInvalid || !form.password || !form.confirmPassword || passwordsMismatch || registerPending;
+  const isSubmitDisabled = !form.name || (requiresBranch ? (!form.branch || !form.department) : !form.organization) || !form.phone || !form.email || emailInvalid || !form.password || !form.confirmPassword || passwordsMismatch || Boolean(passwordRuleError) || !privacyAgreed || registerPending;
 
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   // 입력칸에서 Enter를 눌러도 가입이 되도록 form의 submit으로 받습니다.
@@ -224,10 +256,52 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
           </label>
           {emailInvalid ? <p className="formError" id="register-email-error">이메일에 @를 포함해주세요.</p> : null}
           <div className="formGrid">
-            <label className="field"><span>비밀번호</span><input value={form.password} onChange={(e) => update('password', e.target.value)} type="password" placeholder="비밀번호 입력" /></label>
+            <label className="field">
+              <span>비밀번호</span>
+              <input
+                value={form.password}
+                onChange={(e) => update('password', e.target.value)}
+                type="password"
+                placeholder="비밀번호 입력"
+                aria-invalid={Boolean(passwordRuleError)}
+                aria-describedby="register-password-rule"
+              />
+            </label>
             <label className="field"><span>비밀번호 확인</span><input value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} type="password" placeholder="비밀번호 확인" /></label>
           </div>
+          {/* 규칙은 입력 전에도 보이게 항상 띄웁니다. 틀린 뒤에야 알려주면 몇 번씩 다시 만들게 됩니다. */}
+          <p className="fieldHint" id="register-password-rule">{PASSWORD_RULE_TEXT}</p>
+          {passwordRuleError ? <p className="formError">{passwordRuleError}</p> : null}
           {passwordsMismatch ? <p className="formError">비밀번호와 비밀번호 확인이 일치하지 않습니다.</p> : null}
+
+          <div className="sectionLabel">개인정보 수집 및 이용 동의</div>
+          <div className="consentCard">
+            <div className="consentTableWrap">
+              <table className="consentTable">
+                <thead>
+                  <tr><th scope="col">수집 항목</th><th scope="col">이용 목적</th><th scope="col">보유 기간</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>이름, 이메일, 연락처, 소속(지부·부서)</td>
+                    <td>상담원·변호사 계정 발급 및 권한 관리</td>
+                    <td>퇴직 또는 탈퇴 시까지</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            {/* 법 제15조 제2항 4호 — 거부할 권리와 거부 시 불이익을 함께 알려야 합니다. */}
+            <p className="consentNotice">
+              동의를 거부하실 수 있습니다. 다만 위 항목은 계정 발급에 반드시 필요해, 거부하시면 가입을 진행할 수 없습니다.
+            </p>
+            <label className="consentCheck">
+              <input type="checkbox" checked={privacyAgreed} onChange={(e) => setPrivacyAgreed(e.target.checked)} />
+              <span><strong>[필수]</strong> 개인정보 수집 및 이용에 동의합니다.</span>
+            </label>
+            <p className="consentNotice">
+              보관·파기 절차 등 자세한 내용은 <a href="/privacy.html" target="_blank" rel="noreferrer">개인정보 처리방침</a>에서 확인하실 수 있습니다.
+            </p>
+          </div>
           {/* 관리자는 바로 쓸 수 있으니 단순 안내(파랑), 상담원·변호사는 승인까지 기다려야 하니 주의(주황)로 구분합니다. */}
           <div className={role === 'admin' ? 'notice' : 'notice warn'}>
             {role === 'admin' ? <BadgeCheck size={18} /> : <Clock size={18} />}

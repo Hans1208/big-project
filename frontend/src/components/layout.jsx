@@ -37,15 +37,25 @@ function Header({ onLogin, onRegister, onHome, hideLogin }) {
 
 // 아직 연결할 문서가 없는 항목은 링크(a href="#")로 두지 않습니다.
 // 눌러도 페이지 맨 위로만 튀어 "고장 난 링크"처럼 느껴지므로, 준비 중임을 밝힌 일반 텍스트로 보여줍니다.
-const footerPolicies = ['개인정보 처리방침', '이용 약관', '저작권 정책', '오픈소스 라이선스'];
+//
+// 개인정보 처리방침은 개인정보 보호법 제30조상 수립·공개 의무가 있어(미공개 시 과태료) 먼저 작성했습니다.
+// 라우터가 없는 앱이라 public/privacy.html 정적 문서로 두고 새 탭으로 엽니다 — 보던 화면을 잃지 않고,
+// SPA가 멈춰도 문서 자체는 계속 열립니다.
+const footerPolicies = [
+  { label: '개인정보 처리방침', href: '/privacy.html' },
+  { label: '이용 약관' },
+  { label: '저작권 정책' },
+  { label: '오픈소스 라이선스' },
+];
 
 function Footer() {
   return (
     <footer className="footer">
       <strong>인공지능 법률업무 지원 시스템</strong>
       <div className="footerLinks">
-        {footerPolicies.map((label) => (
-          <span key={label} title="문서 준비 중입니다.">{label}</span>
+        {footerPolicies.map(({ label, href }) => (href
+          ? <a key={label} href={href} target="_blank" rel="noreferrer">{label}</a>
+          : <span key={label} title="문서 준비 중입니다.">{label}</span>
         ))}
       </div>
       <p>© 대한법률구조공단. 모든 권리 보유. 버전 1.0.0</p>

@@ -78,7 +78,7 @@ public class AttachmentController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 // 브라우저가 파일을 열지 않고 "다운로드"하도록 지시하는 헤더, 원본 파일명도 같이 전달
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + attachment.getFileName() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + headerSafeFileName(attachment) + "\"")
                 .body(resource);
     }
 
@@ -87,5 +87,16 @@ public class AttachmentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long consultationId, @PathVariable Long attachmentId) {
         attachmentService.delete(consultationId, attachmentId);
+    }
+
+    // 파일명은 사용자가 올린 값이라 그대로 응답 헤더에 넣으면 안 된다.
+    // CR/LF가 섞여 있으면 헤더가 거기서 끊기고 그 뒤가 새 응답으로 해석돼(HTTP 응답분할),
+    // 공격자가 원하는 헤더나 본문을 붙일 수 있다. 큰따옴표는 filename="..."을 중간에 닫아버린다.
+    // 업로드 시점에도 같은 문자를 거르지만(AttachmentService), 그 전에 저장된 이름이 DB에 남아 있어
+    // 내보내는 쪽에서도 한 번 더 막는다.
+    private static String headerSafeFileName(Attachment attachment) {
+        String fileName = attachment.getFileName();
+        if (fileName == null || fileName.isBlank()) return "attachment";
+        return fileName.replaceAll("[\\r\\n\"]", "_");
     }
 }
