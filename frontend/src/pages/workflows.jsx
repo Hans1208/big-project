@@ -700,7 +700,7 @@ function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSubmitted
       <div className="workflowColumns">
         <div>
           <h3>파일 업로드 (멀티모달 분석 대상)</h3>
-          <p className="helperText">녹취 · 이미지 · 문서 함께 분석</p>
+          <p className="helperText">녹취 · 이미지 · 문서 함께 분석 · 실제 업로드는 저장 버튼을 눌렀을 때 진행됩니다</p>
           <FileDropzone category={dropzoneCategory} onCategoryChange={setDropzoneCategory} onAddFiles={onAddFiles} />
         </div>
         <div>
@@ -750,8 +750,59 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, creatingNew]);
 
-  const saveDraft = () => {
-    writeStorage(storageKeys.uploadDraft, { form: newForm, files: newFiles, savedAt: new Date().toISOString() });
+  // 파일을 고르면 일단 목록에만 추가합니다(즉시 S3 업로드 X). 실제 S3 업로드는 사용자가
+  // "임시저장" 또는 "상담 만들고 자료 저장"/"자료 저장" 버튼을 눌렀을 때 uploadPendingFiles가
+  // 한 번에 수행합니다. → 파일만 골라보고 저장 없이 화면을 벗어나면 애초에 업로드 자체가
+  // 일어나지 않아, 버려지는 파일이 S3 버킷에 쌓이지 않습니다.
+  const addFilesTo = (setFilesState, label, selectedFiles) => {
+    const staged = Array.from(selectedFiles).map((file) => createAttachmentMetadata(file, label));
+    if (!staged.length) return;
+    setFilesState((items) => [...items, ...staged]);
+    setMessage(`${label} ${staged.length}개 추가 · 저장 시 업로드됩니다`);
+  };
+  const removeFileAt = (setFilesState, index) => setFilesState((items) => items.filter((_, itemIndex) => itemIndex !== index));
+
+  // 저장 동작(임시저장·자료 저장)에서 호출해, 그때까지 S3에 올라가지 않은 파일(fileKey 없음 —
+  // 신규 선택분뿐 아니라 이전 시도에서 실패했거나 백엔드 미지원으로 로컬 보관 중이던 파일도 포함)을
+  // 한 번에 업로드합니다. 최신 상태가 반영된 파일 목록을 돌려주므로 호출부는 이 값을 그대로
+  // draft 저장/첨부 payload 생성에 씁니다.
+  const uploadPendingFiles = async (files, setFilesState) => {
+    const pending = files.filter((item) => item.file && !item.fileKey);
+    if (!pending.length) return files;
+    const pendingIds = new Set(pending.map((item) => item.id));
+    setFilesState((items) => items.map((item) => pendingIds.has(item.id) ? { ...item, status: '업로드 중' } : item));
+    setMessage(`파일 ${pending.length}개 업로드 중…`);
+
+    let result = files;
+    let fellBackToLocal = false;
+    let failedCount = 0;
+    for (const meta of pending) {
+      try {
+        const { fileKey, fileUrl } = await uploadFileToS3(meta.file, meta.category);
+        result = result.map((item) => item.id === meta.id ? { ...item, fileKey, uploadedUrl: fileUrl, status: 'S3 업로드 완료' } : item);
+      } catch (error) {
+        if (error instanceof S3UploadUnavailableError) {
+          fellBackToLocal = true;
+          result = result.map((item) => item.id === meta.id ? { ...item, status: 'S3 저장 전)' } : item);
+        } else {
+          failedCount += 1;
+          result = result.map((item) => item.id === meta.id ? { ...item, status: '업로드 실패' } : item);
+          showToast(`${meta.name} 업로드 실패: ${error.message}`, 'warn');
+        }
+      }
+      setFilesState(result);
+    }
+    setMessage(fellBackToLocal
+      ? '파일 업로드 완료. 일부는 업로드 대기' //업로드 대기=로컬 임시 보관
+      : failedCount
+        ? `파일 업로드 완료. ${failedCount}건 실패`
+        : '파일 업로드 완료.');
+    return result;
+  };
+
+  const saveDraft = async () => {
+    const uploadedFiles = await uploadPendingFiles(newFiles, setNewFiles);
+    writeStorage(storageKeys.uploadDraft, { form: newForm, files: uploadedFiles, savedAt: new Date().toISOString() });
     setMessage('임시저장 완료');
   };
   const clearDraft = () => {
@@ -760,35 +811,6 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     setNewFiles([]);
     setMessage('임시저장 비움');
   };
-
-  // 파일을 고르면 브라우저에서 곧장 S3로 올립니다(파일 바이트는 백엔드를 거치지 않음).
-  // 백엔드에 presigned 업로드 엔드포인트가 아직 없으면 로컬에 임시 보관하고 개발을 계속할 수 있게 폴백합니다.
-  const addFilesTo = async (setFilesState, label, selectedFiles) => {
-    const staged = Array.from(selectedFiles).map((file) => createAttachmentMetadata(file, label));
-    if (!staged.length) return;
-    setFilesState((items) => [...items, ...staged.map((meta) => ({ ...meta, status: '업로드 중' }))]);
-    setMessage(`${label} ${staged.length}개 업로드 중…`);
-    const patchFile = (id, changes) => setFilesState((items) => items.map((item) => item.id === id ? { ...item, ...changes } : item));
-    let fellBackToLocal = false;
-    for (const meta of staged) {
-      try {
-        const { fileKey, fileUrl } = await uploadFileToS3(meta.file, label);
-        patchFile(meta.id, { fileKey, uploadedUrl: fileUrl, status: 'S3 업로드 완료' });
-      } catch (error) {
-        if (error instanceof S3UploadUnavailableError) {
-          fellBackToLocal = true;
-          patchFile(meta.id, { status: '로컬 보관 (S3 대기)' });
-        } else {
-          patchFile(meta.id, { status: '업로드 실패' });
-          showToast(`${meta.name} 업로드 실패: ${error.message}`, 'warn');
-        }
-      }
-    }
-    setMessage(fellBackToLocal
-      ? `${label} 추가 완료 · 로컬 임시 보관`
-      : `${label} ${staged.length}개 업로드 완료`);
-  };
-  const removeFileAt = (setFilesState, index) => setFilesState((items) => items.filter((_, itemIndex) => itemIndex !== index));
 
   const buildAttachmentPayload = (files) => files.map(({ category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => (
     { category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }
@@ -813,6 +835,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
       tone: 'info',
     });
     if (!accepted) return;
+    const uploadedFiles = await uploadPendingFiles(newFiles, setNewFiles);
     const result = await onCreateConsultation({
       name: '',
       title: buildAutoUploadTitle(),
@@ -821,7 +844,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
       memo: newForm.memo,
       status: '진행 중',
       eligibilityCheck: buildEligibilityPayload(newForm),
-      attachments: buildAttachmentPayload(newFiles),
+      attachments: buildAttachmentPayload(uploadedFiles),
     }, { skipNavigation: true });
     if (result?.id == null) {
       showToast('상담을 만들지 못했습니다. 다시 시도해주세요.', 'warn');
@@ -846,9 +869,10 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
       tone: 'info',
     });
     if (!accepted) return;
+    const uploadedFiles = await uploadPendingFiles(existingFiles, setExistingFiles);
     onUpdateConsultation(selectedCase.id, {
       eligibilityCheck: buildEligibilityPayload(existingEligibility),
-      attachments: buildAttachmentPayload(existingFiles),
+      attachments: buildAttachmentPayload(uploadedFiles),
     });
     setMessage('');
     showToast('자료 저장 완료 · 검토 요청 시 함께 전달', 'success');
