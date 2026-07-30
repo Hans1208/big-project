@@ -30,8 +30,14 @@ public class AiApiClientConfig {
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        // /consult/analyze는 STT + 여러 LLM 호출이 서버에서 순차로 도는 파이프라인이라 오래 걸릴 수 있음
-        requestFactory.setReadTimeout(Duration.ofMinutes(3));
+        // /consult/analyze는 STT + 여러 LLM 호출이 서버에서 순차로 도는 파이프라인이라 오래 걸릴 수 있음.
+        // 3분으로는 부족하다 — Whisper가 CPU로 돌면 10분짜리 녹취 1건에만 그 이상 걸린다.
+        // 실측: 9분 wav 1건 = 3분 초과(502). 상담 녹취는 20~30분이 기본이라 여유를 크게 잡는다.
+        //
+        // 다만 이건 임시 대응이다. 동기 호출로 버티는 구조라서, 오디오가 길어지면
+        // 프론트가 그만큼 응답을 기다린다. 실시간 STT로 넘어갈 때 이 호출은
+        // "작업 접수 -> 완료되면 조회" 비동기 방식으로 바뀌어야 한다.
+        requestFactory.setReadTimeout(Duration.ofMinutes(20));
 
         return RestClient.builder()
                 .baseUrl(baseUrl)

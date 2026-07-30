@@ -103,14 +103,24 @@ def build_contents(consultation_text: str) -> List[dict]:
     return contents
 
 
+# 기존 기본값이던 gemini-2.5-flash-lite는 신규 사용자에게 더 이상 제공되지 않아
+# 호출하면 404가 난다 ("This model ... is no longer available to new users").
+# 모델은 언제든 또 내려갈 수 있으니 환경변수로 갈아끼울 수 있게 열어둔다.
+FALLBACK_MODEL = "gemini-3.5-flash"
+
+
 def analyze_consultation(
     consultation_text: str,
-    model_name: str = "gemini-2.5-flash-lite",
+    model_name: str | None = None,
     max_retries: int = 2,
 ) -> AIAnalysisSchema:
     """
     상담 텍스트를 받아 신규 google-genai SDK로 AIAnalysisSchema 구조화 분석을 수행.
     """
+    # 환경변수는 import 시점이 아니라 호출 시점에 읽는다.
+    # 이 모듈이 load_dotenv()보다 먼저 import될 수 있어서(.env는 ai/config.py가 읽는다),
+    # 모듈 상수로 두면 .env의 KLAC_GEMINI_MODEL이 반영되지 않는다.
+    model_name = model_name or os.environ.get("KLAC_GEMINI_MODEL") or FALLBACK_MODEL
     client = _get_client()
     contents = build_contents(consultation_text)
 
@@ -145,7 +155,9 @@ def analyze_consultation(
             response_mime_type="application/json",
             response_schema=_GEMINI_CLEANED_SCHEMA,
             temperature=0.1,
-            max_output_tokens=2048,
+            # 2048이면 응답이 중간에 잘려 "Invalid JSON: EOF while parsing"으로 검증에 실패한다.
+            # gemini 3.x는 내부 추론 토큰도 이 예산에서 함께 쓰기 때문에 여유를 둔다.
+            max_output_tokens=8192,
         )
 
         response = client.models.generate_content(

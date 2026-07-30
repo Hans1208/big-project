@@ -63,15 +63,31 @@ public class AiAnalysisService {
 
         JsonNode caseAnalysis = aiResponse.caseAnalysis();
         JsonNode checklist = aiResponse.reliefReviewChecklist();
-        String caseType = caseAnalysis.path("case_list").path(0).path("case_type").asText(null);
+        String graphCaseType = caseAnalysis.path("case_list").path(0).path("case_type").asText(null);
         String caseTypeReason = caseAnalysis.path("case_list").path(0).path("case_type_reason").asText(null);
         String urgencyLevel = caseAnalysis.path("case_emergency_level").asText(null);
         String eligible = checklist.path("eligibility").path("eligible").asText(null);
-        String summary = buildSummary(caseType, caseTypeReason, urgencyLevel, eligible);
 
-        AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, null, urgencyLevel, eligible,
+        // 계약서 필드는 ai-api analysis 층 결과를 우선 쓴다. 그 층이 AI_ANALYSIS를 채우려고
+        // 만들어진 모델이라, 여기서 조합해 만들던 값보다 정확하다.
+        // 사건유형도 analysis 층 값을 우선한다. 대상 사건 범위가 "서식이 실제로 있는
+        // 대분류"(친족/상속/가사소송/가족관계등록)로 확정됐고, 그 목록이 analysis 층의
+        // 분류체계와 같기 때문. 그래프의 8개 유형(임금체불·개인회생 등)은 해당 서식이
+        // 없어서 초안 생성까지 이어지지 못한다.
+        // 폴백을 두는 이유는 summary와 같다 — 구조화 분석이 실패(503 등)하면 사건유형이
+        // 통째로 비는 것보다 그래프 값이라도 남는 편이 낫다.
+        String caseType = firstNonBlank(aiResponse.consultCaseType(), graphCaseType);
+        String summary = resolveSummary(aiResponse.consultSummary(),
+                caseType, caseTypeReason, urgencyLevel, eligible);
+        String caseSubtype = aiResponse.consultCaseSubtype();
+        String timelineJson = toJsonText(aiResponse.consultTimeline());
+
+        // extracted_json은 아직 analysis 층 결과(당사자·금액·날짜)로 바꾸지 않는다.
+        // 프론트가 이 필드에서 case_emergency_ratio / case_list[0].case_type_reason을 읽고 있어서
+        // (coreApiClientV2.js) 지금 교체하면 화면이 깨진다. 프론트와 같이 옮겨야 하는 항목.
+        AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, caseSubtype, urgencyLevel, eligible,
                 caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
-                null, null, null, null, aiResponse.rawInput().toString());
+                null, timelineJson, null, null, aiResponse.rawInput().toString());
 
         AiAnalysis saved = aiAnalysisRepository.save(analysis);
         consultation.setStatus(ConsultationStatus.COMPLETED);
@@ -97,8 +113,25 @@ public class AiAnalysisService {
         ));
     }
 
-    // /consult/analyze 응답에는 계약서 v0.1과 달리 단일 summary 문자열이 없어서,
-    // 핵심 판단 결과(사건유형/사유/긴급도/구조대상여부)를 엮어 사람이 읽을 문장으로 여기서 합성한다.
+    // ai-api analysis 층이 만든 상담 요약을 우선 쓰고, 없으면 기존 조합 문자열로 폴백한다.
+    // 폴백을 남겨두는 이유: 구조화 분석은 모델 과부하(503) 등으로 실패할 수 있는데,
+    // 그때 요약이 통째로 비는 것보다 판정 결과라도 보이는 편이 낫기 때문.
+    // 앞의 값이 비어 있으면 뒤의 값으로 넘어간다. analysis 층 결과를 우선하고
+    // 그 층이 실패했을 때 그래프 값으로 폴백하는 데 쓴다.
+    private String firstNonBlank(String preferred, String fallback) {
+        return (preferred != null && !preferred.isBlank()) ? preferred : fallback;
+    }
+
+    private String resolveSummary(String consultSummary, String caseType, String caseTypeReason,
+                                   String urgencyLevel, String eligible) {
+        if (consultSummary != null && !consultSummary.isBlank()) {
+            return consultSummary;
+        }
+        return buildSummary(caseType, caseTypeReason, urgencyLevel, eligible);
+    }
+
+    // consult_summary를 못 받았을 때 쓰는 폴백. 상담 내용 요약이 아니라
+    // 핵심 판단 결과(사건유형/사유/긴급도/구조대상여부)를 엮은 한 줄이다.
     private String buildSummary(String caseType, String caseTypeReason, String urgencyLevel, String eligible) {
         StringBuilder sb = new StringBuilder();
         if (caseType != null) {

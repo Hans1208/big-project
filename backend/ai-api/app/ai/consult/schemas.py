@@ -71,8 +71,12 @@ class IncomePropertySignal(LLMSignalBase):
         default_factory=list,
         description="소득증빙, 가족관계증명, 장애인 증명 등 언급/제공된 자료 목록"
     )
+    # 기본값 "불명확": 모델이 이 키를 아예 빼고 {} 를 돌려주는 경우가 있다.
+    # (상담 내용이 짧거나 첨부 추출이 실패해서 넣을 근거가 없을 때)
+    # 필수로 두면 신호 하나 못 뽑은 것 때문에 그래프 전체가 죽는다.
+    # 못 뽑았으면 "불명확"이 사실에 맞는 값이기도 하다 — 아래 신호들도 같은 이유.
     extraction_confidence: Literal["명시적", "추정", "불명확"] = Field(
-        description="위 정보가 상담 내용에 직접 언급됐는지, 정황상 추정인지"
+        "불명확", description="위 정보가 상담 내용에 직접 언급됐는지, 정황상 추정인지"
     )
 
 
@@ -89,7 +93,7 @@ class SpecialStatusSignal(LLMSignalBase):
         description="카테고리별 판단 근거. '카테고리명: 근거 1문장' 형식 문자열 목록"
     )
     status_evidence_mentioned: List[str] = Field(default_factory=list)
-    extraction_confidence: Literal["명시적", "추정", "불명확"]
+    extraction_confidence: Literal["명시적", "추정", "불명확"] = "불명확"
 
 
 # ---------------------------------------------------------------------------
@@ -115,15 +119,15 @@ class WinnabilitySignal(LLMSignalBase):
     )
     claim_existence_hint: Optional[Literal["청구권 존재 언급", "청구권 부존재 시사", "판단 불가"]] = None
     fact_provability_hint: Optional[Literal["입증 가능 시사", "입증 곤란 시사", "판단 불가"]] = None
-    extraction_confidence: Literal["명시적", "추정", "불명확"]
-    review_note: str = Field(description="단정 표현 금지. '~로 보임' 형태만 사용")
+    extraction_confidence: Literal["명시적", "추정", "불명확"] = "불명확"
+    review_note: str = Field("", description="단정 표현 금지. '~로 보임' 형태만 사용")
 
 
 class ExecutabilitySignal(LLMSignalBase):
     """집행가능성 검토 보조 신호"""
     debtor_asset_status: Optional[Literal["무재산자 언급", "소재불명 언급", "재산 확인 언급", "판단 불가"]] = None
-    extraction_confidence: Literal["명시적", "추정", "불명확"]
-    review_note: str
+    extraction_confidence: Literal["명시적", "추정", "불명확"] = "불명확"
+    review_note: str = ""
 
 
 class ReliefAppropriatenessSignal(LLMSignalBase):
@@ -133,8 +137,8 @@ class ReliefAppropriatenessSignal(LLMSignalBase):
     alternative_relief_mentioned: Optional[bool] = None
     low_value_claim_mentioned: Optional[bool] = None
     out_of_scope_flags: List[Literal["법인 관련 사건", "종중 관련 사건", "그 외"]] = Field(default_factory=list)
-    extraction_confidence: Literal["명시적", "추정", "불명확"]
-    review_note: str
+    extraction_confidence: Literal["명시적", "추정", "불명확"] = "불명확"
+    review_note: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +287,16 @@ class CaseAnalysisPayload(BaseModel):
 class ConsultAnalyzeResponse(BaseModel):
     """단일화된 /consult/analyze 응답. 기존 3개 엔드포인트 응답을 하나로 합친 것."""
     raw_input: dict
+    # app/ai/analysis 구조화 분석 결과. 생성에 실패하거나 상담 내용이 비어 있으면 None.
+    # Optional로 둬서 core-api가 아직 이 필드를 안 읽는 상태로 배포돼도 문제없게 한다.
+    consult_summary: Optional[str] = None
+    # 대상 사건 범위가 "서식이 실제로 있는 대분류"(친족/상속/가사소송/가족관계등록)로
+    # 확정돼서, 사건유형도 이 층 값을 쓴다. case_analysis.case_list의 8개 유형은
+    # 프론트 표시와 소멸시효 계산 때문에 그대로 남는다.
+    consult_case_type: Optional[str] = None
+    consult_case_subtype: Optional[str] = None
+    consult_extracted: Optional[dict] = None
+    consult_timeline: Optional[list] = None
     case_analysis: CaseAnalysisPayload
     relief_review_checklist: ReliefReviewChecklist
     missing_items: List[MissingItemWithDocuments]

@@ -46,3 +46,4 @@ backend/ai-api/rag/data/parsed_templates.json
 # 로컬 검증용 스크립트·목 데이터 (팀 공용 테스트가 아니라 각자 돌려보는 용도)
 backend/ai-api/test_*.py
 backend/ai-api/custom_mocks/
+

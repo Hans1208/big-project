@@ -65,7 +65,13 @@ class TimelineItem(BaseModel):
 
 
 class AIAnalysisSchema(BaseModel):
-    summary: str = Field(description="상담 내용 핵심 요약 (2~3문장)")
+    # 분량을 못 박지 않는다. 이 요약은 변호사 검토와 법률구조 대상 판단에 함께 쓰이는데,
+    # 문장 수를 정해두면 소득·신분·증빙 같은 판단 재료가 먼저 잘려나간다.
+    # 무엇을 담아야 하는지는 prompts.py의 summary 규칙에 적어둔다.
+    summary: str = Field(
+        description="상담 내용 요약. 사실관계·쟁점·내담자 요구, 그리고 소득·재산·신분·증빙 등 "
+                    "법률구조 대상 판단에 필요한 언급을 빠뜨리지 말 것"
+    )
     case_type: CaseType
     case_subtype: CaseSubtype
     urgency_level: Literal["상", "중", "하"]
