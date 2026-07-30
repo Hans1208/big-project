@@ -2,6 +2,7 @@ package com.aivle.bigproject.attachment;
 
 import com.aivle.bigproject.attachment.dto.AttachmentPresignedUploadRequest;
 import com.aivle.bigproject.attachment.dto.AttachmentPresignedUploadResponse;
+import com.aivle.bigproject.attachment.dto.AttachmentRegistrationRequest;
 import com.aivle.bigproject.attachment.dto.AttachmentResponse;
 import com.aivle.bigproject.storage.S3FileStorageService;
 import java.time.Duration;
@@ -37,6 +38,26 @@ public class AttachmentController {
     public AttachmentPresignedUploadResponse presignedUpload(@RequestBody AttachmentPresignedUploadRequest request) {
         var presigned = s3FileStorageService.presignUpload(request.fileName(), request.contentType(), Duration.ofMinutes(15));
         return new AttachmentPresignedUploadResponse(presigned.uploadUrl(), presigned.key(), presigned.publicUrl());
+    }
+
+    // DELETE /api/attachments/unregistered?fileKey=... — 아직 어떤 상담에도 등록되지 않은(=Attachment DB
+    // row가 없는) S3 오브젝트를 지운다. "새 상담 만들기" 화면에서 파일을 올렸다가(S3까지 감) 상담을
+    // 만들기 전에 "삭제"를 누른 경우처럼, DELETE /attachments/{consultationId}/{attachmentId}로는 지울 수
+    // 없는(consultationId·attachmentId가 아직 없는) 파일을 지우는 유일한 경로.
+    @DeleteMapping("/api/attachments/unregistered")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUnregistered(@RequestParam String fileKey) {
+        attachmentService.deleteUnregistered(fileKey);
+    }
+
+    // POST /api/consultations/{consultationId}/attachments/register — 이미 presigned URL로 S3에 올라간
+    // 파일의 메타데이터를 "기존" 상담에 등록 (multipart 재업로드 없이 DB에만 기록).
+    // frontend/src/pages/workflows.jsx의 "기존 상담에 자료 추가 → 자료 저장"이 이 엔드포인트를 부른다.
+    @PostMapping("/api/consultations/{consultationId}/attachments/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AttachmentResponse register(@PathVariable Long consultationId,
+                                        @RequestBody AttachmentRegistrationRequest request) {
+        return AttachmentResponse.from(attachmentService.register(consultationId, request));
     }
 
     // POST /api/consultations/{consultationId}/attachments — 파일 업로드

@@ -51,8 +51,7 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new UnauthorizedException("이메일 또는 비밀번호가 올바르지 않습니다."));
-        if (user.getPasswordHash() == null
-                || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (user.getPasswordHash() == null || !matchesPassword(request.password(), user)) {
             throw new UnauthorizedException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
         if (user.getApprovalStatus() == ApprovalStatus.PENDING) {
@@ -62,6 +61,15 @@ public class AuthService {
             throw new ForbiddenException("가입이 거절된 계정입니다.");
         }
         return toAuthResponse(user);
+    }
+
+    // MasterAccountInitializer가 만드는 @test.test 마스터 계정은 평문 비밀번호로 저장되므로
+    // BCrypt matches() 대신 단순 문자열 비교로 분기한다 (이메일 도메인만으로 테스트 계정 식별).
+    private boolean matchesPassword(String rawPassword, User user) {
+        if (user.getEmail() != null && user.getEmail().endsWith("@test.test")) {
+            return rawPassword.equals(user.getPasswordHash());
+        }
+        return passwordEncoder.matches(rawPassword, user.getPasswordHash());
     }
 
     private AuthResponse toAuthResponse(User user) {

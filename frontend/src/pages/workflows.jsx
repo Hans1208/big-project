@@ -9,13 +9,17 @@ import {
   buildCoreDocumentDownloadUrl,
   createCoreAnalysis,
   createCoreConsultation,
+  deleteCoreAttachment,
+  deleteUnregisteredCoreAttachment,
   fetchCoreDocuments,
   generateCoreDraft,
   recommendCoreForms,
+  registerCoreAttachment,
   submitCoreAnalysisForReview,
   submitCoreDocumentForReview,
   triggerCoreAnalysis,
   mapCoreAnalysisResponse,
+  timelineEmptyMessage,
 } from '../services/coreApiClientV2.js';
 import { cacheFormRecommendations, hydrateDraftDocument, readCachedFormRecommendations, rememberDraftDocumentSnapshot } from '../services/draftDocumentStore.js';
 import { readLawyerDraftEdit, saveLawyerDraftEdit } from '../services/documentReviewStore.js';
@@ -711,7 +715,7 @@ function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSubmitted
       <div className="workflowColumns">
         <div>
           <h3>파일 업로드 (멀티모달 분석 대상)</h3>
-          <p className="helperText">녹취 · 이미지 · 문서 함께 분석</p>
+          <p className="helperText">녹취 · 이미지 · 문서 함께 분석 · 실제 업로드는 저장 버튼을 눌렀을 때 진행됩니다</p>
           <FileDropzone category={dropzoneCategory} onCategoryChange={setDropzoneCategory} onAddFiles={onAddFiles} />
         </div>
         <div>
@@ -761,48 +765,134 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, creatingNew]);
 
-  const saveDraft = () => {
-    writeStorage(storageKeys.uploadDraft, { form: newForm, files: newFiles, savedAt: new Date().toISOString() });
-    setMessage('임시저장 완료');
-  };
-  const clearDraft = () => {
-    writeStorage(storageKeys.uploadDraft, null);
-    setNewForm(emptyNewForm);
-    setNewFiles([]);
-    setMessage('임시저장 비움');
-  };
-
-  // 파일을 고르면 브라우저에서 곧장 S3로 올립니다(파일 바이트는 백엔드를 거치지 않음).
-  // 백엔드에 presigned 업로드 엔드포인트가 아직 없으면 로컬에 임시 보관하고 개발을 계속할 수 있게 폴백합니다.
-  const addFilesTo = async (setFilesState, label, selectedFiles) => {
+  // 파일을 고르면 일단 목록에만 추가합니다(즉시 S3 업로드 X). 실제 S3 업로드는 사용자가
+  // "임시저장" 또는 "상담 만들고 자료 저장"/"자료 저장" 버튼을 눌렀을 때 uploadPendingFiles가
+  // 한 번에 수행합니다. → 파일만 골라보고 저장 없이 화면을 벗어나면 애초에 업로드 자체가
+  // 일어나지 않아, 버려지는 파일이 S3 버킷에 쌓이지 않습니다.
+  const addFilesTo = (setFilesState, label, selectedFiles) => {
     const staged = Array.from(selectedFiles).map((file) => createAttachmentMetadata(file, label));
     if (!staged.length) return;
-    setFilesState((items) => [...items, ...staged.map((meta) => ({ ...meta, status: '업로드 중' }))]);
-    setMessage(`${label} ${staged.length}개 업로드 중…`);
-    const patchFile = (id, changes) => setFilesState((items) => items.map((item) => item.id === id ? { ...item, ...changes } : item));
-    let fellBackToLocal = false;
-    for (const meta of staged) {
+    setFilesState((items) => [...items, ...staged]);
+    setMessage(`${label} ${staged.length}개 추가 · 저장 시 업로드됩니다`);
+  };
+  // "삭제"는 그 파일이 실제로 어디까지 저장돼 있는지에 따라 다르게 처리합니다.
+  //  - DB(Attachment)에 이미 등록됨(attachmentId 있음) → 백엔드가 DB row + S3 오브젝트를 함께 지웁니다.
+  //  - 아직 등록 전이지만 S3에는 이미 올라가 있음(fileKey만 있음 — 예: "새 상담 만들기"에서 상담을
+  //    만들기 전에 지우는 경우) → 등록되지 않은 S3 오브젝트 전용 삭제 경로로 지웁니다.
+  //  - 둘 다 없으면(로컬에서 방금 고르기만 함) 지울 서버 실체가 없으므로 목록에서만 뺍니다.
+  // 실패하면 목록에서 빼지 않습니다 — "지웠는데 서버·S3엔 그대로 남아있는" 불일치를 막기 위함입니다.
+  // draftKey를 주면(=아직 상담이 없는 새 상담 만들기 초안) 로컬스토리지 draft도 같이 갱신해서,
+  // "임시저장"을 다시 누르지 않아도 지운 파일이 새로고침 후 되살아나지 않게 합니다.
+  const removeFileAt = async (setFilesState, files, index, coreId, draftKey) => {
+    const target = files[index];
+    if (!target) return undefined;
+    try {
+      if (target.attachmentId && coreId) {
+        await deleteCoreAttachment(coreId, target.attachmentId);
+      } else if (target.fileKey) {
+        await deleteUnregisteredCoreAttachment(target.fileKey);
+      }
+    } catch (error) {
+      showToast(`삭제 실패: ${error.message}`, 'warn');
+      return undefined;
+    }
+    const nextFiles = files.filter((_, itemIndex) => itemIndex !== index);
+    setFilesState(nextFiles);
+    if (draftKey) {
+      const savedDraft = readStorage(draftKey, null);
+      if (savedDraft) writeStorage(draftKey, { ...savedDraft, files: nextFiles });
+    }
+    return nextFiles;
+  };
+
+  // 업로드는 됐지만(fileKey 있음) 아직 이 상담의 DB에 등록되지 않은 파일(attachmentId 없음)을
+  // 등록합니다. coreId가 없으면(=아직 core-api에 없는 상담, 예: 새 상담 만들기 흐름) 등록할 곳이
+  // 없어 건너뜁니다 — 그 흐름은 상담 생성 자체가 attachments를 함께 등록하므로 이 호출이 필요 없습니다.
+  const registerNewAttachments = async (files, coreId) => {
+    if (!coreId) return files;
+    const unregistered = files.filter((item) => item.fileKey && !item.attachmentId);
+    if (!unregistered.length) return files;
+    let result = files;
+    for (const item of unregistered) {
       try {
-        const { fileKey, fileUrl } = await uploadFileToS3(meta.file, label);
-        patchFile(meta.id, { fileKey, uploadedUrl: fileUrl, status: 'S3 업로드 완료' });
+        const saved = await registerCoreAttachment(coreId, item);
+        result = result.map((file) => file.id === item.id ? { ...file, attachmentId: saved.id, status: '서버 저장' } : file);
+      } catch (error) {
+        showToast(`${item.name} 등록 실패: ${error.message}`, 'warn');
+      }
+    }
+    return result;
+  };
+
+  // 저장 동작(임시저장·자료 저장)에서 호출해, 그때까지 S3에 올라가지 않은 파일(fileKey 없음 —
+  // 신규 선택분뿐 아니라 이전 시도에서 실패했거나 백엔드 미지원으로 로컬 보관 중이던 파일도 포함)을
+  // 한 번에 업로드합니다. 최신 상태가 반영된 파일 목록을 돌려주므로 호출부는 이 값을 그대로
+  // draft 저장/첨부 payload 생성에 씁니다.
+  const uploadPendingFiles = async (files, setFilesState) => {
+    const pending = files.filter((item) => item.file && !item.fileKey);
+    if (!pending.length) return files;
+    const pendingIds = new Set(pending.map((item) => item.id));
+    setFilesState((items) => items.map((item) => pendingIds.has(item.id) ? { ...item, status: '업로드 중' } : item));
+    setMessage(`파일 ${pending.length}개 업로드 중…`);
+
+    let result = files;
+    let fellBackToLocal = false;
+    let failedCount = 0;
+    for (const meta of pending) {
+      try {
+        const { fileKey, fileUrl } = await uploadFileToS3(meta.file, meta.category);
+        result = result.map((item) => item.id === meta.id ? { ...item, fileKey, uploadedUrl: fileUrl, status: 'S3 업로드 완료' } : item);
       } catch (error) {
         if (error instanceof S3UploadUnavailableError) {
           fellBackToLocal = true;
-          patchFile(meta.id, { status: '로컬 보관 (S3 대기)' });
+          result = result.map((item) => item.id === meta.id ? { ...item, status: 'S3 저장 전)' } : item);
         } else {
-          patchFile(meta.id, { status: '업로드 실패' });
+          failedCount += 1;
+          result = result.map((item) => item.id === meta.id ? { ...item, status: '업로드 실패' } : item);
           showToast(`${meta.name} 업로드 실패: ${error.message}`, 'warn');
         }
       }
+      setFilesState(result);
     }
     setMessage(fellBackToLocal
-      ? `${label} 추가 완료 · 로컬 임시 보관`
-      : `${label} ${staged.length}개 업로드 완료`);
+      ? '파일 업로드 완료. 일부는 업로드 대기' //업로드 대기=로컬 임시 보관
+      : failedCount
+        ? `파일 업로드 완료. ${failedCount}건 실패`
+        : '파일 업로드 완료.');
+    return result;
   };
-  const removeFileAt = (setFilesState, index) => setFilesState((items) => items.filter((_, itemIndex) => itemIndex !== index));
 
-  const buildAttachmentPayload = (files) => files.map(({ category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => (
-    { category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }
+  const saveDraft = async () => {
+    const uploadedFiles = await uploadPendingFiles(newFiles, setNewFiles);
+    writeStorage(storageKeys.uploadDraft, { form: newForm, files: uploadedFiles, savedAt: new Date().toISOString() });
+    setMessage('임시저장 완료');
+  };
+  // "비우기"도 "삭제"와 같은 이유로 정리가 필요합니다 — 임시저장 단계에서 이미 S3에 올라간 파일
+  // (fileKey는 있지만 아직 어떤 상담에도 등록되지 않아 attachmentId가 없는 파일)을 먼저 지우지 않으면,
+  // 로컬 목록·draft만 비워질 뿐 S3에는 그 파일이 그대로 남습니다.
+  const clearDraft = async () => {
+    const orphaned = newFiles.filter((item) => item.fileKey && !item.attachmentId);
+    let failedCount = 0;
+    for (const item of orphaned) {
+      try {
+        await deleteUnregisteredCoreAttachment(item.fileKey);
+      } catch (error) {
+        failedCount += 1;
+      }
+    }
+    writeStorage(storageKeys.uploadDraft, null);
+    setNewForm(emptyNewForm);
+    setNewFiles([]);
+    if (failedCount) {
+      showToast(`S3에 남은 파일 ${failedCount}건을 정리하지 못했습니다.`, 'warn');
+      setMessage(`임시저장 비움 · S3 파일 ${failedCount}건 정리 실패`);
+    } else {
+      setMessage('임시저장 비움');
+    }
+  };
+
+  const buildAttachmentPayload = (files) => files.map(({ attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => (
+    { attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }
   ));
   const buildEligibilityPayload = ({ legalAidType, eligibilityEvidenceSubmitted }) => {
     const selectedApplicantType = legalAidApplicantTypes.find((item) => item.key === legalAidType) || legalAidApplicantTypes[0];
@@ -824,6 +914,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
       tone: 'info',
     });
     if (!accepted) return;
+    const uploadedFiles = await uploadPendingFiles(newFiles, setNewFiles);
     const result = await onCreateConsultation({
       name: '',
       title: buildAutoUploadTitle(),
@@ -832,7 +923,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
       memo: newForm.memo,
       status: '진행 중',
       eligibilityCheck: buildEligibilityPayload(newForm),
-      attachments: buildAttachmentPayload(newFiles),
+      attachments: buildAttachmentPayload(uploadedFiles),
     }, { skipNavigation: true });
     if (result?.id == null) {
       showToast('상담을 만들지 못했습니다. 다시 시도해주세요.', 'warn');
@@ -857,9 +948,14 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
       tone: 'info',
     });
     if (!accepted) return;
+    const uploadedFiles = await uploadPendingFiles(existingFiles, setExistingFiles);
+    // S3까지는 올라갔어도 아직 이 상담의 Attachment DB row가 없는 파일(방금 새로 고른 파일)을
+    // 여기서 등록합니다 — 이걸 하지 않으면 화면에는 보이지만 DB에는 없는 파일이 생깁니다.
+    const registeredFiles = await registerNewAttachments(uploadedFiles, selectedCase.coreId);
+    setExistingFiles(registeredFiles);
     onUpdateConsultation(selectedCase.id, {
       eligibilityCheck: buildEligibilityPayload(existingEligibility),
-      attachments: buildAttachmentPayload(existingFiles),
+      attachments: buildAttachmentPayload(registeredFiles),
     });
     setMessage('');
     showToast('자료 저장 완료 · 검토 요청 시 함께 전달', 'success');
@@ -932,7 +1028,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
               onChangeEvidenceSubmitted={(checked) => setNewForm({ ...newForm, eligibilityEvidenceSubmitted: checked })}
               files={newFiles}
               onAddFiles={(label, files) => addFilesTo(setNewFiles, label, files)}
-              onRemoveFile={(index) => removeFileAt(setNewFiles, index)}
+              onRemoveFile={(index) => removeFileAt(setNewFiles, newFiles, index, null, storageKeys.uploadDraft)}
             />
             <div className="uploadActionRow">
               <div className="uploadSecondaryActions">
@@ -974,7 +1070,10 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
               onChangeEvidenceSubmitted={(checked) => setExistingEligibility((current) => ({ ...current, eligibilityEvidenceSubmitted: checked }))}
               files={existingFiles}
               onAddFiles={(label, files) => addFilesTo(setExistingFiles, label, files)}
-              onRemoveFile={(index) => removeFileAt(setExistingFiles, index)}
+              onRemoveFile={async (index) => {
+                const nextFiles = await removeFileAt(setExistingFiles, existingFiles, index, selectedCase?.coreId, null);
+                if (nextFiles) onUpdateConsultation(selectedCase.id, { attachments: buildAttachmentPayload(nextFiles) });
+              }}
             />
             <div className="uploadActionRow">
               <button className="primaryButton uploadSubmitButton" type="button" onClick={submitExistingCase}>자료 저장</button>
@@ -2086,13 +2185,17 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <section className="railSection">
                 <h3>사실관계 타임라인</h3>
                 <div className="scrollBox small">
-                  {(analysis.timeline || []).map((item, index) => <button type="button" key={`${item.date}-${index}`}>{item.date} - {item.text}</button>)}
+                  {/* 없을 때 안내를 보여주는 건 master 쪽 동작을 그대로 살리고,
+                      timeline이 아예 undefined인 경우(복원 경로)에도 죽지 않게 감쌉니다. */}
+                  {(analysis.timeline || []).length
+                    ? analysis.timeline.map((item, index) => <button type="button" key={`${item.date}-${index}`}>{item.date} - {item.text}</button>)
+                    : <InlineEmptyNotice>{timelineEmptyMessage(analysis.timelineIssue)}</InlineEmptyNotice>}
                 </div>
                 <div className="inlineControls compactInline">
                   <input value={timelineText} onChange={(event) => setTimelineText(event.target.value)} placeholder="타임라인 항목" />
                   <button type="button" onClick={() => {
                     if (!timelineText.trim()) return;
-                    setAnalysis({ ...analysis, timeline: [...analysis.timeline, { date: today, text: timelineText }] });
+                    setAnalysis({ ...analysis, timeline: [...(analysis.timeline || []), { date: today, text: timelineText }] });
                     setTimelineText('');
                   }}>추가</button>
                 </div>

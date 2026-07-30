@@ -19,6 +19,7 @@ import {
   fetchCoreUsers,
   loginCoreUser,
   mapCoreAnalysisResponse,
+  mapCoreAttachmentsToLocal,
   mapCoreUserToLocal,
   normalizeAuthResponse,
   registerCoreUser,
@@ -68,25 +69,6 @@ function buildHydratedAnalysis(row, consultation) {
     coreAnalysisId: coreAnalysisIdOf(row),
     analysis: hydrateAnalysisForDisplay(row, consultation),
   };
-}
-
-function mapCoreAttachmentToLocal(item = {}) {
-  return {
-    category: item.fileType || item.category || '첨부자료',
-    name: item.fileName || item.name || item.fileKey || '첨부파일',
-    size: item.size || 0,
-    mimeType: item.contentType || item.mimeType || '',
-    storageBucket: item.storageBucket || '',
-    fileKey: item.fileKey || '',
-    uploadedUrl: item.fileUrl || item.downloadUrl || item.uploadedUrl || '',
-    status: item.fileKey || item.fileUrl ? '서버 저장' : '',
-  };
-}
-
-function mapCoreAttachmentsToLocal(row = {}) {
-  return (row.attachments || row.coreAttachments || [])
-    .map(mapCoreAttachmentToLocal)
-    .filter((item) => item.name || item.fileKey || item.uploadedUrl);
 }
 
 // 로그인한 역할에 따라 상담원/변호사/관리자 대시보드를 분기합니다.
@@ -181,11 +163,15 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         if (cancelled || !Array.isArray(serverRows)) return;
         setConsultations((items) => {
           const serverByCoreId = new Map(serverRows.map((row) => [row.id, row]));
+          // 첨부파일은 다른 필드(메모·법률구조 대상 등)와 달리 로컬 전용 값이 없습니다 — 추가/삭제가
+          // 항상 core-api(Attachment 테이블)를 거쳐 확정되므로, 서버 응답이 항상 진실입니다.
+          // 그래서 다른 필드는 로컬 값을 지키되(덮어쓰지 않음), attachments만은 서버 목록으로 완전히
+          // 맞춰씁니다 — 그래야 이미 삭제된 파일이 새로고침 후 되살아나 보이는 문제가 재발하지 않습니다.
           const mergedItems = items.map((item) => {
-            if (!item.coreId || item.attachments?.length) return item;
+            if (!item.coreId) return item;
             const serverRow = serverByCoreId.get(item.coreId);
-            const serverAttachments = mapCoreAttachmentsToLocal(serverRow);
-            return serverAttachments.length ? { ...item, attachments: serverAttachments } : item;
+            if (!serverRow) return item;
+            return { ...item, attachments: mapCoreAttachmentsToLocal(serverRow) };
           });
           const knownCoreIds = new Set(items.map((item) => item.coreId).filter(Boolean));
           const missingRows = serverRows.filter((row) => !knownCoreIds.has(row.id));
@@ -436,6 +422,10 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       logs: [{ status: '상담 접수', createdAt: today }],
       analysis: null,
       ...form,
+      // form.attachments는 아직 서버가 확정하지 않은 클라이언트 쪽 echo(첨부파일 DB row id가 없음)라
+      // "삭제" 버튼이 지울 대상을 특정할 수 없습니다. 방금 생성 응답(coreSync.attachments)에 서버가
+      // 실제로 저장을 확정한 목록(attachmentId 포함)이 있으면 그걸 우선합니다.
+      attachments: coreSync?.attachments?.length ? coreSync.attachments : (form.attachments || []),
     };
     setConsultations((items) => [nextConsultation, ...items]);
     appendAuditLog({
@@ -680,14 +670,14 @@ function App() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
-  const handleLogin = async (event) => {
-    event.preventDefault();
+  // 실제 백엔드(core-api)가 이메일/비밀번호 대조, 승인 대기·거절 차단을 전부 처리합니다.
+  // 여기서 로컬로 다시 검사하지 않고, 성공/실패 모두 백엔드 응답을 그대로 따릅니다.
+  // handleLogin(로그인 폼 제출)과 handleQuickLogin(마스터 계정 자동 로그인)이 이 로직을 함께 씁니다.
+  const performLogin = async (email, password) => {
     if (loginPending) return;
     setLoginPending(true);
     try {
-      // 실제 백엔드(core-api)가 이메일/비밀번호 대조, 승인 대기·거절 차단을 전부 처리합니다.
-      // 여기서 로컬로 다시 검사하지 않고, 성공/실패 모두 백엔드 응답을 그대로 따릅니다.
-      const auth = normalizeAuthResponse(await loginCoreUser({ email: loginForm.email, password: loginForm.password }));
+      const auth = normalizeAuthResponse(await loginCoreUser({ email, password }));
       // 소속기관·연락처처럼 아직 백엔드에 없는 프로필 항목은, 이 브라우저에 저장된 값이 있으면
       // 그대로 이어받아 화면이 비어 보이지 않게 합니다. (다른 기기 최초 로그인 시엔 빈 값으로 시작)
       const existingLocal = users.find((user) => user.email === auth.email);
@@ -714,22 +704,25 @@ function App() {
     }
   };
 
+  const handleLogin = (event) => {
+    event.preventDefault();
+    return performLogin(loginForm.email, loginForm.password);
+  };
+
+  // 회원가입 절차 없이도 역할별(상담원/변호사/관리자) 마스터 계정으로 실제 로그인 플로우를 그대로
+  // 태워볼 수 있도록, 자격 증명을 로그인 폼에 채우고 performLogin(=handleLogin과 동일한 제출 로직)을
+  // 그대로 호출합니다. 계정 자체는 core-api의 MasterAccountInitializer가 기동 시 생성합니다.
+  const masterAccountCredentials = {
+    counselor: { email: 'test_talker@test.test', password: 'test1234' },
+    lawyer: { email: 'test_lawyer@test.test', password: 'test1234' },
+    admin: { email: 'test_admin@test.test', password: 'test1234' },
+  };
+
   const handleQuickLogin = (role) => {
-    // 가입 신청일이 없는 데모 계정도 실제 가입자와 동일하게 오늘 날짜로 채워, 관리자 화면에서 '-'로 비어 보이지 않게 합니다.
-    const demoAccounts = {
-      counselor: { name: '테스트', organization: '서울중앙지부 / 법률구조1부', branch: '서울중앙지부', department: '법률구조1부', phone: '010-1234-5601', email: 'demo.counselor@test.local', role: 'counselor', status: '승인', requestedAt: today },
-      lawyer: { name: '테스트', organization: '서울중앙지부 / 송무부', branch: '서울중앙지부', department: '송무부', phone: '010-1234-5602', email: 'demo.lawyer@test.local', role: 'lawyer', status: '승인', requestedAt: today },
-      admin: { name: '테스트', organization: '대한법률구조공단 / 운영팀', phone: '010-1234-5603', email: 'demo.admin@test.local', role: 'admin', status: '승인', requestedAt: today },
-    };
-    const demoUser = demoAccounts[role];
-    if (!demoUser) return;
-    persistUsers([demoUser, ...users.filter((user) => user.email !== demoUser.email)]);
-    setLoginError('');
-    setRegisteredRole(demoUser.role);
-    setCurrentUserEmail(demoUser.email);
-    appendAuditLog({ actor: demoUser.email, action: '테스트 빠른 로그인', target: demoUser.role });
-    window.localStorage.setItem('registeredRole', demoUser.role);
-    setPage('dashboard');
+    const credentials = masterAccountCredentials[role];
+    if (!credentials) return;
+    setLoginForm({ email: credentials.email, password: credentials.password });
+    return performLogin(credentials.email, credentials.password);
   };
 
   const currentUser = users.find((user) => user.email === currentUserEmail) || null;
