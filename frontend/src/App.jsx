@@ -622,14 +622,14 @@ function App() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
-  const handleLogin = async (event) => {
-    event.preventDefault();
+  // 실제 백엔드(core-api)가 이메일/비밀번호 대조, 승인 대기·거절 차단을 전부 처리합니다.
+  // 여기서 로컬로 다시 검사하지 않고, 성공/실패 모두 백엔드 응답을 그대로 따릅니다.
+  // handleLogin(로그인 폼 제출)과 handleQuickLogin(마스터 계정 자동 로그인)이 이 로직을 함께 씁니다.
+  const performLogin = async (email, password) => {
     if (loginPending) return;
     setLoginPending(true);
     try {
-      // 실제 백엔드(core-api)가 이메일/비밀번호 대조, 승인 대기·거절 차단을 전부 처리합니다.
-      // 여기서 로컬로 다시 검사하지 않고, 성공/실패 모두 백엔드 응답을 그대로 따릅니다.
-      const auth = normalizeAuthResponse(await loginCoreUser({ email: loginForm.email, password: loginForm.password }));
+      const auth = normalizeAuthResponse(await loginCoreUser({ email, password }));
       // 소속기관·연락처처럼 아직 백엔드에 없는 프로필 항목은, 이 브라우저에 저장된 값이 있으면
       // 그대로 이어받아 화면이 비어 보이지 않게 합니다. (다른 기기 최초 로그인 시엔 빈 값으로 시작)
       const existingLocal = users.find((user) => user.email === auth.email);
@@ -656,22 +656,25 @@ function App() {
     }
   };
 
+  const handleLogin = (event) => {
+    event.preventDefault();
+    return performLogin(loginForm.email, loginForm.password);
+  };
+
+  // 회원가입 절차 없이도 역할별(상담원/변호사/관리자) 마스터 계정으로 실제 로그인 플로우를 그대로
+  // 태워볼 수 있도록, 자격 증명을 로그인 폼에 채우고 performLogin(=handleLogin과 동일한 제출 로직)을
+  // 그대로 호출합니다. 계정 자체는 core-api의 MasterAccountInitializer가 기동 시 생성합니다.
+  const masterAccountCredentials = {
+    counselor: { email: 'test_talker@test.test', password: 'test1234' },
+    lawyer: { email: 'test_lawyer@test.test', password: 'test1234' },
+    admin: { email: 'test_admin@test.test', password: 'test1234' },
+  };
+
   const handleQuickLogin = (role) => {
-    // 가입 신청일이 없는 데모 계정도 실제 가입자와 동일하게 오늘 날짜로 채워, 관리자 화면에서 '-'로 비어 보이지 않게 합니다.
-    const demoAccounts = {
-      counselor: { name: '테스트', organization: '서울중앙지부 / 법률구조1부', branch: '서울중앙지부', department: '법률구조1부', phone: '010-1234-5601', email: 'demo.counselor@test.local', role: 'counselor', status: '승인', requestedAt: today },
-      lawyer: { name: '테스트', organization: '서울중앙지부 / 송무부', branch: '서울중앙지부', department: '송무부', phone: '010-1234-5602', email: 'demo.lawyer@test.local', role: 'lawyer', status: '승인', requestedAt: today },
-      admin: { name: '테스트', organization: '대한법률구조공단 / 운영팀', phone: '010-1234-5603', email: 'demo.admin@test.local', role: 'admin', status: '승인', requestedAt: today },
-    };
-    const demoUser = demoAccounts[role];
-    if (!demoUser) return;
-    persistUsers([demoUser, ...users.filter((user) => user.email !== demoUser.email)]);
-    setLoginError('');
-    setRegisteredRole(demoUser.role);
-    setCurrentUserEmail(demoUser.email);
-    appendAuditLog({ actor: demoUser.email, action: '테스트 빠른 로그인', target: demoUser.role });
-    window.localStorage.setItem('registeredRole', demoUser.role);
-    setPage('dashboard');
+    const credentials = masterAccountCredentials[role];
+    if (!credentials) return;
+    setLoginForm({ email: credentials.email, password: credentials.password });
+    return performLogin(credentials.email, credentials.password);
   };
 
   const currentUser = users.find((user) => user.email === currentUserEmail) || null;

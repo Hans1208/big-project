@@ -26,3 +26,18 @@ app:
     region: ${AWS_S3_REGION:ap-northeast-2}
     access-key: ${AWS_ACCESS_KEY_ID:}
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
+  # 회원가입 없이 역할별로 실제 로그인 플로우를 바로 태워볼 수 있는 테스트용 마스터 계정 3종.
+  # MasterAccountInitializer가 기동 시 없으면 생성한다 (평문 비밀번호, @test.test 도메인으로 식별).
+  master-account:
+    talker:
+      email: ${MASTER_TALKER_EMAIL:test_talker@test.test}
+      password: ${MASTER_TALKER_PASSWORD:test1234}
+      name: ${MASTER_TALKER_NAME:테스트상담원}
+    lawyer:
+      email: ${MASTER_LAWYER_EMAIL:test_lawyer@test.test}
+      password: ${MASTER_LAWYER_PASSWORD:test1234}
+      name: ${MASTER_LAWYER_NAME:테스트변호사}
+    admin:
+      email: ${MASTER_ADMIN_EMAIL:test_admin@test.test}
+      password: ${MASTER_ADMIN_PASSWORD:test1234}
+      name: ${MASTER_ADMIN_NAME:테스트관리자}
