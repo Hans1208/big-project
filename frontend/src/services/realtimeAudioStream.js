@@ -3,6 +3,8 @@
 // 바이너리 프레임으로 변환해 보냅니다. 현재 백엔드는 수신·PCM 디코딩까지만 하므로
 // 이 모듈은 전송 상태를 제공하고, STT 텍스트는 기존 상담 메모 흐름을 유지합니다.
 
+import { CORE_API_BASE_URL, coreAuthHeader } from './coreApiClientV2.js';
+
 const DEFAULT_AUDIO_WS_PATH = '/ws/audio/mulaw';
 
 function audioWebSocketUrl() {
@@ -10,6 +12,34 @@ function audioWebSocketUrl() {
   if (configured) return configured;
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}${DEFAULT_AUDIO_WS_PATH}`;
+}
+
+// 소켓에 붙기 전에 1회용 티켓을 받아옵니다.
+//
+// core-api는 로그인한 사용자만 쓸 수 있게 잠겨 있는데, 브라우저의 new WebSocket()에는
+// Authorization 헤더를 넣을 자리가 없습니다. 그래서 헤더를 쓸 수 있는 이 REST 요청으로
+// 먼저 티켓을 받고, 그 티켓만 소켓 주소에 실어 보냅니다.
+// 주소는 접속 로그·브라우저 히스토리에 남기 때문에 24시간짜리 JWT를 그대로 붙이지 않습니다.
+// 티켓은 30초 1회용이라 주소에 남더라도 이미 만료됐거나 소모된 값입니다.
+async function requestAudioTicket() {
+  let response;
+  try {
+    response = await fetch(`${CORE_API_BASE_URL}/api/audio/tickets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...coreAuthHeader() },
+    });
+  } catch {
+    throw new Error('통화 서버에 연결할 수 없습니다. Core API 서버가 켜져 있는지 확인해주세요.');
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('통화 권한이 없습니다. 다시 로그인해주세요.');
+  }
+  if (!response.ok) {
+    throw new Error(`통화 연결을 준비하지 못했습니다 (HTTP ${response.status})`);
+  }
+  const body = await response.json();
+  if (!body?.ticket) throw new Error('통화 연결 티켓을 받지 못했습니다.');
+  return body.ticket;
 }
 
 function downsample(buffer, inputSampleRate, outputSampleRate = 8000) {
@@ -66,7 +96,9 @@ export class RealtimeAudioStream {
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
     try {
-      this.socket = new WebSocket(audioWebSocketUrl());
+      // 티켓은 30초짜리라 연결할 때마다 새로 받습니다(재사용도 막혀 있습니다).
+      const ticket = await requestAudioTicket();
+      this.socket = new WebSocket(`${audioWebSocketUrl()}?ticket=${encodeURIComponent(ticket)}`);
       this.socket.binaryType = 'arraybuffer';
       await new Promise((resolve, reject) => {
         this.socket.addEventListener('open', resolve, { once: true });
