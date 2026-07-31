@@ -481,8 +481,16 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         setConsultations((items) => items.map((item) => item.id === consultation.id ? { ...item, coreAnalysisId: analysisId } : item));
       }
       return { ok: true, synced: true, message: 'Core API 분석 저장까지 완료되었습니다.' };
-    } catch {
-      return { ok: true, synced: false, message: '로컬 저장 완료' };
+    } catch (error) {
+      // 예전에는 여기서도 ok: true를 돌려줬습니다. 서버 저장이 실패해도 화면에는 저장됐다고
+      // 떠서, 상담원은 남았다고 믿는데 DB에는 없는 상태가 됐습니다. 브라우저를 닫으면 사라집니다.
+      // 로컬(localStorage)에는 실제로 남으므로 그 사실은 그대로 알리되, 서버에 못 갔다는 것을
+      // 숨기지 않습니다.
+      return {
+        ok: false,
+        synced: false,
+        message: `서버 저장 실패 — 이 브라우저에만 남았습니다. 다시 저장해주세요. (${error?.message || '원인 불명'})`,
+      };
     }
   };
 
