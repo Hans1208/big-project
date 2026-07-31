@@ -21,6 +21,7 @@ public record AiAnalysisRequest(
         JsonNode extractedJson,
         JsonNode missingInfoJson,
         JsonNode checklistJson,
+        JsonNode checklistStatusJson,
         JsonNode recommendationJson,
         JsonNode timelineJson,
         JsonNode clusterResultJson,
