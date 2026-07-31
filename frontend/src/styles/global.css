@@ -1673,6 +1673,27 @@ button:disabled:active {
   background: var(--accent-press, var(--accent-hover));
 }
 
+/* 표 위에 붙는 산식 설명입니다. 카드의 비율이 무엇을 나눈 값인지 밝혀,
+   "표에는 1줄인데 왜 25%지?" 같은 오해를 막습니다. */
+.panelCaption {
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-chip);
+  background: var(--surface-subtle, #f9f9fb);
+  color: var(--text-main);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.panelCaptionSub {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-sub);
+  font-weight: 400;
+}
+
 .panelCountBadge {
   display: inline-flex;
   align-items: center;
