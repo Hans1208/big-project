@@ -77,6 +77,14 @@ public class AiAnalysis {
     @Column(name = "checklist_json", columnDefinition = "jsonb")
     private String checklistJson;
 
+    // checklist_json은 분석 직후엔 relief_review_checklist 객체(eligibility/winnability/
+    // executability/appropriateness)로, "분석 내용 저장" 이후엔 {label, checked}[] 배열로
+    // 구조가 바뀐다. 이 컬럼은 그 변동과 무관하게 실제 체크리스트 5개 항목의 체크 상태만
+    // 항상 {label, checked}[] 형태로 담아, UI 체크리스트가 이 컬럼 기준으로 동작하게 한다.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "checklist_status_json", columnDefinition = "jsonb")
+    private String checklistStatusJson;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "recommendation_json", columnDefinition = "jsonb")
     private String recommendationJson;
@@ -121,8 +129,8 @@ public class AiAnalysis {
 
     public AiAnalysis(Consultation consultation, String summary, String caseType, String caseSubtype,
                        String urgencyLevel, String eligibility, String extractedJson, String missingInfoJson,
-                       String checklistJson, String recommendationJson, String timelineJson,
-                       String clusterResultJson, String estimatedTime, String rawInputJson) {
+                       String checklistJson, String checklistStatusJson, String recommendationJson,
+                       String timelineJson, String clusterResultJson, String estimatedTime, String rawInputJson) {
         this.consultation = consultation;
         this.summary = summary;
         this.caseType = caseType;
@@ -132,6 +140,7 @@ public class AiAnalysis {
         this.extractedJson = extractedJson;
         this.missingInfoJson = missingInfoJson;
         this.checklistJson = checklistJson;
+        this.checklistStatusJson = checklistStatusJson;
         this.recommendationJson = recommendationJson;
         this.timelineJson = timelineJson;
         this.clusterResultJson = clusterResultJson;

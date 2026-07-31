@@ -85,9 +85,12 @@ public class AiAnalysisService {
         // extracted_json은 아직 analysis 층 결과(당사자·금액·날짜)로 바꾸지 않는다.
         // 프론트가 이 필드에서 case_emergency_ratio / case_list[0].case_type_reason을 읽고 있어서
         // (coreApiClientV2.js) 지금 교체하면 화면이 깨진다. 프론트와 같이 옮겨야 하는 항목.
+        // checklist_status_json은 분석 직후엔 채우지 않는다. 프론트가 checklist_json(4개 평가블록
+        // 객체)에서 5개 체크박스 상태를 파생시켜 보여주고(mapCoreChecklist), 상담원이 "분석 내용
+        // 저장"을 누를 때 그 시점의 체크 상태를 이 컬럼에 담아 보낸다.
         AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, caseSubtype, urgencyLevel, eligible,
                 caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
-                null, timelineJson, null, null, aiResponse.rawInput().toString());
+                null, null, timelineJson, null, null, aiResponse.rawInput().toString());
 
         AiAnalysis saved = aiAnalysisRepository.save(analysis);
         consultation.setStatus(ConsultationStatus.COMPLETED);
@@ -162,6 +165,7 @@ public class AiAnalysisService {
                 toJsonText(request.extractedJson()),
                 toJsonText(request.missingInfoJson()),
                 toJsonText(request.checklistJson()),
+                toJsonText(request.checklistStatusJson()),
                 toJsonText(request.recommendationJson()),
                 toJsonText(request.timelineJson()),
                 toJsonText(request.clusterResultJson()),
@@ -219,6 +223,9 @@ public class AiAnalysisService {
         }
         if (request.checklistJson() != null) {
             analysis.setChecklistJson(toJsonText(request.checklistJson()));
+        }
+        if (request.checklistStatusJson() != null) {
+            analysis.setChecklistStatusJson(toJsonText(request.checklistStatusJson()));
         }
         if (request.recommendationJson() != null) {
             analysis.setRecommendationJson(toJsonText(request.recommendationJson()));
@@ -323,6 +330,7 @@ public class AiAnalysisService {
                 parseJson(a.getExtractedJson()),
                 parseJson(a.getMissingInfoJson()),
                 parseJson(a.getChecklistJson()),
+                parseJson(a.getChecklistStatusJson()),
                 parseJson(a.getRecommendationJson()),
                 parseJson(a.getTimelineJson()),
                 parseJson(a.getClusterResultJson()),

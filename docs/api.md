@@ -149,11 +149,17 @@ Response `201` — `{id, fileName, fileType, extractedText, uploadedAt, download
 {
   "summary": "...", "case_type": "임금체불", "case_subtype": "정기임금 미지급",
   "urgency_level": "중", "eligibility": "대상후보",
-  "extracted_json": {}, "missing_info_json": [], "checklist_json": [],
+  "extracted_json": {}, "missing_info_json": [], "checklist_json": [], "checklist_status_json": [],
   "recommendation_json": {}, "timeline_json": [], "cluster_result_json": [], "estimated_time": null
 }
 ```
 `_json` 필드는 구조 자유(Postgres `jsonb`). Response `201` — 위 + `analysis_id`, `consultation_id`, `created_at`, 검토 관련 필드(아래 참고).
+
+`checklist_status_json`은 계약서(v0.1)에는 없는 필드. `checklist_json`은 분석 직후엔
+ai-api `relief_review_checklist` 객체, "분석 내용 저장" 이후엔 `{label, checked}[]` 배열로
+구조가 바뀌는데, 이 컬럼은 그 변동과 무관하게 체크리스트 5개 항목의 체크 상태만 항상
+`{label, checked}[]` 형태로 담는다. 프론트 체크리스트 UI는 이 컬럼을 우선 참조하고,
+비어 있을 때만(분석 직후, 저장 전) `checklist_json`에서 파생시킨다.
 
 ### GET (목록/단건) / PUT (부분수정) / DELETE
 기존 Consultation과 같은 패턴.
