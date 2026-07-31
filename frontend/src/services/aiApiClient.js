@@ -59,4 +59,19 @@ export async function generateAiDraft(payload) {
   return response;
 }
 
+// 서식 개정 점검 (요구사항 AI-05-04-01).
+// helplaw24 서식 목록 22페이지를 순회하며 받아오므로 기본 제한(30초)으로는 모자랍니다.
+const FORM_REVISION_TIMEOUT_MS = 180_000;
+
+// 점검만 합니다. 기준 스냅샷은 바뀌지 않으므로 여러 번 눌러도 결과가 같습니다.
+export function checkFormRevisions() {
+  return requestJson('/forms/revisions', {}, FORM_REVISION_TIMEOUT_MS);
+}
+
+// 관리자가 변경 내용을 확인했다는 표시. 현재 상태가 새 기준선이 되어
+// 같은 변경이 다음 점검에서 다시 올라오지 않습니다.
+export function acknowledgeFormRevisions() {
+  return requestJson('/forms/revisions/acknowledge', { method: 'POST' }, FORM_REVISION_TIMEOUT_MS);
+}
+
 export { AI_API_BASE_URL };

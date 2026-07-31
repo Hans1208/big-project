@@ -10670,3 +10670,28 @@ button:disabled,
 .documentReviewTable .tableAction.danger {
   border-radius: var(--r-pill) !important;
 }
+
+/* 서식 개정 점검에서 바뀐 항목 목록. 어떤 서식을 손봐야 하는지 이름까지 보여줍니다.
+   건수가 많을 수 있어 카드 안에서만 스크롤되게 하고 바깥 레이아웃은 밀지 않습니다. */
+.formRevisionChanges {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.formRevisionChanges > div + div {
+  margin-top: 12px;
+}
+
+.formRevisionChanges ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.formRevisionChanges li {
+  font-size: var(--fs-caption);
+  line-height: 1.6;
+  word-break: keep-all;
+}
