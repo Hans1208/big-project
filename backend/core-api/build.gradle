@@ -29,6 +29,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	// implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
 
 	// JWT — gson 기반 모듈을 써서 이 프로젝트의 Jackson 3(tools.jackson) 설정과
