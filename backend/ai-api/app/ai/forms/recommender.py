@@ -1,4 +1,4 @@
-﻿# ai/forms/recommender.py — 서식 추천 모듈
+# ai/forms/recommender.py — 서식 추천 모듈
 #
 # 역할: AI 분석 결과(구조화 JSON) → 추천 서식 목록(recommended_forms_json)
 # 사용:
@@ -81,7 +81,14 @@ def get_candidates(case_type: str, case_subtype: str = None, query_text: str = N
               if case_subtype in m["name"] and m["main"] in MVP_CATEGORIES])
 
     if query_text:
-        _add(search_rag_candidates(query_text, top_n=EMBEDDING_TOP_N))
+        _add(
+            search_rag_candidates(
+                query_text=query_text,
+                top_n=EMBEDDING_TOP_N,
+                case_type=case_type,
+                case_subtype=case_subtype,
+            )
+        )
 
     return candidates
 

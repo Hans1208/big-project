@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 
 from rag.classification import build_where_filter
 from rag.form_retriever import (
@@ -45,6 +45,7 @@ def make_result(
     chunk_id,
     document_id,
     similarity,
+    source=None,
 ):
     return {
         "id": chunk_id,
@@ -55,7 +56,10 @@ def make_result(
         "similarity": similarity,
         "distance": 1.0 - similarity,
         "content": "Form content",
-        "source": "forms/test.hwpx",
+        "source": (
+            source
+            or f"forms/{document_id}.hwpx"
+        ),
     }
 
 
@@ -225,3 +229,68 @@ def test_retrieve_rejects_invalid_top_k():
             top_k=0,
         )
 
+
+
+def test_missing_confidence_uses_available_classification():
+    filters = build_filter_chain(
+        case_type="가족관계등록",
+        case_subtype="성본창설과 개명",
+        classification_confidence=None,
+    )
+
+    assert filters == [
+        build_where_filter(
+            case_type="가족관계등록",
+            case_subtype="성본창설과 개명",
+        ),
+        build_where_filter(
+            case_type="가족관계등록",
+        ),
+        None,
+    ]
+
+
+
+def test_retrieve_skips_duplicate_sources_before_top_k():
+    vector_store = FakeVectorStore(
+        responses=[
+            [
+                make_result(
+                    "A-0",
+                    "A",
+                    0.95,
+                    source="forms/name-change.hwpx",
+                ),
+                make_result(
+                    "B-0",
+                    "B",
+                    0.94,
+                    source="forms/name-change.hwpx",
+                ),
+                make_result(
+                    "C-0",
+                    "C",
+                    0.93,
+                    source="forms/name-origin.hwpx",
+                ),
+            ],
+        ]
+    )
+
+    retriever = FormRetriever(
+        embedding_service=FakeEmbeddingService(),
+        vector_store=vector_store,
+    )
+
+    results = retriever.retrieve(
+        query="name change",
+        top_k=2,
+    )
+
+    assert [
+        result["document_id"]
+        for result in results
+    ] == [
+        "A",
+        "C",
+    ]

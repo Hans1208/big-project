@@ -1,4 +1,4 @@
-﻿"""Retrieve unique legal forms from the vector index."""
+"""Retrieve unique legal forms from the vector index."""
 
 from __future__ import annotations
 
@@ -28,6 +28,26 @@ def build_filter_chain(
 ) -> list[dict[str, Any] | None]:
     """Build filters from strict to broad."""
     if classification_confidence is None:
+        if case_type and case_subtype:
+            return [
+                build_where_filter(
+                    case_type=case_type,
+                    case_subtype=case_subtype,
+                ),
+                build_where_filter(
+                    case_type=case_type,
+                ),
+                None,
+            ]
+
+        if case_type:
+            return [
+                build_where_filter(
+                    case_type=case_type,
+                ),
+                None,
+            ]
+
         return [None]
 
     if (
@@ -124,6 +144,7 @@ class FormRetriever:
 
         selected: list[dict[str, Any]] = []
         seen_document_ids: set[str] = set()
+        seen_sources: set[str] = set()
 
         for where_filter in filters:
             candidates = self.vector_store.search(
@@ -145,6 +166,22 @@ class FormRetriever:
                 if document_id in seen_document_ids:
                     continue
 
+                source_key = str(
+                    candidate.get("source")
+                    or ""
+                ).strip()
+
+                source_key = source_key.replace(
+                    "\\",
+                    "/",
+                ).casefold()
+
+                if (
+                    source_key
+                    and source_key in seen_sources
+                ):
+                    continue
+
                 normalized = dict(candidate)
 
                 normalized["document_id"] = (
@@ -159,6 +196,9 @@ class FormRetriever:
 
                 selected.append(normalized)
                 seen_document_ids.add(document_id)
+
+                if source_key:
+                    seen_sources.add(source_key)
 
                 if len(selected) >= top_k:
                     return selected

@@ -123,3 +123,72 @@ def test_search_rag_candidates_uses_local_retriever():
     assert candidates[0]["name"] == (
         "이혼 및 재산분할청구의 소"
     )
+
+
+def test_search_rag_candidates_deduplicates_same_source():
+    from app.ai.forms.rag_candidates import (
+        search_rag_candidates,
+    )
+
+    def fake_retrieve(**kwargs):
+        return [
+            {
+                "document_id": "I001000051",
+                "title": "개명허가신청서",
+                "case_type": "가족관계등록",
+                "case_subtype": "성본창설과 개명",
+                "similarity": 0.91,
+                "chunk_id": (
+                    "I001000051::chunk-0000"
+                ),
+                "source": (
+                    "서식_hwpx/가족관계등록/"
+                    "성본창설과 개명/"
+                    "개명허가신청서.hwpx"
+                ),
+            },
+            {
+                "document_id": "I001000052",
+                "title": "개명허가신청서",
+                "case_type": "가족관계등록",
+                "case_subtype": "성본창설과 개명",
+                "similarity": 0.90,
+                "chunk_id": (
+                    "I001000052::chunk-0000"
+                ),
+                "source": (
+                    "서식_hwpx/가족관계등록/"
+                    "성본창설과 개명/"
+                    "개명허가신청서.hwpx"
+                ),
+            },
+            {
+                "document_id": "I001001181",
+                "title": "성 및 본의 창설허가신청서",
+                "case_type": "가족관계등록",
+                "case_subtype": "성본창설과 개명",
+                "similarity": 0.89,
+                "chunk_id": (
+                    "I001001181::chunk-0000"
+                ),
+                "source": (
+                    "서식_hwpx/가족관계등록/"
+                    "성본창설과 개명/"
+                    "성및본창설허가신청서.hwpx"
+                ),
+            },
+        ]
+
+    candidates = search_rag_candidates(
+        query_text="이름을 개명하고 싶습니다.",
+        top_n=3,
+        retrieve=fake_retrieve,
+    )
+
+    assert [
+        candidate["tmpltNo"]
+        for candidate in candidates
+    ] == [
+        "I001000051",
+        "I001001181",
+    ]

@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.ai.forms import recommender
@@ -21,9 +21,11 @@ def test_recommend_endpoint_uses_local_rag_candidates(
     def fake_rag_search(
         query_text,
         top_n=10,
+        **kwargs,
     ):
         captured["query_text"] = query_text
         captured["top_n"] = top_n
+        captured.update(kwargs)
 
         return [
             {
