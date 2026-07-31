@@ -2227,6 +2227,15 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 </div>
               </section>
               <section className="railSection">
+                <h3>검토 반영 항목</h3>
+                <div className="scrollBox small chosenBox">{chosen.length ? chosen.map((item) => (
+                  <button type="button" key={item} onClick={() => setChosen(chosen.filter((value) => value !== item))}>
+                    <span className="chosenItemName">{item}</span>
+                    <em className="chosenItemDrop">제외</em>
+                  </button>
+                )) : <p>채택 항목 없음</p>}</div>
+              </section>
+              <section className="railSection">
                 <h3>사실관계 타임라인</h3>
                 <div className="scrollBox small">
                   {/* 없을 때 안내를 보여주는 건 master 쪽 동작을 그대로 살리고,
@@ -2245,13 +2254,8 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 </div>
               </section>
               <section className="railSection">
-                <h3>검토 반영 항목</h3>
-                <div className="scrollBox small chosenBox">{chosen.length ? chosen.map((item) => (
-                  <button type="button" key={item} onClick={() => setChosen(chosen.filter((value) => value !== item))}>
-                    <span className="chosenItemName">{item}</span>
-                    <em className="chosenItemDrop">제외</em>
-                  </button>
-                )) : <p>채택 항목 없음</p>}</div>
+                <h3>체크리스트 AI 분석 결과</h3>
+                
               </section>
             </div>
           </div>
