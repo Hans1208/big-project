@@ -1,7 +1,6 @@
 package com.aivle.bigproject.analysis;
 
 import java.util.List;
-import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -16,14 +15,13 @@ public interface AiAnalysisRepository extends JpaRepository<AiAnalysis, Long> {
     // 관리자 대시보드 "분석 처리 현황"(승인/반려/대기) 집계용 (AdminStatsService)
     long countByStatus(AnalysisReviewStatus status);
 
-    // 한 상담의 가장 최근 분석 1건. analyze()가 검토 전 초안을 덮어쓸 대상을 찾을 때 쓴다.
-    Optional<AiAnalysis> findFirstByConsultationIdOrderByIdDesc(Long consultationId);
-
     // 상담별 '최신 분석 1건'의 (상태, 검토여부)를 모은다 (AdminStatsService 처리율 집계용).
     //
     // 전체 행을 세면 같은 상담을 여러 번 분석했을 때 그 횟수만큼 분모가 커진다.
     // 재분석을 할수록 처리율이 떨어지는 셈이라 지표로 쓸 수 없다.
     // 상담 하나당 한 건만 세도록 각 상담의 최대 id(=가장 최근 행)만 남긴다.
+    // (analyze()가 더 이상 행을 만들지 않으므로 앞으로는 중복이 쌓이지 않지만,
+    //  그 전에 쌓인 행들이 DB에 남아 있어 집계 쪽 중복 제거는 계속 필요하다.)
     //
     // reviewedAt도 함께 가져오는 이유: 개발 중 만들어진 데이터 중에 검토를 거치지 않고
     // 상태만 APPROVED로 들어간 행이 있다(검토자·검토일·검토의견이 전부 비어 있음).
