@@ -7,6 +7,7 @@ import { appendAuditLog, getFavoriteTemplates, readStorage, storageKeys, toggleF
 import {
   approveCoreDocument,
   buildCoreDocumentDownloadUrl,
+  coreAuthHeader,
   createCoreAnalysis,
   createCoreConsultation,
   deleteCoreAttachment,
@@ -1802,14 +1803,21 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       reviewAction: selectedCase.reviewAction ? { ...selectedCase.reviewAction, resolved: true, resolvedAt: today } : null,
       logs: [...(selectedCase.logs || []), { status: `인공지능 분석 저장: ${reviewAnalysis.eligibility}`, createdAt: today }],
     });
+    // 서버 저장 성공 여부를 그대로 문구에 반영합니다. 예전에는 결과와 상관없이 늘
+    // "저장 완료"로 시작해서, 서버에 못 갔는데도 저장된 것처럼 읽혔습니다.
     let syncMessage = '';
+    let syncFailed = false;
     try {
       const syncResult = await onAnalysisSaved?.(selectedCase, reviewAnalysis);
       syncMessage = syncResult?.message ? ` ${syncResult.message}` : '';
+      syncFailed = syncResult ? syncResult.ok === false : false;
     } catch (error) {
-      syncMessage = ` Core API 저장 실패: ${error.message}`;
+      syncMessage = ` ${error.message}`;
+      syncFailed = true;
     }
-    setSavedMessage(`저장 완료: 분석 내용이 저장되고 처리 단계에 반영되었습니다.${syncMessage}`);
+    setSavedMessage(syncFailed
+      ? `서버 저장 실패:${syncMessage}`
+      : `저장 완료: 분석 내용이 저장되고 처리 단계에 반영되었습니다.${syncMessage}`);
     setReviewMessage('');
     setAnalysisSaved(true);
     setAnalysis(reviewAnalysis);
@@ -1862,18 +1870,31 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   // 분석 결과가 core-api에 저장돼 있으면(coreId+coreAnalysisId) 실제 검토 상태(AnalysisReviewStatus)도
   // SUBMITTED_FOR_REVIEW로 함께 바꿔둡니다. 아직 core-api에 동기화되지 않은 사건(프로토타입 로컬 진행)에서는
   // 이 호출만 조용히 건너뛰고, 기존 로컬 검토 큐(reviews) 등록은 그대로 진행합니다.
+  // 반환값으로 결과를 알립니다. 예전에는 실패해도 console.warn만 찍고 조용히 넘어가서,
+  // 변호사 쪽 서버에는 검토 요청이 안 들어갔는데 상담원 화면에는 "등록되었습니다"만 떴습니다.
+  // 상담원은 넘긴 줄 알고 손을 떼는데 변호사 목록에는 안 보이는 상태가 됩니다.
   const syncAnalysisReviewToCoreApi = async () => {
-    if (!selectedCase.coreId || !selectedCase.coreAnalysisId) return;
+    if (!selectedCase.coreId || !selectedCase.coreAnalysisId) {
+      return { synced: false, reason: 'not-synced' };
+    }
     try {
       await submitCoreAnalysisForReview(selectedCase.coreId, selectedCase.coreAnalysisId);
+      return { synced: true };
     } catch (error) {
-      console.warn('[분석 검토 요청] core-api 동기화 실패, 로컬 검토 큐만 갱신합니다:', error.message);
+      console.warn('[분석 검토 요청] core-api 동기화 실패:', error.message);
+      return { synced: false, reason: 'error', message: error.message };
     }
   };
 
   const performRequestReview = async () => {
-    await syncAnalysisReviewToCoreApi();
+    const sync = await syncAnalysisReviewToCoreApi();
     const result = onRequestLegalReview(selectedCase.id, buildReviewAnalysisPackage());
+
+    if (sync.reason === 'error') {
+      // 로컬 큐에는 올라갔지만 서버에는 못 갔습니다. 화면을 넘기지 않고 그대로 알립니다.
+      setReviewMessage(`검토 요청이 서버에 전달되지 않았습니다 — 변호사 화면에 보이지 않습니다. 다시 시도해주세요. (${sync.message})`);
+      return;
+    }
     setReviewMessage(result?.message || '변호사 검토 요청이 등록되었습니다.');
     if (result?.ok && onGoToDashboard) {
       setTimeout(onGoToDashboard, 1000);
@@ -3278,17 +3299,44 @@ function generatedFileName(path = '') {
 // consultationId+documentId를 넘기면(=core-api에 실제 저장된 문서) 새로 생긴 다운로드 API로
 // 진짜 파일을 받는 링크를 만듭니다. 없으면(로컬 전용 문서) 예전처럼 draft_file_path 자체를
 // 링크로 쓸 수 있는지만 확인합니다(blob: URL 등).
+// core-api가 인증을 요구하게 되면서 <a href>로는 더 이상 받을 수 없습니다. 브라우저가 주소만
+// 열고 Authorization 헤더를 실어주지 않아 401이 나기 때문입니다.
+// fetch로 받아 blob으로 만든 뒤, 그 blob을 가리키는 임시 링크를 클릭시켜 저장합니다.
+// 사용자가 보는 동작(눌러서 내려받기)은 그대로입니다.
 function ServerDocumentDownloadButton({ url, fileName, className = '' }) {
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState('');
   if (!url) return null;
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setError('');
+    try {
+      const response = await fetch(url, { headers: coreAuthHeader() });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fileName || '첨부파일';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // 브라우저가 저장을 시작할 시간을 준 뒤 해제합니다. 바로 지우면 받다 말고 끊깁니다.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    } catch (downloadError) {
+      setError(`다운로드 실패 (${downloadError.message})`);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <span className="serverDocumentDownload">
-      <a
-        className={className || undefined}
-        href={url}
-        download={fileName || true}
-      >
-        다운로드
-      </a>
+      <button type="button" className={className || undefined} onClick={handleDownload} disabled={downloading}>
+        {downloading ? '내려받는 중…' : '다운로드'}
+      </button>
+      {error ? <span className="formError">{error}</span> : null}
     </span>
   );
 }

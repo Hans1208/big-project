@@ -481,8 +481,16 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         setConsultations((items) => items.map((item) => item.id === consultation.id ? { ...item, coreAnalysisId: analysisId } : item));
       }
       return { ok: true, synced: true, message: 'Core API 분석 저장까지 완료되었습니다.' };
-    } catch {
-      return { ok: true, synced: false, message: '로컬 저장 완료' };
+    } catch (error) {
+      // 예전에는 여기서도 ok: true를 돌려줬습니다. 서버 저장이 실패해도 화면에는 저장됐다고
+      // 떠서, 상담원은 남았다고 믿는데 DB에는 없는 상태가 됐습니다. 브라우저를 닫으면 사라집니다.
+      // 로컬(localStorage)에는 실제로 남으므로 그 사실은 그대로 알리되, 서버에 못 갔다는 것을
+      // 숨기지 않습니다.
+      return {
+        ok: false,
+        synced: false,
+        message: `서버 저장 실패 — 이 브라우저에만 남았습니다. 다시 저장해주세요. (${error?.message || '원인 불명'})`,
+      };
     }
   };
 
@@ -642,7 +650,13 @@ function App() {
   // 이메일로 식별되는 새 계정만 추가합니다. 이미 로컬에 있는 계정(퀵 로그인 데모 계정 포함)은
   // 절대 덮어쓰지 않습니다 — 안 그러면 데모 계정이 실제 서버 승인 상태로 바뀌어 "테스트용 빠른
   // 로그인"이 매번 승인 대기로 막히게 됩니다.
+  //
+  // core-api가 인증을 요구하게 되면서, 앱 시작 시점(=로그인 전)에는 이 호출이 403으로 막힙니다.
+  // 그래서 마운트 시 한 번이 아니라 로그인해서 토큰이 생긴 뒤에 돕니다.
+  // (예전 [] 의존성 그대로 두면 관리자 화면의 사용자 목록이 조용히 비어 보입니다 — 아래
+  //  catch가 실패를 삼키기 때문에 오류도 안 뜹니다.)
   useEffect(() => {
+    if (!authToken) return undefined;
     let cancelled = false;
     fetchCoreUsers()
       .then((serverRows) => {
@@ -657,7 +671,7 @@ function App() {
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authToken]);
   // 다른 탭에서 계정을 승인/거절하거나 새로 가입하면(localStorage 변경), 이 탭도 새로고침 없이
   // 반영합니다. storage 이벤트는 "다른 탭"이 바꿨을 때만 발생하므로 이 탭 자신의 변경과는 겹치지
   // 않습니다.
@@ -760,24 +774,31 @@ function App() {
   // 으로 바꿔버렸는데, 그러면 실제 계정은 core-api에 여전히 PENDING으로 남아 그 계정으로 실제
   // 로그인을 시도하면 "관리자 승인 대기 중인 계정입니다"로 계속 막히면서도, 관리자 화면에는
   // 이미 승인된 것처럼 보이는 불일치가 생겼습니다.
-  const updateUserStatus = async (email, status) => {
+  // 관리자 화면은 서버 목록(GET /api/users)을 그리므로, 거기서 고른 계정이 이 브라우저의
+  // 로컬 배열에는 없을 수 있습니다. 그래서 호출부가 서버 행의 backendId를 함께 넘깁니다.
+  // 예전엔 로컬에서만 찾아서, 로컬에 없는 계정은 "대상 계정을 찾을 수 없습니다"로 막히고
+  // 로컬에 있어도 backendId가 없으면 서버 호출을 건너뛴 채 화면만 바뀌었습니다.
+  const updateUserStatus = async (email, status, backendIdFromRow) => {
     const target = users.find((user) => user.email === email);
-    if (!target) return { ok: false, message: '대상 계정을 찾을 수 없습니다.' };
+    const backendId = backendIdFromRow || target?.backendId;
+    if (!target && !backendId) return { ok: false, message: '대상 계정을 찾을 수 없습니다.' };
 
-    if (target.backendId) {
+    if (backendId) {
       try {
-        if (status === '승인') await approveCoreUser(target.backendId, authToken);
-        if (status === '거절') await rejectCoreUser(target.backendId, authToken);
+        if (status === '승인') await approveCoreUser(backendId, authToken);
+        if (status === '거절') await rejectCoreUser(backendId, authToken);
       } catch (error) {
         return {
           ok: false,
-          message: `계정 ${status} 처리에 실패했습니다: ${error.message || '서버 오류'}`
-            + (authToken ? '' : ' (테스트용 빠른 로그인은 실제 인증 토큰을 발급하지 않아 관리자 전용 API를 호출할 수 없습니다. 실제 관리자 계정으로 로그인해주세요.)'),
+          message: `계정 ${status} 처리에 실패했습니다: ${error.message || '서버 오류'}`,
         };
       }
     }
 
-    persistUsers(users.map((user) => user.email === email ? { ...user, status } : user));
+    // 로컬에도 같은 계정이 있으면 함께 맞춰둡니다(다른 화면들이 이 목록을 씁니다).
+    if (target) {
+      persistUsers(users.map((user) => user.email === email ? { ...user, status } : user));
+    }
     appendAuditLog({ actor: currentUser?.email || '관리자', action: `계정 ${status}`, target: email });
     return { ok: true };
   };

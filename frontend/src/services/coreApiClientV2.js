@@ -1,3 +1,5 @@
+import { readTextStorage, storageKeys } from './storage.js';
+
 const CORE_API_BASE_URL = import.meta.env.VITE_CORE_API_BASE_URL || '/core-api';
 
 const CORE_API_ERROR_CODE = {
@@ -77,15 +79,29 @@ function classifyCoreError(message, status) {
   };
 }
 
+// 로그인할 때 받아둔 JWT를 꺼내옵니다(App.jsx persistAuthToken이 저장).
+// 로그인 전이거나 로그아웃 상태면 빈 값이라 헤더를 붙이지 않습니다.
+export function coreAuthHeader() {
+  const token = readTextStorage(storageKeys.authToken, '');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function requestCoreJson(path, options = {}) {
   const { headers, ...restOptions } = options;
   let response;
   try {
+    // 토큰을 여기 한 곳에서 붙입니다.
+    //
+    // 예전에는 승인·반려처럼 SecurityConfig가 이미 막아둔 9개 함수만 각자 authHeader(token)을
+    // 넘겼고, 상담 생성·조회·분석·첨부·서식은 토큰 없이 나갔습니다. 그래서 core-api를
+    // .authenticated()로 좁히면 앱이 통째로 401이 되는 상태였습니다.
+    // 모든 요청이 이 함수를 거치므로, 함수 40여 개를 각각 고치지 않고 여기서 한 번에 붙입니다.
+    // 개별 함수가 headers로 넘긴 값이 있으면 그쪽을 우선합니다(기존 호출부 동작 유지).
     response = await fetch(`${CORE_API_BASE_URL}${path}`, {
       ...restOptions,
       headers: restOptions.body instanceof FormData
-        ? headers
-        : { 'Content-Type': 'application/json', ...(headers || {}) },
+        ? { ...coreAuthHeader(), ...(headers || {}) }
+        : { 'Content-Type': 'application/json', ...coreAuthHeader(), ...(headers || {}) },
     });
   } catch {
     throw buildCoreApiError(

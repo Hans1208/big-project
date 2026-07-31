@@ -88,9 +88,33 @@ public class AiAnalysisService {
         // checklist_status_json은 분석 직후엔 채우지 않는다. 프론트가 checklist_json(4개 평가블록
         // 객체)에서 5개 체크박스 상태를 파생시켜 보여주고(mapCoreChecklist), 상담원이 "분석 내용
         // 저장"을 누를 때 그 시점의 체크 상태를 이 컬럼에 담아 보낸다.
-        AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, caseSubtype, urgencyLevel, eligible,
-                caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
-                null, null, timelineJson, null, null, aiResponse.rawInput().toString());
+        //
+        // 같은 상담을 다시 분석하면 예전에는 매번 새 행을 만들었다. 상담 하나에 분석이 4~6건씩
+        // 쌓였고, 그 전부가 관리자 대시보드 처리율의 분모로 들어가 재분석을 할수록 지표가
+        // 나빠졌다(상담 17건에 분석 19건, 그중 14건이 재분석으로 생긴 중복이었다).
+        //
+        // 아직 검토에 넘어가지 않은 초안(DRAFTED)만 덮어쓴다. 이미 검토 요청·승인·반려까지 간
+        // 분석은 변호사의 판단이 붙어 있으므로 건드리지 않고 새 행을 만든다 — 덮어쓰면 승인 이력과
+        // 검토 의견(reviewNote, reviewer)이 조용히 사라진다.
+        AiAnalysis analysis = aiAnalysisRepository.findFirstByConsultationIdOrderByIdDesc(consultationId)
+                .filter(existing -> existing.getStatus() == AnalysisReviewStatus.DRAFTED)
+                .orElseGet(() -> new AiAnalysis(consultation, summary, caseType, caseSubtype, urgencyLevel, eligible,
+                        caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
+                        null, null, timelineJson, null, null, aiResponse.rawInput().toString()));
+
+        // 재사용하는 경우엔 새 분석 결과로 내용을 갱신한다(새로 만든 경우엔 생성자가 이미 채웠다).
+        // checklistStatusJson은 여기서 건드리지 않는다 — ai-api가 주는 값이 아니라 상담원이
+        // 체크한 상태라, 재분석했다고 사람이 해둔 표시를 지우면 안 된다.
+        analysis.setSummary(summary);
+        analysis.setCaseType(caseType);
+        analysis.setCaseSubtype(caseSubtype);
+        analysis.setUrgencyLevel(urgencyLevel);
+        analysis.setEligibility(eligible);
+        analysis.setExtractedJson(caseAnalysis.toString());
+        analysis.setMissingInfoJson(aiResponse.missingItems().toString());
+        analysis.setChecklistJson(checklist.toString());
+        analysis.setTimelineJson(timelineJson);
+        analysis.setRawInputJson(aiResponse.rawInput().toString());
 
         AiAnalysis saved = aiAnalysisRepository.save(analysis);
         consultation.setStatus(ConsultationStatus.COMPLETED);

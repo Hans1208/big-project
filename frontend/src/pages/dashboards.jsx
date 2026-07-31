@@ -7,7 +7,7 @@ import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatu
 import { appendAuditLog, getAuditLogs } from '../services/storage.js';
 import { checkTemplateRevision, simulateBackendLatency } from '../services/legalAidApi.js';
 import { checkAiApiHealth } from '../services/aiApiClient.js';
-import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, requestCoreAnalysisRevision, verifyCoreAuditLogChain, timelineEmptyMessage } from '../services/coreApiClientV2.js';
+import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, fetchCoreUsers, mapCoreUserToLocal, requestCoreAnalysisRevision, verifyCoreAuditLogChain, timelineEmptyMessage } from '../services/coreApiClientV2.js';
 import { readSubmittedLocalDocumentReviews, updateLocalDocumentReview, removeLocalDocumentReview, dismissDocumentReview, isDocumentReviewDismissed, saveLawyerDraftEdit, readLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { hydrateDraftDocument } from '../services/draftDocumentStore.js';
 import { caseCategories, getCaseCategory } from '../data/domain.js';
@@ -170,6 +170,8 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
   const [filter, setFilter] = useState(statusAll);
   const [logs, setLogs] = useState([]);
   const [activeReview, setActiveReview] = useState(null);
+  // 검토 결정이 서버에 반영되지 않았을 때 알리는 데 씁니다(decideReview 참고).
+  const showToast = useToast();
   const filtered = filter === statusAll ? reviews : reviews.filter((item) => item.status === filter);
 
   // 변호사가 볼 수 있는 사건 후보 전체(coreId 있는 것만). '변호사 검토 요청'(분석 검토, reviews)을
@@ -221,7 +223,13 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
           await requestCoreAnalysisRevision(target.coreId, target.coreAnalysisId, reason || '', currentUser?.token);
         }
       } catch (error) {
-        console.warn('[법률구조 검토 결정] core-api 동기화 실패, 로컬 처리만 반영합니다:', error.message);
+        // 예전에는 console.warn만 찍고 그대로 진행해서, 서버가 거절해도 화면은 '승인'으로 바뀌었습니다.
+        // 실제로 그런 일이 있었습니다 — 재분석으로 새 초안(DRAFTED)이 생기면 coreAnalysisId가 그쪽을
+        // 가리키는데, 검토 요청은 이전 행(SUBMITTED_FOR_REVIEW)에 붙어 있어서 승인이 409로 막혔습니다.
+        // 그런데도 관리자 화면에는 승인 1건으로 보이고 서버 통계는 0건이라 숫자가 어긋났습니다.
+        // 서버가 받지 못한 결정은 화면에도 반영하지 않습니다.
+        showToast(`검토 결정이 서버에 반영되지 않았습니다. 다시 시도해주세요. (${error.message})`, 'warn');
+        return { ok: false, message: error.message };
       }
     }
     setReviews((items) => items.map((item) => item.id === id ? { ...item, status, reason: reason || '', lawyer: reviewerInfo, recipientEmail: recipient } : item));
@@ -1165,18 +1173,47 @@ const roleLabels = { counselor: '상담원', lawyer: '변호사', admin: '관리
 function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification }) {
   const [activeAdminView, setActiveAdminView] = useState('consultations');
   const showToast = useToast();
-  // 관리자 자신을 포함해 전체 회원가입 신청자를 대상으로 승인 현황을 관리합니다.
+  // 관리자 화면의 사용자 목록은 서버(GET /api/users)를 기준으로 봅니다.
+  //
+  // 예전에는 이 화면도 localStorage의 users를 그렸습니다. 그런데 위 KPI 카드는
+  // /api/admin/stats(서버 DB 집계)를 쓰고 있어서, 카드의 "활성 사용자 11명"과 아래 표의
+  // 행 수가 서로 안 맞았습니다. 브라우저마다 로컬 목록이 달라 사람마다 다른 숫자를 봤습니다.
+  // 관리자 화면은 원래 "서버에 실제로 뭐가 있는지" 보는 자리이므로 출처를 서버로 통일합니다.
+  // (localStorage users는 다른 화면들이 계속 쓰므로 그대로 둡니다.)
+  const [serverUsers, setServerUsers] = useState(null);
+  const [userListRefreshKey, setUserListRefreshKey] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCoreUsers()
+      .then((rows) => {
+        if (cancelled || !Array.isArray(rows)) return;
+        setServerUsers(rows.map(mapCoreUserToLocal));
+      })
+      .catch(() => { if (!cancelled) setServerUsers(null); });
+    return () => { cancelled = true; };
+  }, [currentUser?.email, userListRefreshKey]);
+
+  // 서버를 못 읽으면(연결 실패 등) 예전처럼 로컬 목록으로 그립니다 — 화면이 비어 깨지지 않도록.
+  const userRows = serverUsers || users;
   const userFilter = activeAdminView === 'pendingUsers' ? '대기' : activeAdminView === 'activeUsers' ? '승인' : statusAll;
-  const filteredUsers = userFilter === statusAll ? users : users.filter((item) => item.status === userFilter);
+  const filteredUsers = userFilter === statusAll ? userRows : userRows.filter((item) => item.status === userFilter);
   // onUpdateUserStatus는 core-api 승인/거절 호출이 실패하면 성공한 것처럼 화면을 바꾸지 않고
   // { ok: false, message } 를 돌려줍니다. 실패 이유(대개는 "테스트용 빠른 로그인"이라 관리자
   // 토큰이 없어서 403)를 토스트로 보여줘야, 화면에서는 승인됐는데 실제 로그인은 계속 막히는
   // 상황(화면과 DB가 어긋난 상태)을 admin이 바로 알아챌 수 있습니다.
-  const handleUpdateUserStatus = async (email, status) => {
-    const result = await onUpdateUserStatus(email, status);
+  const handleUpdateUserStatus = async (row, status) => {
+    // 서버 행의 backendId를 함께 넘겨야 App이 로컬 배열에 없는 계정도 승인/거절할 수 있습니다.
+    const result = await onUpdateUserStatus(row?.email, status, row?.backendId);
     if (result?.ok === false) {
       showToast(result.message || `계정 ${status} 처리에 실패했습니다.`, 'warn');
+      return;
     }
+    // 성공도 알립니다. 예전에는 실패할 때만 알려줘서, 승인이 됐는지 버튼이 안 눌린 건지
+    // 알 수 없었습니다(목록에서 사라지는 것 말고는 신호가 없음).
+    showToast(`${row?.name || row?.email || '계정'} · ${status} 처리했습니다.`, 'success');
+    // 승인/거절이 서버에 반영됐으니 목록과 카드를 다시 읽어옵니다.
+    // (로컬 배열만 고치면 서버 기준으로 그리는 이 화면에는 반영되지 않습니다)
+    setUserListRefreshKey((key) => key + 1);
   };
 
   // GET /api/admin/stats(신규): 요약 카드 4개를 로컬 배열(users/consultations/reviews)로 어림잡아 계산하는
@@ -1193,14 +1230,17 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
       .then((stats) => { if (!cancelled) { setAdminStats(stats); setAdminStatsFailed(false); } })
       .catch(() => { if (!cancelled) { setAdminStats(null); setAdminStatsFailed(true); } });
     return () => { cancelled = true; };
-  }, [currentUser?.token]);
+    // 승인/거절 직후에도 다시 읽어 카드와 아래 표가 같은 시점을 보게 합니다.
+  }, [currentUser?.token, userListRefreshKey]);
 
   const localAnalysisRate = reviews.length ? Math.round((reviews.filter((item) => item.status === '승인').length / reviews.length) * 100) : 0;
-  const pendingApprovals = adminStats ? adminStats.pending_user_approvals : users.filter((item) => item.status === '대기').length;
+  // 폴백도 아래 표와 같은 목록(userRows)을 셉니다. users를 세면 서버 통계가 실패했을 때
+  // 카드와 표가 또 어긋납니다.
+  const pendingApprovals = adminStats ? adminStats.pending_user_approvals : userRows.filter((item) => item.status === '대기').length;
   // KPI 타일에는 단위 없이 숫자만 둡니다(시안 기준). 무엇을 센 값인지는 아래 라벨이 말해 줍니다.
   const cards = [
     { title: '전체 상담 건수', value: `${adminStats ? adminStats.total_consultations : consultations.length}`, filter: 'consultations' },
-    { title: '활성 사용자', value: `${adminStats ? adminStats.active_users : users.filter((item) => item.status === '승인').length}`, filter: 'activeUsers' },
+    { title: '활성 사용자', value: `${adminStats ? adminStats.active_users : userRows.filter((item) => item.status === '승인').length}`, filter: 'activeUsers' },
     { title: '분석 처리율', value: `${adminStats ? Math.round(adminStats.analysis_processing_rate * 100) : localAnalysisRate}%`, filter: 'analysis' },
     { title: '직원 승인 대기', value: `${pendingApprovals}`, filter: 'pendingUsers' },
   ];
@@ -1216,7 +1256,15 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
       <div className="dashboardIntroWrap">
         <div className="dashboardIntro">
           <h1>운영 현황</h1>
-          <p>가입 승인 대기 {pendingApprovals}건 · 실시간 집계 반영 중</p>
+          <p>
+            가입 승인 대기 {pendingApprovals}건 · 실시간 집계 반영 중
+            {adminStats?.analysis_status_breakdown ? (() => {
+              const { approved = 0, rejected = 0, pending = 0 } = adminStats.analysis_status_breakdown;
+              const total = approved + rejected + pending;
+              // 카드에 숫자만 있으면 "상담 17건인데 왜 25%?"가 됩니다. 분자·분모를 옆에 적어둡니다.
+              return total ? ` · 분석 처리 ${approved + rejected}/${total}건` : '';
+            })() : ''}
+          </p>
         </div>
       </div>
       <main className="dashboard dashboard-admin">
@@ -1240,11 +1288,11 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
       ) : null}
       {activeAdminView === 'analysis' ? (
         <div className="adminSplit">
-          <AnalysisStatsPanel reviews={reviews} />
+          <AnalysisStatsPanel reviews={reviews} statusBreakdown={adminStats?.analysis_status_breakdown} />
           <DonutChartMock reviews={reviews} />
         </div>
       ) : null}
-      {activeAdminView === 'activeUsers' ? <ActiveUsersPanel users={users} /> : null}
+      {activeAdminView === 'activeUsers' ? <ActiveUsersPanel users={userRows} /> : null}
       {activeAdminView === 'pendingUsers' ? <AccountTable rows={filteredUsers} onUpdate={handleUpdateUserStatus} title="회원가입 승인 대기" /> : null}
       </main>
     </>
@@ -1309,7 +1357,9 @@ function AccountTable({ rows, onUpdate, title = '회원가입 승인 관리', co
               <tr key={row.email}>
                 <td>{row.name}</td><td>{roleLabels[row.role] || row.role}</td>{compact ? null : <td>{row.organization}</td>}<td>{row.email}</td>{compact ? null : <td>{row.requestedAt}</td>}
                 {/* 관리자만 상담원/변호사 계정을 승인·거절할 수 있고, 승인 전에는 로그인이 막힙니다. */}
-                <td><div className="statusActions"><StatusButton active={row.status === '승인'} onClick={() => onUpdate(row.email, '승인')}>승인</StatusButton><StatusButton active={row.status === '거절'} onClick={() => onUpdate(row.email, '거절')}>거절</StatusButton></div></td>
+                {/* 행 전체를 넘깁니다. 이 표는 서버 목록(GET /api/users)을 그리므로, 이메일만 넘기면
+                    App이 로컬 배열에서 다시 찾아야 하는데 거기 없는 계정이면 승인이 조용히 실패합니다. */}
+                <td><div className="statusActions"><StatusButton active={row.status === '승인'} onClick={() => onUpdate(row, '승인')}>승인</StatusButton><StatusButton active={row.status === '거절'} onClick={() => onUpdate(row, '거절')}>거절</StatusButton></div></td>
               </tr>
             ))}
             {scrollable ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - rows.length)} columns={compact ? 4 : 6} isEmpty={rows.length === 0} emptyLabel="승인 대기 계정 없음" />}
@@ -1460,11 +1510,33 @@ function ConsultationStatsPanel({ consultations }) {
   );
 }
 
-function AnalysisStatsPanel({ reviews }) {
+// 위 KPI 카드의 "분석 처리율"과 아래 표는 세는 대상이 다릅니다.
+//   카드 = 분석이 있는 상담 전체 (검토 요청 전 초안 포함)
+//   표   = 변호사에게 검토 요청이 나간 건만
+// 그래서 "표에는 1줄인데 왜 25%지?"가 됩니다. 산식을 그대로 적어 오해를 없앱니다.
+function AnalysisProcessingBasis({ breakdown }) {
+  if (!breakdown) return null;
+  const { approved = 0, rejected = 0, pending = 0 } = breakdown;
+  const total = approved + rejected + pending;
+  if (!total) return null;
+  const done = approved + rejected;
+  return (
+    <p className="panelCaption">
+      분석 처리율 {Math.round((done / total) * 100)}% = 검토가 끝난 {done}건 ÷ 분석이 있는 상담 {total}건
+      <span className="panelCaptionSub">
+        승인 {approved} · 반려 {rejected} · 검토 전 {pending}
+        {' · '}분석을 아직 안 돌린 상담은 세지 않습니다. 아래 표는 그중 검토 요청이 나간 건만 보여줍니다.
+      </span>
+    </p>
+  );
+}
+
+function AnalysisStatsPanel({ reviews, statusBreakdown }) {
   const scrollable = reviews.length > VISIBLE_ROW_COUNT;
   return (
     <section className="panel">
       <div className="panelTitleRow"><h2>분석 처리 상세</h2></div>
+      <AnalysisProcessingBasis breakdown={statusBreakdown} />
       <div className={scrollable ? 'tableScroll' : ''}>
         <table className="dataTable">
           <thead><tr><th>사건 번호</th><th>사건 제목</th><th>상태</th><th>요청일</th></tr></thead>
