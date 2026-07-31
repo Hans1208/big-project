@@ -2241,11 +2241,40 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   </div>
                 ) : null}
               </div>
+              
+              
+              {analysis.reliefReviewDetail ? (
+                <>
+                  <h3>체크리스트 AI 분석 상세</h3>
+                  <div className="resultCard">
+                    <ReliefReviewDetailTabs detail={analysis.reliefReviewDetail} />
+                  </div>
+                </>
+              ) : null}
               <h3>체크리스트</h3>
               <div className="resultCard checklistBox">
-                {(analysis.checklist || []).map((item, index) => (
-                  <label key={item.label}><input type="checkbox" checked={item.checked} onChange={() => updateChecklist(index)} />{item.label}</label>
-                ))}
+                {(analysis.checklist || []).map((item, index) => {
+                  const note = checklistItemNote(item, analysis.reliefReviewDetail);
+                  const flag = checklistItemFlag(item, analysis.reliefReviewDetail);
+                  return (
+                    <div className="checklistItem" key={item.label}>
+                      <label>
+                        <input type="checkbox" checked={item.checked} onChange={() => updateChecklist(index)} />
+                        {item.label}
+                      </label>
+                      {note ? <p className="checklistItemNote">{note}</p> : null}
+                      {flag ? <span className={`statusChip ${flag.tone}`}>{flag.text}</span> : null}
+                    </div>
+                  );
+                })}
+              </div>
+              <h3>체크리스트 AI 분석 결과</h3>
+              <div className="resultCard">
+                {analysis.reliefReviewDetail ? (
+                  <ReliefLawyerSummaryCard detail={analysis.reliefReviewDetail} />
+                ) : (
+                  <InlineEmptyNotice>AI 분석 결과 없음 · 분석을 다시 실행하세요</InlineEmptyNotice>
+                )}
               </div>
             </div>
             <div className="analysisActionRail">
@@ -2288,6 +2317,15 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     );
                   })}
                 </div>
+              </section>
+              <section className="railSection">
+                <h3>검토 반영 항목</h3>
+                <div className="scrollBox small chosenBox">{chosen.length ? chosen.map((item) => (
+                  <button type="button" key={item} onClick={() => setChosen(chosen.filter((value) => value !== item))}>
+                    <span className="chosenItemName">{item}</span>
+                    <em className="chosenItemDrop">제외</em>
+                  </button>
+                )) : <p>채택 항목 없음</p>}</div>
               </section>
               <section className="railSection">
                 <h3>사실관계 타임라인</h3>
@@ -3346,6 +3384,224 @@ function ReliefReviewSummary({ review }) {
   );
 }
 
+// checklist_summary_for_lawyer는 "[구조대상자 여부] 대상 (...)\n[승소가능성] ...\n※ 위 내용은..."
+// 형태의 한 덩어리 문자열입니다. 항목별 대괄호 태그가 그대로 화면에 보이면 읽기 어려우므로,
+// 줄 단위로 "[라벨] 내용" 패턴을 잘라 label/value 목록으로 만들고, 맨 끝 "※..." 안내문은 따로
+// 분리해 각주로 둡니다. 값이 빈 항목(해당 신호에 review_note가 없던 경우)은 목록에서 뺍니다.
+function parseLawyerSummary(rawText = '') {
+  const footnoteIndex = rawText.indexOf('※');
+  const bodyText = footnoteIndex >= 0 ? rawText.slice(0, footnoteIndex) : rawText;
+  const footnote = footnoteIndex >= 0 ? rawText.slice(footnoteIndex).trim() : '';
+  const items = bodyText
+    .split('\n')
+    .map((line) => {
+      const match = line.match(/^\[([^\]]+)\]\s*(.*)$/);
+      if (!match) return null;
+      const value = match[2].trim();
+      return value ? { label: match[1].trim(), value } : null;
+    })
+    .filter(Boolean);
+  return { items, footnote };
+}
+
+// requires_lawyer_review + checklist_summary_for_lawyer 전용 카드입니다. ReliefReviewDetailTabs(4탭)의
+// 근거 상세와는 성격이 달라 별도 카드로 분리합니다 — 이쪽은 변호사에게 바로 넘길 수 있는 한 줄 요약이고,
+// 탭 쪽은 상담원이 각 신호의 근거를 하나씩 파고들 때 보는 상세 화면입니다.
+function ReliefLawyerSummaryCard({ detail }) {
+  if (!detail) return null;
+  const { items, footnote } = parseLawyerSummary(detail.lawyerSummary || '');
+  if (!detail.requiresLawyerReview && !items.length && !footnote) return null;
+  return (
+    <>
+      {detail.requiresLawyerReview ? (
+        <div className="hitlBanner">
+          <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
+          <span><strong>변호사 최종 검토 필요</strong></span>
+        </div>
+      ) : null}
+      {items.length ? (
+        <dl className="reliefLawyerSummaryList">
+          {items.map((item) => (
+            <div key={item.label}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {footnote ? <p className="reliefLawyerSummary">{footnote}</p> : null}
+    </>
+  );
+}
+
+// 체크박스 5항목(법률구조 대상 여부/증빙/승소가능성/집행가능성/구조타당성) 옆에 AI 근거를 한 줄
+// 덧붙입니다. 체크 여부(checked)는 절대 건드리지 않습니다 — 상담원이 직접 확인하고 체크하는
+// 항목이라는 HITL 원칙은 그대로이고, 이건 표시 전용 참고 문구입니다. requestEligibilityCandidate
+// 등 기존 코드가 이미 쓰는 item.label.includes(...) 매칭 방식을 그대로 따릅니다.
+function checklistItemNote(item, detail) {
+  if (!detail) return null;
+  if (item.label.includes('대상자 증빙서류')) {
+    const evidence = detail.eligibility;
+    if (!evidence) return null;
+    const requiredEvidence = evidence.requiredEvidence.join(', ');
+    const statusText = evidence.evidenceStatus === '충족' ? '제출 확인됨'
+      : evidence.evidenceStatus === '미비' ? '미제출' : '확인불가';
+    return requiredEvidence ? `${requiredEvidence} ${statusText}` : null;
+  }
+  if (item.label.includes('대상 여부')) return detail.eligibility?.judgmentNote || null;
+  if (item.label.includes('승소 가능성')) return detail.winnability?.reviewNote || null;
+  if (item.label.includes('집행 가능성')) return detail.executability?.reviewNote || null;
+  if (item.label.includes('구조 타당성')) return detail.appropriateness?.reviewNote || null;
+  return null;
+}
+
+// 위험 신호는 노트 문장에 묻히면 놓치기 쉬워 별도 칩으로 뺍니다 — ReliefReviewDetailTabs의 탭 점
+// (categoryTabDot)과 같은 두 조건을 그대로 씁니다.
+function checklistItemFlag(item, detail) {
+  if (!detail) return null;
+  if (item.label.includes('승소 가능성') && detail.winnability?.statuteOfLimitationsFlag === '계산 불가') {
+    return { text: '소멸시효 계산 불가', tone: 'tone-warn' };
+  }
+  if (item.label.includes('구조 타당성') && (detail.appropriateness?.personalMotiveFlags || []).length) {
+    return { text: detail.appropriateness.personalMotiveFlags.join(', '), tone: 'tone-danger' };
+  }
+  return null;
+}
+
+// null을 함부로 '미충족'/'언급 없음'으로 해석하지 않기 위한 3단계 라벨. income_criterion_met 같은
+// 필드는 true/false/null(=아직 판단 불가) 셋을 구분해서 받는데, null을 false 취급하면 실제로는
+// 판단이 안 된 사건을 '탈락'으로 잘못 보여주게 됩니다.
+function criterionLabel(value) {
+  if (value === true) return '충족';
+  if (value === false) return '미충족';
+  return '판단 보류';
+}
+
+function mentionLabel(value) {
+  if (value === true) return '언급됨';
+  if (value === false) return '언급 없음';
+  return '미확인';
+}
+
+function evidenceStatusTone(status) {
+  if (status === '충족') return 'tone-success';
+  if (status === '미비') return 'tone-warn';
+  return 'tone-muted';
+}
+
+function ReliefEligibilityTab({ data }) {
+  if (!data) return <InlineEmptyNotice>표시할 정보 없음</InlineEmptyNotice>;
+  return (
+    <div className="reliefReviewBox">
+      <p className="reliefReviewHead">
+        <span className={`statusChip ${evidenceStatusTone(data.evidenceStatus)}`}>증빙 {data.evidenceStatus || '미확인'}</span>
+      </p>
+      <dl className="reliefSignalList">
+        <div><dt>소득 기준</dt><dd>{criterionLabel(data.incomeCriterionMet)}</dd></div>
+        <div><dt>신분 기준</dt><dd>{criterionLabel(data.statusCriterionMet)}</dd></div>
+        {data.matchedReasons.length ? <div><dt>해당 사유</dt><dd>{data.matchedReasons.join(' · ')}</dd></div> : null}
+        {data.requiredEvidence.length ? <div><dt>필요 증빙</dt><dd>{data.requiredEvidence.join(', ')}</dd></div> : null}
+      </dl>
+      {data.judgmentNote ? <p className="reasonText">판정 근거: {data.judgmentNote}</p> : null}
+    </div>
+  );
+}
+
+function ReliefWinnabilityTab({ data }) {
+  if (!data) return <InlineEmptyNotice>표시할 정보 없음</InlineEmptyNotice>;
+  const limitation = data.limitationStartDate
+    ? `${data.limitationStartDate}${data.limitationPeriodYears != null ? ` (${data.limitationPeriodYears}년)` : ''}`
+    : '';
+  return (
+    <div className="reliefReviewBox">
+      <p className="reliefReviewHead">
+        <span className="statusChip tone-info">신뢰도 {data.extractionConfidence || '불명확'}</span>
+        {data.statuteOfLimitationsFlag ? (
+          <span className={`statusChip ${data.statuteOfLimitationsFlag === '계산 불가' ? 'tone-warn' : 'tone-info'}`}>소멸시효 {data.statuteOfLimitationsFlag}</span>
+        ) : null}
+      </p>
+      <dl className="reliefSignalList">
+        <div><dt>청구권 존재</dt><dd>{data.claimExistenceHint || '판단 불가'}</dd></div>
+        <div><dt>입증 가능성</dt><dd>{data.factProvabilityHint || '판단 불가'}</dd></div>
+        {limitation ? <div><dt>소멸시효 기산일</dt><dd>{limitation}</dd></div> : null}
+        {data.submittedEvidenceTypes.length ? <div><dt>제출 증빙</dt><dd>{data.submittedEvidenceTypes.join(', ')}</dd></div> : null}
+      </dl>
+      {data.reviewNote ? <p className="reasonText">{data.reviewNote}</p> : null}
+    </div>
+  );
+}
+
+function ReliefExecutabilityTab({ data }) {
+  if (!data) return <InlineEmptyNotice>표시할 정보 없음</InlineEmptyNotice>;
+  return (
+    <div className="reliefReviewBox">
+      <p className="reliefReviewHead">
+        <span className="statusChip tone-info">신뢰도 {data.extractionConfidence || '불명확'}</span>
+        <span className="statusChip tone-info">{data.debtorAssetStatus || '판단 불가'}</span>
+      </p>
+      {data.reviewNote ? <p className="reasonText">{data.reviewNote}</p> : null}
+    </div>
+  );
+}
+
+function ReliefAppropriatenessTab({ data }) {
+  if (!data) return <InlineEmptyNotice>표시할 정보 없음</InlineEmptyNotice>;
+  return (
+    <div className="reliefReviewBox">
+      <p className="reliefReviewHead">
+        <span className="statusChip tone-info">신뢰도 {data.extractionConfidence || '불명확'}</span>
+        {data.personalMotiveFlags.map((flag) => <span key={flag} className="statusChip tone-danger">{flag}</span>)}
+      </p>
+      <dl className="reliefSignalList">
+        <div><dt>사건 성격</dt><dd>{data.caseNature || '판단보류'}</dd></div>
+        <div><dt>대안적 구제</dt><dd>{mentionLabel(data.alternativeReliefMentioned)}</dd></div>
+        <div><dt>소액 청구</dt><dd>{mentionLabel(data.lowValueClaimMentioned)}</dd></div>
+        {data.outOfScopeFlags.length ? <div><dt>범위 밖 사유</dt><dd>{data.outOfScopeFlags.join(', ')}</dd></div> : null}
+      </dl>
+      {data.reviewNote ? <p className="reasonText">{data.reviewNote}</p> : null}
+    </div>
+  );
+}
+
+// checklist_json(=relief_review_checklist)의 4개 신호를 탭으로 나눠 보여줍니다. eligibility만
+// Rule Engine의 결론이고 나머지 셋(winnability/executability/appropriateness)은 LLM이 뽑아낸
+// '판단 보조 신호'라 결론처럼 보이지 않게 헤더에 extractionConfidence(명시적/추정/불명확)를
+// 같이 보여줍니다(eligibility 탭은 이 필드 자체가 없어 생략). detail이 없으면(옛 저장 데이터
+// 등) 아무것도 렌더링하지 않습니다.
+function ReliefReviewDetailTabs({ detail }) {
+  const [activeTab, setActiveTab] = useState('eligibility');
+  if (!detail) return null;
+
+  const tabs = [
+    { key: 'eligibility', label: '구조대상 여부', dot: false },
+    { key: 'winnability', label: '승소가능성', dot: detail.winnability?.statuteOfLimitationsFlag === '계산 불가' },
+    { key: 'executability', label: '집행가능성', dot: false },
+    { key: 'appropriateness', label: '구조타당성', dot: (detail.appropriateness?.personalMotiveFlags || []).length > 0 },
+  ];
+
+  return (
+    <div>
+      <div className="categoryTabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            className={activeTab === tab.key ? 'categoryTab active' : 'categoryTab'}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+            {tab.dot ? <span className="categoryTabDot" aria-hidden="true" /> : null}
+          </button>
+        ))}
+      </div>
+      {activeTab === 'eligibility' ? <ReliefEligibilityTab data={detail.eligibility} /> : null}
+      {activeTab === 'winnability' ? <ReliefWinnabilityTab data={detail.winnability} /> : null}
+      {activeTab === 'executability' ? <ReliefExecutabilityTab data={detail.executability} /> : null}
+      {activeTab === 'appropriateness' ? <ReliefAppropriatenessTab data={detail.appropriateness} /> : null}
+    </div>
+  );
+}
+
 // 서식 초안 검토 상태(DocumentReviewStatus, backend/core-api)를 화면에 보여줄 라벨/톤으로 바꿉니다.
 const DOCUMENT_STATUS_LABEL = {
   DRAFTED: '초안 작성됨 (검토 요청 전)',
@@ -3553,4 +3809,4 @@ function GeneratedFileBox({ document, consultationId }) {
   );
 }
 
-export { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList };
+export { UtilityPanel, ReliefReviewSummary, ReliefReviewDetailTabs, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList };

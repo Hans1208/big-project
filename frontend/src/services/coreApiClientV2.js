@@ -299,6 +299,15 @@ export function timelineEmptyMessage(issueCode) {
   return `확인된 타임라인 자료가 없습니다_${issueCode || TIMELINE_ISSUE.OTHER}`;
 }
 
+// checklist_json은 analysis.extractedJson.aiAnalysisResponse(마지막으로 돌았던 analyze() 응답 —
+// mergeContractAnalysisResponse가 채워둠)의 checklist_json을 그대로 옮겨 매 저장마다 보낸다.
+// 예전엔 이 키를 아예 보내지 않았다 — analyze()가 AiAnalysis 행을 만들지 않고(트랜잭션 안에서
+// 결과만 돌려주고 저장은 안 함) 결과만 반환하니, "분석 내용 저장"을 처음 누르는 순간(create)이
+// relief_review_checklist 원본을 DB에 심을 유일한 시점인데 그때조차 안 보내서 checklist_json이
+// DB에 영영 null로 남았다("보존"할 기존 값 자체가 없었다). 재분석 후 재저장(update)에서도 최신
+// 값을 반영해야 하므로 create/update 모두 같은 값을 보낸다 — analysis 안 다른 필드들과 동일한
+// 원칙("지금 analysis 상태를 그대로 저장")이라 update만 특별취급할 이유가 없다. 체크박스 상태는
+// 항상 {label, checked}[] 형태만 담는 전용 컬럼인 checklist_status_json에만 싣는다.
 function toCoreAnalysisPayload(analysis = {}) {
   return {
     summary: analysis.summary || '',
@@ -308,11 +317,7 @@ function toCoreAnalysisPayload(analysis = {}) {
     eligibility: analysis.eligibility || '',
     extracted_json: buildCoreExtractedJson(analysis),
     missing_info_json: Array.isArray(analysis.missingInfo) ? analysis.missingInfo : [],
-    // checklist_json은 일부러 여기서 보내지 않는다. ai-api가 analyze() 시점에 채운
-    // relief_review_checklist 원본 구조를 그대로 보존하기 위함이다 — core-api의 update()는
-    // 요청에 없는(null) 필드는 기존 DB 값을 그대로 두는 부분수정이라, 이 키를 아예 보내지
-    // 않으면 저장을 여러 번 해도 checklist_json은 분석 시점 그대로 남는다. 체크박스 상태는
-    // 항상 {label, checked}[] 형태만 담는 전용 컬럼인 checklist_status_json에만 싣는다.
+    checklist_json: analysis.extractedJson?.aiAnalysisResponse?.checklist_json ?? null,
     checklist_status_json: (analysis.checklist || []).map(normalizeChecklistItem),
     recommendation_json: analysis.recommendation || {},
     timeline_json: (analysis.timeline || []).map(normalizeTimelineItem),
@@ -496,6 +501,55 @@ function mapCoreChecklist(rawChecklist) {
   return items;
 }
 
+// checklist_json(=relief_review_checklist)의 eligibility/winnability/executability/appropriateness
+// 4개 신호 객체를 화면 전용으로 camelCase 옮깁니다. mapCoreChecklist와 달리 항목 라벨이 아니라
+// eligible/evidence_status 등 판단값 자체를 그대로 보존합니다 — 다만 이 값으로 체크박스를 자동
+// 채우지는 않습니다(HITL 원칙, mapCoreChecklist 주석 참고). '체크리스트 AI 분석 결과' 4탭 전용.
+// rawChecklist가 배열이면(옛 checklist_status_json 저장분) 이 필드는 신규라 호환 대상이 아니므로 null.
+function mapReliefReviewDetail(rawChecklist) {
+  if (!rawChecklist || Array.isArray(rawChecklist)) return null;
+  const { eligibility, winnability, executability, appropriateness } = rawChecklist;
+  return {
+    eligibility: eligibility ? {
+      incomeCriterionMet: eligibility.income_criterion_met ?? null,
+      statusCriterionMet: Boolean(eligibility.status_criterion_met),
+      matchedReasons: eligibility.matched_reasons || [],
+      requiredEvidence: eligibility.required_evidence || [],
+      evidenceStatus: eligibility.evidence_status || '',
+      eligible: eligibility.eligible || '',
+      appliedIncomeThresholdRatio: eligibility.applied_income_threshold_ratio ?? null,
+      judgmentNote: eligibility.judgment_note || '',
+    } : null,
+    winnability: winnability ? {
+      submittedEvidenceTypes: winnability.submitted_evidence_types || [],
+      subjectiveCircumstancesSummary: winnability.subjective_circumstances_summary ?? null,
+      statuteOfLimitationsFlag: winnability.statute_of_limitations_flag ?? null,
+      limitationStartDate: winnability.limitation_start_date ?? null,
+      limitationPeriodYears: winnability.limitation_period_years ?? null,
+      claimExistenceHint: winnability.claim_existence_hint ?? null,
+      factProvabilityHint: winnability.fact_provability_hint ?? null,
+      extractionConfidence: winnability.extraction_confidence || '',
+      reviewNote: winnability.review_note || '',
+    } : null,
+    executability: executability ? {
+      debtorAssetStatus: executability.debtor_asset_status ?? null,
+      extractionConfidence: executability.extraction_confidence || '',
+      reviewNote: executability.review_note || '',
+    } : null,
+    appropriateness: appropriateness ? {
+      caseNature: appropriateness.case_nature ?? null,
+      personalMotiveFlags: appropriateness.personal_motive_flags || [],
+      alternativeReliefMentioned: appropriateness.alternative_relief_mentioned ?? null,
+      lowValueClaimMentioned: appropriateness.low_value_claim_mentioned ?? null,
+      outOfScopeFlags: appropriateness.out_of_scope_flags || [],
+      extractionConfidence: appropriateness.extraction_confidence || '',
+      reviewNote: appropriateness.review_note || '',
+    } : null,
+    requiresLawyerReview: Boolean(rawChecklist.requires_lawyer_review),
+    lawyerSummary: rawChecklist.checklist_summary_for_lawyer || '',
+  };
+}
+
 export function mapCoreAnalysisResponse(coreAnalysis = {}) {
   const extractedJson = coreAnalysis.extracted_json || {};
   const emergencyRatio = typeof extractedJson.case_emergency_ratio === 'number'
@@ -517,6 +571,7 @@ export function mapCoreAnalysisResponse(coreAnalysis = {}) {
     checklist: Array.isArray(coreAnalysis.checklist_status_json) && coreAnalysis.checklist_status_json.length
       ? coreAnalysis.checklist_status_json.map(normalizeChecklistItem)
       : mapCoreChecklist(coreAnalysis.checklist_json),
+    reliefReviewDetail: mapReliefReviewDetail(coreAnalysis.checklist_json),
     recommendation: coreAnalysis.recommendation_json || {},
     timeline: (coreAnalysis.timeline_json || []).map(normalizeIncomingTimelineItem),
     timelineIssue: classifyTimelineIssue(coreAnalysis.timeline_json),
