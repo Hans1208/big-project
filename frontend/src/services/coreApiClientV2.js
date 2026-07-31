@@ -279,7 +279,12 @@ function toCoreAnalysisPayload(analysis = {}) {
     eligibility: analysis.eligibility || '',
     extracted_json: buildCoreExtractedJson(analysis),
     missing_info_json: Array.isArray(analysis.missingInfo) ? analysis.missingInfo : [],
-    checklist_json: (analysis.checklist || []).map(normalizeChecklistItem),
+    // checklist_json은 일부러 여기서 보내지 않는다. ai-api가 analyze() 시점에 채운
+    // relief_review_checklist 원본 구조를 그대로 보존하기 위함이다 — core-api의 update()는
+    // 요청에 없는(null) 필드는 기존 DB 값을 그대로 두는 부분수정이라, 이 키를 아예 보내지
+    // 않으면 저장을 여러 번 해도 checklist_json은 분석 시점 그대로 남는다. 체크박스 상태는
+    // 항상 {label, checked}[] 형태만 담는 전용 컬럼인 checklist_status_json에만 싣는다.
+    checklist_status_json: (analysis.checklist || []).map(normalizeChecklistItem),
     recommendation_json: analysis.recommendation || {},
     timeline_json: (analysis.timeline || []).map(normalizeTimelineItem),
     cluster_result_json: analysis.clusterResult || [],
@@ -472,7 +477,12 @@ export function mapCoreAnalysisResponse(coreAnalysis = {}) {
     emergencyRatio,
     eligibility: CORE_ELIGIBILITY_LABEL[coreAnalysis.eligibility] || coreAnalysis.eligibility || '검토 필요',
     missingInfo: (coreAnalysis.missing_info_json || []).map(normalizeMissingInfoItem).filter(Boolean),
-    checklist: mapCoreChecklist(coreAnalysis.checklist_json),
+    // checklist_status_json이 있으면(=한 번이라도 저장된 분석) 그 값을 그대로 쓴다 — 이게
+    // 실제 5개 체크박스 상태의 단일 진실 공급원(SSOT)이다. 아직 저장 전(분석 직후)이라
+    // 비어 있을 때만 checklist_json(relief_review_checklist 객체)에서 파생시킨다.
+    checklist: Array.isArray(coreAnalysis.checklist_status_json) && coreAnalysis.checklist_status_json.length
+      ? coreAnalysis.checklist_status_json.map(normalizeChecklistItem)
+      : mapCoreChecklist(coreAnalysis.checklist_json),
     recommendation: coreAnalysis.recommendation_json || {},
     timeline: (coreAnalysis.timeline_json || []).map(normalizeIncomingTimelineItem),
     timelineIssue: classifyTimelineIssue(coreAnalysis.timeline_json),

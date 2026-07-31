@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, ClipboardList, ChevronDown, ChevronRight, FileText, Info, Search, Check, FileAudio2, Mic, PhoneCall, Radio } from 'lucide-react';
 import { today } from '../constants.jsx';
 import { formatDateTimeLabel } from '../utils/date.js';
@@ -1577,9 +1577,25 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   const [showMaskedStt, setShowMaskedStt] = useState(true);
   const [pendingHitlAction, setPendingHitlAction] = useState(null);
   const activeReviewAction = selectedCase?.reviewAction && !selectedCase.reviewAction.resolved ? selectedCase.reviewAction : null;
+  // focusedConsultationId(대시보드/알림에서 특정 사건으로 바로 진입)로 들어왔을 때 한 번만
+  // selectedId/analysis를 맞춰준다. consultations를 deps에 그대로 두면(사건이 아직 안
+  // 실려 있을 때 재시도하려고 필요) startAnalysis()의 onUpdateConsultation(coreAnalysisId
+  // 패치)만으로도 consultations 참조가 바뀌어 이 effect가 다시 돌아, 방금 setAnalysis로
+  // 반영한 새 분석 결과를 focusedCase.analysis(패치에 없는, 저장 전이라 갱신 안 된 값)로
+  // 덮어써버리는 문제가 있었다. appliedFocusIdRef로 같은 focusedConsultationId에 대해서는
+  // 한 번만 적용되게 막는다.
+  const appliedFocusIdRef = useRef(null);
   useEffect(() => {
-    if (!focusedConsultationId) return;
+    if (!focusedConsultationId) {
+      // 포커스가 풀리면(다른 화면으로 이동) 다음에 같은 사건으로 다시 들어와도
+      // 새로 동기화되도록 기록을 지운다.
+      appliedFocusIdRef.current = null;
+      return;
+    }
+    if (appliedFocusIdRef.current === focusedConsultationId) return;
     const focusedCase = consultations.find((item) => String(item.id) === String(focusedConsultationId));
+    if (!focusedCase) return;
+    appliedFocusIdRef.current = focusedConsultationId;
     setSelectedId(focusedConsultationId);
     setAnalyzed(Boolean(focusedCase?.analysis));
     setAnalysis(focusedCase?.analysis || null);
