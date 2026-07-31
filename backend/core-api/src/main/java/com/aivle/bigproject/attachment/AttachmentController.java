@@ -2,6 +2,7 @@ package com.aivle.bigproject.attachment;
 
 import com.aivle.bigproject.attachment.dto.AttachmentPresignedUploadRequest;
 import com.aivle.bigproject.attachment.dto.AttachmentPresignedUploadResponse;
+import com.aivle.bigproject.attachment.dto.AttachmentRegistrationRequest;
 import com.aivle.bigproject.attachment.dto.AttachmentResponse;
 import com.aivle.bigproject.storage.S3FileStorageService;
 import java.time.Duration;
@@ -39,6 +40,26 @@ public class AttachmentController {
         return new AttachmentPresignedUploadResponse(presigned.uploadUrl(), presigned.key(), presigned.publicUrl());
     }
 
+    // DELETE /api/attachments/unregistered?fileKey=... — 아직 어떤 상담에도 등록되지 않은(=Attachment DB
+    // row가 없는) S3 오브젝트를 지운다. "새 상담 만들기" 화면에서 파일을 올렸다가(S3까지 감) 상담을
+    // 만들기 전에 "삭제"를 누른 경우처럼, DELETE /attachments/{consultationId}/{attachmentId}로는 지울 수
+    // 없는(consultationId·attachmentId가 아직 없는) 파일을 지우는 유일한 경로.
+    @DeleteMapping("/api/attachments/unregistered")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUnregistered(@RequestParam String fileKey) {
+        attachmentService.deleteUnregistered(fileKey);
+    }
+
+    // POST /api/consultations/{consultationId}/attachments/register — 이미 presigned URL로 S3에 올라간
+    // 파일의 메타데이터를 "기존" 상담에 등록 (multipart 재업로드 없이 DB에만 기록).
+    // frontend/src/pages/workflows.jsx의 "기존 상담에 자료 추가 → 자료 저장"이 이 엔드포인트를 부른다.
+    @PostMapping("/api/consultations/{consultationId}/attachments/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AttachmentResponse register(@PathVariable Long consultationId,
+                                        @RequestBody AttachmentRegistrationRequest request) {
+        return AttachmentResponse.from(attachmentService.register(consultationId, request));
+    }
+
     // POST /api/consultations/{consultationId}/attachments — 파일 업로드
     // JSON이 아니라 multipart/form-data로 받음 (file: 실제 파일, fileType: 문자열)
     @PostMapping("/api/consultations/{consultationId}/attachments")
@@ -57,7 +78,7 @@ public class AttachmentController {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 // 브라우저가 파일을 열지 않고 "다운로드"하도록 지시하는 헤더, 원본 파일명도 같이 전달
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + attachment.getFileName() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + headerSafeFileName(attachment) + "\"")
                 .body(resource);
     }
 
@@ -66,5 +87,16 @@ public class AttachmentController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long consultationId, @PathVariable Long attachmentId) {
         attachmentService.delete(consultationId, attachmentId);
+    }
+
+    // 파일명은 사용자가 올린 값이라 그대로 응답 헤더에 넣으면 안 된다.
+    // CR/LF가 섞여 있으면 헤더가 거기서 끊기고 그 뒤가 새 응답으로 해석돼(HTTP 응답분할),
+    // 공격자가 원하는 헤더나 본문을 붙일 수 있다. 큰따옴표는 filename="..."을 중간에 닫아버린다.
+    // 업로드 시점에도 같은 문자를 거르지만(AttachmentService), 그 전에 저장된 이름이 DB에 남아 있어
+    // 내보내는 쪽에서도 한 번 더 막는다.
+    private static String headerSafeFileName(Attachment attachment) {
+        String fileName = attachment.getFileName();
+        if (fileName == null || fileName.isBlank()) return "attachment";
+        return fileName.replaceAll("[\\r\\n\"]", "_");
     }
 }

@@ -86,35 +86,31 @@ src/
 | 브라우저 HWPX 대체 생성         | `src/services/clientHwpxGenerator.js`             | 백엔드 실패 시 대체 생성                                                   |
 | 서식 검토 요청 로컬 복원        | `documentReviewStore.js`, `draftDocumentStore.js` | core-api 누락/실패 시 화면 유지 보조                                       |
 
-## 이번 백엔드 작업 내용
+## 백엔드 같이 띄우기
 
-이번 PR에는 서식 초안 다운로드를 위해 `backend/core-api`의 문서 파트도 함께 포함되어 있습니다.
+프론트만 띄워도 로그인 화면과 정적 화면은 보이지만, 상담 목록·AI 분석·서식 생성처럼 실제 데이터가 오가는 화면을 제대로 확인하려면 백엔드 두 개(`core-api`, `ai-api`)가 함께 떠 있어야 합니다. `vite.config.js`의 프록시 설정이 아래 포트를 그대로 기대합니다.
 
-```text
-backend/core-api/src/main/java/com/aivle/bigproject/document/GeneratedDocumentController.java
-backend/core-api/src/main/java/com/aivle/bigproject/document/GeneratedDocumentService.java
-```
+| 백엔드    | 기본 포트 | 역할                              |
+| --------- | --------- | --------------------------------- |
+| core-api  | 8080      | 인증, 상담 CRUD, DB                |
+| ai-api    | 8001      | AI 분석 파이프라인, HWPX 서식 생성 |
 
-- `GET /api/consultations/{consultationId}/documents/{documentId}/download` 엔드포인트 추가
-- `GeneratedDocumentService.loadDraftFile(...)` 추가
-- DB에 저장된 `draftFilePath`의 실제 파일을 `FileSystemResource`로 스트리밍
-- 파일이 없거나 경로가 비어 있으면 404 반환
-- `Content-Disposition: attachment` 헤더로 브라우저 다운로드 처리
-- `backend/ai-api/.env`는 열람하지 않았고 수정하지 않았습니다.
+각 백엔드를 처음 세팅/실행하는 방법은 저장소 루트의 [`README.md`](../README.md)를 참고하세요. 백엔드가 꺼져 있어도 프론트는 `localStorage`에 남아있던 데이터로 화면은 그대로 동작하도록 만들어져 있습니다(`services/storage.js`, `services/documentReviewStore.js`).
 
-## UI/UX 변경 요약
+## 작업 시작 전 체크리스트
 
-- 전체 디자인을 `DESIGN.md` 기준의 밝은 공공서비스 스타일로 재정리
-- 상담원, 변호사, 관리자 대시보드 최대 폭 확장 및 좌우 폭 균형 조정
-- 표 안의 버튼, 상태 칩, 검색 입력 높이와 글자 크기 통일
-- 글자가 세로로 쪼개지거나 잘리지 않도록 표 컬럼과 줄바꿈 규칙 보정
-- 변호사 메뉴에서 `서식 검토`를 제거하고 `검토`로 통합
-- 변호사는 서식 생성 UI 없이 제출된 서식 검토만 가능하도록 역할 분리
-- 실시간 분석 AI 화면에서 상담받은 사람 입력 필요성을 강조
-- 달력 버튼은 원형이 아닌 사각형 UI로 정리
-
-## 작업 시 주의사항
-
-- 프론트 작업은 `frontend` 폴더 안에서 진행합니다.
-- `backend/ai-api/.env`는 API 키가 있으므로 열람하지 않습니다.
-- PR 대상 저장소: `seungjin-Oh1/big-project`
+1. `frontend` 폴더 안에서만 코드를 수정합니다. (`backend/`, 루트 설정 파일은 별도 작업이 아니면 건드리지 않습니다.)
+2. `backend/ai-api/.env`는 API 키가 들어 있으므로 절대 열람하지 않습니다.
+3. `master`에서 새 브랜치를 따서 작업합니다. (`master`에 직접 커밋하지 않습니다.)
+   ```bash
+   git checkout master
+   git pull
+   git checkout -b feature/브랜치-이름
+   ```
+   브랜치 이름은 새 기능은 `feature/`, 버그 수정은 `fix/` 접두사를 씁니다.
+4. 작업 후 확인:
+   ```bash
+   npm run lint
+   npm run build
+   ```
+5. PR 대상 저장소: [`seungjin-Oh1/big-project`](https://github.com/seungjin-Oh1/big-project) (base: `master`)

@@ -5,6 +5,7 @@ import { Header, Footer, DashboardHeader } from './components/layout.jsx';
 import { initialConsultations, initialReviews, today } from './constants.jsx';
 import { LoginPage, RegisterPage, PasswordFindPage } from './pages/auth.jsx';
 import { CounselorDashboard, LawyerDashboard, AdminDashboard } from './pages/dashboards.jsx';
+import { hydrateAnalysisForDisplay } from './pages/workflows.jsx';
 import { appendAuditLog, readStorage, readTextStorage, storageKeys, writeStorage, writeTextStorage } from './services/storage.js';
 import { LoadingProvider } from './components/loading.jsx';
 import { FeedbackProvider, useToast } from './components/feedback.jsx';
@@ -18,6 +19,7 @@ import {
   fetchCoreUsers,
   loginCoreUser,
   mapCoreAnalysisResponse,
+  mapCoreAttachmentsToLocal,
   mapCoreUserToLocal,
   normalizeAuthResponse,
   registerCoreUser,
@@ -32,12 +34,84 @@ function stripSensitiveUserFields(user) {
   return safeUser;
 }
 
+function coreAnalysisIdOf(row = {}) {
+  return row.analysis_id ?? row.analysisId ?? row.id ?? '';
+}
+
+function coreAnalysisUpdatedAt(row = {}) {
+  return row.updated_at || row.updatedAt || row.created_at || row.createdAt || '';
+}
+
+function coreAnalysisTime(row = {}) {
+  const time = new Date(coreAnalysisUpdatedAt(row)).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function pickLatestCoreAnalysis(rows = []) {
+  return [...rows]
+    .filter((row) => coreAnalysisIdOf(row))
+    .sort((left, right) => coreAnalysisTime(right) - coreAnalysisTime(left))[0] || null;
+}
+
+// 저장된 분석을 화면이 쓸 수 있는 모양으로 되살립니다.
+//
+// mapCoreAnalysisResponse는 계약(AI_ANALYSIS) 필드만 줍니다. 그런데 상담 분석 화면은
+// modalities(입력자료 구성)·extractionDetail(첨부 읽기 결과)·sttPreview·verification처럼
+// 계약에 없는 값도 그립니다. 그 넷은 로컬 목업(buildAnalysisResult)이 만들어 주던 것들입니다.
+//
+// 분석을 방금 돌린 직후에는 mergeContractAnalysisResponse가 둘을 합쳐 줘서 문제가 없는데,
+// 새로고침 후 복원할 때는 그 병합이 없어 modalities가 undefined인 채로 화면에 들어가고
+// `analysis.modalities.map(...)`에서 터져 흰 화면이 됐습니다.
+// 복원할 때도 같은 병합을 거치게 해서 두 경로의 결과 모양을 맞춥니다.
+function buildHydratedAnalysis(row, consultation) {
+  if (!row) return null;
+  return {
+    coreAnalysisId: coreAnalysisIdOf(row),
+    analysis: hydrateAnalysisForDisplay(row, consultation),
+  };
+}
+
 // 로그인한 역할에 따라 상담원/변호사/관리자 대시보드를 분기합니다.
 function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, onUpdateUserStatus }) {
   const defaultView = '대시보드';
   const [activeView, setActiveView] = useState(defaultView);
   const [focusedConsultationId, setFocusedConsultationId] = useState(null);
   const [focusedReviewCaseNo, setFocusedReviewCaseNo] = useState(null);
+
+  // ── 브라우저 뒤로가기 ──
+  //
+  // 이 앱은 라우터가 없어 화면 전환이 전부 state로만 일어납니다. 그래서 주소가 한 번도
+  // 바뀌지 않고, 서식 생성 화면에서 뒤로가기를 누르면 앱 안에서 뒤로 가는 게 아니라
+  // 이 페이지에 오기 전 방문지(새 탭이면 빈 페이지)로 나가버립니다.
+  //
+  // 주소를 화면마다 붙이는 것(#/서식생성 같은 것)은 activeView를 쓰는 모든 곳을 손봐야 해서
+  // 범위가 큽니다. 여기서는 화면을 옮길 때 히스토리 항목만 하나 쌓아, 뒤로가기가 앱 안에서
+  // 이전 화면으로 돌아가게 합니다. 첫 화면(대시보드)에서 한 번 더 누르면 그때는 밖으로 나갑니다
+  // — 나갈 수 없게 가두지는 않습니다.
+  useEffect(() => {
+    const onPopState = (event) => {
+      const view = event.state?.appView;
+      // 우리가 쌓은 항목이면 그 화면으로 돌아가고, 아니면(앱 진입 이전 기록) 그대로 나갑니다.
+      if (!view) return;
+      setFocusedConsultationId(null);
+      setFocusedReviewCaseNo(null);
+      setActiveView(view);
+    };
+    window.addEventListener('popstate', onPopState);
+    // 앱에 들어온 첫 상태를 기록해둬야, 두 번째 화면에서 뒤로가기했을 때 돌아올 자리가 있습니다.
+    if (!window.history.state?.appView) {
+      window.history.replaceState({ appView: defaultView }, '');
+    }
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [defaultView]);
+
+  // 화면이 바뀌면 히스토리에 한 칸 쌓습니다. 뒤로가기가 되돌아갈 자리를 만드는 것이 목적이라
+  // 주소(URL)는 건드리지 않습니다.
+  const pushViewHistory = (nextView) => {
+    if (window.history.state?.appView === nextView) return;
+    window.history.pushState({ appView: nextView }, '');
+  };
+
   const [consultations, setConsultations] = useState(() => readStorage(storageKeys.consultations, initialConsultations));
   const [reviews, setReviews] = useState(() => readStorage(storageKeys.reviews, initialReviews));
   const [notifications, setNotifications] = useState(() => readStorage(storageKeys.notifications, []));
@@ -88,16 +162,28 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       .then((serverRows) => {
         if (cancelled || !Array.isArray(serverRows)) return;
         setConsultations((items) => {
+          const serverByCoreId = new Map(serverRows.map((row) => [row.id, row]));
+          // 첨부파일은 다른 필드(메모·법률구조 대상 등)와 달리 로컬 전용 값이 없습니다 — 추가/삭제가
+          // 항상 core-api(Attachment 테이블)를 거쳐 확정되므로, 서버 응답이 항상 진실입니다.
+          // 그래서 다른 필드는 로컬 값을 지키되(덮어쓰지 않음), attachments만은 서버 목록으로 완전히
+          // 맞춰씁니다 — 그래야 이미 삭제된 파일이 새로고침 후 되살아나 보이는 문제가 재발하지 않습니다.
+          const mergedItems = items.map((item) => {
+            if (!item.coreId) return item;
+            const serverRow = serverByCoreId.get(item.coreId);
+            if (!serverRow) return item;
+            return { ...item, attachments: mapCoreAttachmentsToLocal(serverRow) };
+          });
           const knownCoreIds = new Set(items.map((item) => item.coreId).filter(Boolean));
           const missingRows = serverRows.filter((row) => !knownCoreIds.has(row.id));
-          if (!missingRows.length) return items;
-          let nextLocalId = items.length ? Math.max(...items.map((item) => item.id)) : 0;
+          if (!missingRows.length) return mergedItems;
+          let nextLocalId = mergedItems.length ? Math.max(...mergedItems.map((item) => item.id)) : 0;
           const additions = missingRows.map((row) => {
             nextLocalId += 1;
             return {
               id: nextLocalId,
               caseNo: `C-CORE-${row.id}`,
               coreId: row.id,
+              name: row.clientName || '이름 미입력',
               title: row.title || '제목 미입력',
               memo: row.inputText || '',
               opponentName: row.opponentName || '',
@@ -108,10 +194,10 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
               counselor: null,
               logs: [],
               analysis: null,
-              attachments: [],
+              attachments: mapCoreAttachmentsToLocal(row),
             };
           });
-          return [...additions, ...items];
+          return [...additions, ...mergedItems];
         });
       })
       .catch(() => {
@@ -120,6 +206,34 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const hydrateConsultationsWithCoreAnalyses = (analysisResults, candidateCases) => {
+    const analysisByCoreId = new Map();
+    analysisResults.forEach((result, index) => {
+      if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
+      const latest = pickLatestCoreAnalysis(result.value);
+      // 상담을 함께 넘겨야 첨부·메모 기반 값(입력자료 구성, 첨부 읽기 결과)이 채워집니다.
+      const hydrated = buildHydratedAnalysis(latest, candidateCases[index]);
+      if (hydrated) analysisByCoreId.set(candidateCases[index].coreId, hydrated);
+    });
+    if (!analysisByCoreId.size) return;
+
+    setConsultations((items) => items.map((item) => {
+      const hydrated = analysisByCoreId.get(item.coreId);
+      if (!hydrated) return item;
+      const sameAnalysis = item.coreAnalysisId && String(item.coreAnalysisId) === String(hydrated.coreAnalysisId);
+      if (sameAnalysis && item.analysis?.summary === hydrated.analysis.summary) return item;
+      return {
+        ...item,
+        analysis: {
+          ...(item.analysis || {}),
+          ...hydrated.analysis,
+        },
+        coreAnalysisId: hydrated.coreAnalysisId,
+        workflowStatus: item.workflowStatus || '상담 분석',
+      };
+    }));
+  };
 
   // '법률구조 검토 요청'(reviews)은 상담원이 검토를 요청한 그 브라우저에만 즉시 반영되고,
   // 지금까지는 core-api에 실제로 남아있는 검토 요청을 다시 읽어오는 곳이 전혀 없었습니다.
@@ -136,25 +250,32 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     Promise.allSettled(candidateCases.map((item) => fetchCoreAnalyses(item.coreId)))
       .then((results) => {
         if (cancelled) return;
+        hydrateConsultationsWithCoreAnalyses(results, candidateCases);
         setReviews((currentReviews) => {
           const known = new Set(
             currentReviews
               .filter((item) => item.coreId && item.coreAnalysisId)
               .map((item) => `${item.coreId}:${item.coreAnalysisId}`),
           );
-          const additions = [];
+          // requestLegalReview는 상담(target.id) 하나당 review 행 하나만 유지합니다(재요청 시
+          // 새로 추가하지 않고 기존 행을 덮어씀). 여기서도 같은 규칙을 지켜야 합니다 — 그렇지 않으면
+          // 반려/수정 요청 후 상담원이 새 분석을 다시 제출했을 때, 이전 분석의 review 행을 그대로 둔 채
+          // id가 똑같은 새 행을 하나 더 추가하게 됩니다. reviews.find/map은 모두 id로 찾기 때문에,
+          // 이렇게 id가 중복되면 변호사가 새 검토를 승인/반려해도 옛 행까지 같이 바뀌거나
+          // (map이 id로 필터링), 옛 행이 먼저 잡혀 엉뚱한 coreAnalysisId로 승인 API가 불립니다.
+          const upsertsByConsultationId = new Map();
           results.forEach((result, index) => {
             if (result.status !== 'fulfilled' || !Array.isArray(result.value)) return;
             const target = candidateCases[index];
             result.value
               .filter((row) => row.status === 'SUBMITTED_FOR_REVIEW')
               .forEach((row) => {
-                const coreAnalysisId = row.analysis_id ?? row.analysisId;
+                const coreAnalysisId = coreAnalysisIdOf(row);
                 const key = `${target.coreId}:${coreAnalysisId}`;
                 if (known.has(key)) return;
                 known.add(key);
                 const mapped = mapCoreAnalysisResponse(row);
-                additions.push({
+                upsertsByConsultationId.set(target.id, {
                   id: target.id,
                   caseNo: target.caseNo,
                   type: mapped.caseType || target.type,
@@ -176,8 +297,13 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
                 });
               });
           });
-          if (!additions.length) return currentReviews;
-          return [...additions, ...currentReviews];
+          if (!upsertsByConsultationId.size) return currentReviews;
+          const existingIds = new Set(currentReviews.map((item) => item.id));
+          const merged = currentReviews.map((item) => upsertsByConsultationId.get(item.id) || item);
+          const brandNew = Array.from(upsertsByConsultationId.entries())
+            .filter(([id]) => !existingIds.has(id))
+            .map(([, review]) => review);
+          return [...brandNew, ...merged];
         });
       })
       .catch(() => {
@@ -256,6 +382,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     setActiveView('대시보드');
   };
   const changeActiveView = (nextView) => {
+    pushViewHistory(nextView);
     setFocusedConsultationId(null);
     setFocusedReviewCaseNo(null);
     setActiveView(nextView);
@@ -295,6 +422,10 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       logs: [{ status: '상담 접수', createdAt: today }],
       analysis: null,
       ...form,
+      // form.attachments는 아직 서버가 확정하지 않은 클라이언트 쪽 echo(첨부파일 DB row id가 없음)라
+      // "삭제" 버튼이 지울 대상을 특정할 수 없습니다. 방금 생성 응답(coreSync.attachments)에 서버가
+      // 실제로 저장을 확정한 목록(attachmentId 포함)이 있으면 그걸 우선합니다.
+      attachments: coreSync?.attachments?.length ? coreSync.attachments : (form.attachments || []),
     };
     setConsultations((items) => [nextConsultation, ...items]);
     appendAuditLog({
@@ -400,7 +531,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     return { ok: true, message: '변호사 검토 요청이 등록되었습니다.' };
   };
 
-  const applyReviewDecision = ({ id, status, reason, reviewer, recipientEmail }) => {
+  const applyReviewDecision = ({ id, status, reason, reviewer, recipientEmail, lawyerComment = '', editedSummary = '' }) => {
     const needsCounselorWork = ['수정 요청', '추가자료 요청', '반려', '보류'].includes(status);
     const nextLocalStatus = status === '승인' ? '완료' : status === '반려' || status === '보류' ? '보류' : '진행 중';
     setFocusedReviewCaseNo(null);
@@ -411,7 +542,11 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         status: nextLocalStatus,
         workflowStatus: needsCounselorWork ? status : '승인 완료',
         lawyer: reviewer || null,
-        reviewAction: needsCounselorWork ? { status, reason: reason || '', reviewer: reviewer || null, recipientEmail: recipientEmail || item.counselor?.email || '', requestedAt: today, resolved: false } : null,
+        // 변호사 코멘트는 결정 종류(승인 포함)와 무관하게 남길 수 있고, 편집한 요약이 있으면
+        // 상담원이 보는 분석 요약 자체를 변호사가 다듬은 문장으로 바꿔둡니다.
+        lawyerComment: lawyerComment || '',
+        analysis: editedSummary && item.analysis ? { ...item.analysis, summary: editedSummary } : item.analysis,
+        reviewAction: needsCounselorWork ? { status, reason: reason || '', reviewer: reviewer || null, recipientEmail: recipientEmail || item.counselor?.email || '', requestedAt: today, resolved: false, lawyerComment: lawyerComment || '' } : null,
         logs: [...(item.logs || []), { status: `변호사 검토 결과: ${status}`, reason: reason || '', createdAt: today }],
       };
     }));
@@ -423,42 +558,6 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     if (target?.coreId) {
       const backendStatus = nextLocalStatus === '완료' ? 'COMPLETED' : nextLocalStatus === '보류' ? 'HOLD' : 'ANALYZING';
       updateCoreConsultationStatus(target.coreId, backendStatus).catch(() => {});
-    }
-  };
-
-  const applyDocumentReviewDecision = ({ caseNo, action, reason, reviewer, recipientEmail, formName, requestedMaterials = [] }) => {
-    const needsCounselorWork = action === 'revision';
-    setConsultations((items) => items.map((item) => {
-      if (item.caseNo !== caseNo) return item;
-      return {
-        ...item,
-        status: needsCounselorWork ? '진행 중' : item.status,
-        workflowStatus: needsCounselorWork ? '서식 보완 요청' : '서식 승인 완료',
-        lawyer: reviewer || item.lawyer || null,
-        reviewAction: needsCounselorWork ? {
-          status: '서식 반려',
-          reason: reason || '반려 사유가 입력되지 않았습니다.',
-          reviewer: reviewer || null,
-          recipientEmail: recipientEmail || item.counselor?.email || '',
-          requestedAt: today,
-          resolved: false,
-          workbench: '서식 생성',
-          formName: formName || '',
-          requestedMaterials,
-        } : null,
-        logs: [...(item.logs || []), {
-          status: needsCounselorWork ? '서식 초안 반려' : '서식 초안 승인',
-          reason: reason || '',
-          createdAt: today,
-        }],
-      };
-    }));
-    // 서식이 반려돼 상담원이 다시 작업해야 하는 상태(진행 중)로 돌아갈 때도 core-api 상태를 맞춥니다.
-    if (needsCounselorWork) {
-      const target = consultations.find((item) => item.caseNo === caseNo);
-      if (target?.coreId) {
-        updateCoreConsultationStatus(target.coreId, 'ANALYZING').catch(() => {});
-      }
     }
   };
 
@@ -493,8 +592,8 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
   return (
     <div className="dashboardScreen">
       <DashboardHeader role={role} activeView={activeView} onViewChange={changeActiveView} onLogout={onLogout} currentUser={currentUser} unreadCount={unreadCount} />
-      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} /> : null}
-      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onDocumentReviewDecision={applyDocumentReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
+      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} /> : null}
+      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} /> : null}
     </div>
   );
@@ -571,14 +670,14 @@ function App() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
-  const handleLogin = async (event) => {
-    event.preventDefault();
+  // 실제 백엔드(core-api)가 이메일/비밀번호 대조, 승인 대기·거절 차단을 전부 처리합니다.
+  // 여기서 로컬로 다시 검사하지 않고, 성공/실패 모두 백엔드 응답을 그대로 따릅니다.
+  // handleLogin(로그인 폼 제출)과 handleQuickLogin(마스터 계정 자동 로그인)이 이 로직을 함께 씁니다.
+  const performLogin = async (email, password) => {
     if (loginPending) return;
     setLoginPending(true);
     try {
-      // 실제 백엔드(core-api)가 이메일/비밀번호 대조, 승인 대기·거절 차단을 전부 처리합니다.
-      // 여기서 로컬로 다시 검사하지 않고, 성공/실패 모두 백엔드 응답을 그대로 따릅니다.
-      const auth = normalizeAuthResponse(await loginCoreUser({ email: loginForm.email, password: loginForm.password }));
+      const auth = normalizeAuthResponse(await loginCoreUser({ email, password }));
       // 소속기관·연락처처럼 아직 백엔드에 없는 프로필 항목은, 이 브라우저에 저장된 값이 있으면
       // 그대로 이어받아 화면이 비어 보이지 않게 합니다. (다른 기기 최초 로그인 시엔 빈 값으로 시작)
       const existingLocal = users.find((user) => user.email === auth.email);
@@ -605,22 +704,25 @@ function App() {
     }
   };
 
+  const handleLogin = (event) => {
+    event.preventDefault();
+    return performLogin(loginForm.email, loginForm.password);
+  };
+
+  // 회원가입 절차 없이도 역할별(상담원/변호사/관리자) 마스터 계정으로 실제 로그인 플로우를 그대로
+  // 태워볼 수 있도록, 자격 증명을 로그인 폼에 채우고 performLogin(=handleLogin과 동일한 제출 로직)을
+  // 그대로 호출합니다. 계정 자체는 core-api의 MasterAccountInitializer가 기동 시 생성합니다.
+  const masterAccountCredentials = {
+    counselor: { email: 'test_talker@test.test', password: 'test1234' },
+    lawyer: { email: 'test_lawyer@test.test', password: 'test1234' },
+    admin: { email: 'test_admin@test.test', password: 'test1234' },
+  };
+
   const handleQuickLogin = (role) => {
-    // 가입 신청일이 없는 데모 계정도 실제 가입자와 동일하게 오늘 날짜로 채워, 관리자 화면에서 '-'로 비어 보이지 않게 합니다.
-    const demoAccounts = {
-      counselor: { name: '테스트', organization: '서울중앙지부 / 법률구조1부', branch: '서울중앙지부', department: '법률구조1부', phone: '010-1234-5601', email: 'demo.counselor@test.local', role: 'counselor', status: '승인', requestedAt: today },
-      lawyer: { name: '테스트', organization: '서울중앙지부 / 송무부', branch: '서울중앙지부', department: '송무부', phone: '010-1234-5602', email: 'demo.lawyer@test.local', role: 'lawyer', status: '승인', requestedAt: today },
-      admin: { name: '테스트', organization: '대한법률구조공단 / 운영팀', phone: '010-1234-5603', email: 'demo.admin@test.local', role: 'admin', status: '승인', requestedAt: today },
-    };
-    const demoUser = demoAccounts[role];
-    if (!demoUser) return;
-    persistUsers([demoUser, ...users.filter((user) => user.email !== demoUser.email)]);
-    setLoginError('');
-    setRegisteredRole(demoUser.role);
-    setCurrentUserEmail(demoUser.email);
-    appendAuditLog({ actor: demoUser.email, action: '테스트 빠른 로그인', target: demoUser.role });
-    window.localStorage.setItem('registeredRole', demoUser.role);
-    setPage('dashboard');
+    const credentials = masterAccountCredentials[role];
+    if (!credentials) return;
+    setLoginForm({ email: credentials.email, password: credentials.password });
+    return performLogin(credentials.email, credentials.password);
   };
 
   const currentUser = users.find((user) => user.email === currentUserEmail) || null;
