@@ -5,8 +5,7 @@ import { EmptyRows, InlineEmptyNotice, StatusButton, SummaryCards, ConsultationT
 import { useConfirm, useToast } from '../components/feedback.jsx';
 import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList } from './workflows.jsx';
 import { appendAuditLog, getAuditLogs } from '../services/storage.js';
-import { checkTemplateRevision, simulateBackendLatency } from '../services/legalAidApi.js';
-import { checkAiApiHealth } from '../services/aiApiClient.js';
+import { checkAiApiHealth, checkFormRevisions, acknowledgeFormRevisions } from '../services/aiApiClient.js';
 import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, fetchCoreUsers, mapCoreUserToLocal, requestCoreAnalysisRevision, verifyCoreAuditLogChain, timelineEmptyMessage } from '../services/coreApiClientV2.js';
 import { readSubmittedLocalDocumentReviews, updateLocalDocumentReview, removeLocalDocumentReview, dismissDocumentReview, isDocumentReviewDismissed, saveLawyerDraftEdit, readLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { hydrateDraftDocument } from '../services/draftDocumentStore.js';
@@ -1550,8 +1549,42 @@ function AnalysisStatsPanel({ reviews, statusBreakdown }) {
   );
 }
 
+// 서식 개정 점검에서 바뀐 항목을 유형별로 보여줍니다.
+// 무엇을 손봐야 하는지 알아야 하므로 건수만이 아니라 서식 이름까지 함께 보여줍니다.
+const FORM_REVISION_LABELS = {
+  revised: '개정(파일 교체)',
+  added: '신규',
+  removed: '삭제',
+  recategorized: '분류 변경',
+  renamed: '이름 변경',
+};
+
+function FormRevisionChanges({ changes }) {
+  const groups = Object.entries(FORM_REVISION_LABELS)
+    .map(([key, label]) => [label, changes[key] || []])
+    .filter(([, rows]) => rows.length);
+
+  return (
+    <div className="formRevisionChanges">
+      {groups.map(([label, rows]) => (
+        <div key={label}>
+          <strong>{label} {rows.length}건</strong>
+          <ul>
+            {rows.slice(0, 10).map((row) => (
+              <li key={row.tmpltNo}>{row.tmpltNm || row.after || row.before}</li>
+            ))}
+            {rows.length > 10 ? <li>… 외 {rows.length - 10}건</li> : null}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AdminOpsPanel({ currentUser }) {
-  const [templateStatus, setTemplateStatus] = useState('검사 전');
+  const [templateStatus, setTemplateStatus] = useState({ tone: 'muted', label: '검사 전' });
+  // 마지막 점검 결과 원본. 변경 목록을 표로 펼치고 '확인 완료' 버튼을 띄울지 판단하는 데 씁니다.
+  const [templateResult, setTemplateResult] = useState(null);
   const [auditRows, setAuditRows] = useState(() => getAuditLogs());
   const [aiApiStatus, setAiApiStatus] = useState({ tone: 'muted', label: '확인 전' });
   const [coreApiStatus, setCoreApiStatus] = useState({ tone: 'muted', label: '확인 전', users: 0, consultations: 0 });
@@ -1573,12 +1606,44 @@ function AdminOpsPanel({ currentUser }) {
     }
   };
 
+  // helplaw24 서식 목록을 받아 직전 기준선과 비교합니다 (요구사항 AI-05-04-01).
+  // 서식 파일을 자동으로 바꾸지는 않습니다 — 원본이 .hwp라 구조가 달라진 걸 모른 채
+  // 갈아끼우면 초안 생성이 조용히 어긋납니다. 무엇이 바뀌었는지 알려주는 데까지만 합니다.
   const runTemplateCheck = () => runCheck('template', async () => {
-    await simulateBackendLatency();
-    const result = checkTemplateRevision();
-    setTemplateStatus(result.message);
-    setAuditRows(appendAuditLog({ actor: '관리자', action: '서식 개정 확인', target: result.source, metadata: result }));
-  }, '서식 개정 여부를 확인하고 있습니다');
+    try {
+      const result = await checkFormRevisions();
+      setTemplateResult(result);
+      const changed = result.changes?.totalChanged || 0;
+      setTemplateStatus({ tone: changed ? 'warning' : 'success', label: result.message });
+      setAuditRows(appendAuditLog({
+        actor: currentUser?.name || '관리자',
+        action: '서식 개정 확인',
+        target: result.source,
+        metadata: { 감시서식: result.totalForms, 변경: changed },
+      }));
+    } catch (error) {
+      // 수집 실패를 '변경 없음'으로 보여주면 점검이 정상이라고 오해합니다.
+      setTemplateResult(null);
+      setTemplateStatus({ tone: 'danger', label: error.message });
+    }
+  }, 'helplaw24 서식 목록을 확인하고 있습니다');
+
+  // 관리자가 변경 내용을 확인했다는 표시. 이걸 눌러야 같은 변경이 다음 점검에 다시 뜨지 않습니다.
+  const runTemplateAcknowledge = () => runCheck('templateAck', async () => {
+    try {
+      const result = await acknowledgeFormRevisions();
+      setTemplateResult(null);
+      setTemplateStatus({ tone: 'success', label: result.message });
+      setAuditRows(appendAuditLog({
+        actor: currentUser?.name || '관리자',
+        action: '서식 개정 확인 완료',
+        target: 'helplaw24',
+        metadata: { 기준서식: result.totalForms },
+      }));
+    } catch (error) {
+      setTemplateStatus({ tone: 'danger', label: error.message });
+    }
+  }, '기준 서식 목록을 갱신하고 있습니다');
 
   // ai-api(FastAPI) 서버가 실제로 떠 있고 프론트에서 호출 가능한지 확인하는 실제 네트워크 요청입니다.
   const runAiApiHealthCheck = () => runCheck('ai', async () => {
@@ -1678,10 +1743,18 @@ function AdminOpsPanel({ currentUser }) {
           <div>
             <h3>서식 개정 모니터링</h3>
             <div className="resultCard">
-              <p>Helplaw24 서식 개정 여부를 점검하는 운영 기능입니다.</p>
-              <strong>상태: {templateStatus}</strong>
+              <p>helplaw24에서 우리가 쓰는 서식(친족·상속·가사소송·가족관계등록 291건)이 바뀌었는지 점검합니다. 버튼을 누를 때 점검하며, 서식 파일을 자동으로 바꾸지는 않고 무엇이 바뀌었는지 알려주기만 합니다.</p>
+              <strong>
+                상태: <span className={`statusChip tone-${templateStatus.tone}`}>{templateStatus.label}</span>
+              </strong>
+              {templateResult?.changes?.totalChanged ? (
+                <FormRevisionChanges changes={templateResult.changes} />
+              ) : null}
             </div>
             <button className="primaryButton" type="button" onClick={runTemplateCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'template' ? '확인하는 중…' : '서식 개정 확인'}</button>
+            {templateResult?.changes?.totalChanged ? (
+              <button className="secondaryButton" type="button" onClick={runTemplateAcknowledge} disabled={Boolean(runningCheck)}>{runningCheck === 'templateAck' ? '처리하는 중…' : '확인 완료 (기준 갱신)'}</button>
+            ) : null}
             <h3>AI API 서버 연결 상태</h3>
             <div className="resultCard">
               <p>backend/ai-api(FastAPI) 서버가 프론트에서 실제로 호출 가능한 상태인지 확인합니다.</p>
