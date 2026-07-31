@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from app.ai.forms.recommender import recommend
 from app.ai.forms.drafter import draft, find_hwpx
 from app.ai.forms.verifier import verify
+from app.ai.forms import monitor
 
 router = APIRouter(prefix="/forms", tags=["forms"])
 
@@ -46,3 +47,31 @@ def verify_draft(payload: dict):
         raise HTTPException(status_code=404, detail=f"서식 파일 없음: {form_name}")
 
     return verify(str(original), draft_file, payload.get("extracted", {}))
+
+
+@router.get("/revisions")
+def check_form_revisions():
+    """helplaw24 서식 목록을 받아 직전 스냅샷과 비교한다 (요구사항 AI-05-04-01).
+
+    신규·개정·삭제·분류변경·이름변경을 찾아서 돌려주기만 한다. 서식 파일을
+    자동으로 교체하지 않는다 — 원본이 .hwp라 구조가 바뀐 걸 모른 채 갈아끼우면
+    초안 생성이 조용히 어긋난다. 교체는 관리자가 확인하고 직접 넣는다.
+
+    스냅샷은 여기서 갱신하지 않는다. 확인만 여러 번 해도 결과가 같아야 하고,
+    관리자가 보기 전에 기준선이 바뀌면 변경 내용이 묻히기 때문이다."""
+    try:
+        return monitor.check()
+    except monitor.FormMonitorError as exc:
+        # 수집 실패를 '변경 없음'으로 돌려주면 관리자는 점검이 정상이라고 오해한다.
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/revisions/acknowledge")
+def acknowledge_form_revisions():
+    """관리자가 변경 내용을 확인했다는 표시로 현재 상태를 새 기준선으로 저장한다.
+
+    이걸 눌러야 같은 변경이 다음 점검에서 다시 올라오지 않는다."""
+    try:
+        return monitor.acknowledge()
+    except monitor.FormMonitorError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

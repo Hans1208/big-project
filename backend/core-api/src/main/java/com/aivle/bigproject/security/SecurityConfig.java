@@ -50,10 +50,33 @@ public class SecurityConfig {
                         // AI 분석 결과 승인/반려도 마찬가지로 변호사 전용.
                         .requestMatchers(HttpMethod.POST, "/api/consultations/*/analyses/*/approve").hasRole("LAWYER")
                         .requestMatchers(HttpMethod.POST, "/api/consultations/*/analyses/*/request-revision").hasRole("LAWYER")
-                        // TODO: 프론트엔드가 로그인 붙이고 토큰을 실제로 보내기 시작하면,
-                        // 나머지 라인들도 .authenticated() 등으로 좁혀야 진짜 보호가 됨.
-                        // 지금은 기존 화면(로그인 없이 상담 등록 등)이 안 깨지게 전부 permitAll로 둠.
-                        .anyRequest().permitAll()
+                        // S3를 직접 다루는 개발용 엔드포인트. key만 바꾸면 버킷의 아무 오브젝트나
+                        // 읽고 지울 수 있어서, 인증 여부와 별개로 외부에 열려 있으면 안 된다.
+                        // 운영에 나가기 전에 이 컨트롤러 자체를 지우는 게 맞다.
+                        .requestMatchers("/test/**").denyAll()
+                        // 오디오 스트림 소켓만 여기서 통과시킨다. 인증을 푸는 게 아니라
+                        // 검사 위치를 옮기는 것이다 — 실제 확인은 핸드셰이크에서 한다
+                        // (AudioStreamHandshakeInterceptor, 티켓 없으면 403으로 끊는다).
+                        //
+                        // 여기서 막을 수 없는 이유: 브라우저의 new WebSocket(url)에는 헤더를
+                        // 넣을 수 없다. 이 필터 체인은 Authorization 헤더를 보고 판단하므로
+                        // 그대로 두면 브라우저는 붙을 방법이 아예 없다(토큰이 있어도 403).
+                        // 주소에 JWT를 실으면 통과는 하지만 접속 로그·브라우저 히스토리에
+                        // 24시간짜리 토큰이 남는다. 그래서 30초 1회용 티켓을 대신 싣는다.
+                        //
+                        // /api/audio/** (티켓 발급, 세션 목록)는 평범한 REST라 아래 규칙대로
+                        // 인증이 그대로 걸린다.
+                        .requestMatchers("/ws/audio/**").permitAll()
+                        // 위에서 역할을 지정하지 않은 나머지(상담 CRUD·분석·첨부·서식 등)는
+                        // 로그인한 사용자만 쓸 수 있다.
+                        //
+                        // 예전에는 여기가 permitAll이라 토큰 없이도 GET /api/consultations로
+                        // 상담 전체가 그대로 조회됐고, PUT/DELETE도 통과했다. 화면에서 역할별로
+                        // 메뉴를 나눠도 서버가 요청의 출처를 구분하지 못하므로 아무 의미가 없었다.
+                        //
+                        // 프론트가 모든 요청에 토큰을 싣기 시작해서(coreApiClientV2 requestCoreJson)
+                        // 이제 좁힐 수 있다. 역할별 구분이 더 필요한 곳은 위쪽에 개별 규칙을 추가하면 된다.
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

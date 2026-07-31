@@ -30,7 +30,7 @@
 //   (별도 register 엔드포인트를 두는 방식도 가능하나, 현재 프론트는 상담 생성 시 함께 넘깁니다.)
 // ─────────────────────────────────────────────────────────────────────────
 
-import { CORE_API_BASE_URL } from './coreApiClientV2.js';
+import { CORE_API_BASE_URL, coreAuthHeader } from './coreApiClientV2.js';
 
 // 백엔드가 아직 준비되지 않았을 때(엔드포인트 없음/네트워크 실패) 던지는 신호용 에러.
 // 이 에러면 호출부는 "기존 방식으로 폴백"하고, 그 외 에러는 사용자에게 실패로 알립니다.
@@ -50,9 +50,12 @@ const DIRECT_UPLOAD_ENABLED = !['0', 'false', 'off'].includes(
 async function requestPresignedUpload({ fileName, contentType, fileType }) {
   let response;
   try {
+    // 이 파일은 coreApiClientV2의 requestCoreJson을 거치지 않고 fetch를 직접 부르므로,
+    // 토큰도 여기서 따로 붙여야 합니다(core-api가 인증을 요구하기 때문).
+    // 3단계의 S3 PUT은 presigned URL 자체가 서명이라 이 헤더를 붙이면 안 됩니다 — 서명이 깨집니다.
     response = await fetch(`${CORE_API_BASE_URL}/api/attachments/presigned-upload`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...coreAuthHeader() },
       body: JSON.stringify({ fileName, contentType, fileType }),
     });
   } catch {

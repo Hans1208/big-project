@@ -98,11 +98,6 @@ export function searchReferenceCandidates({ type, query = '', caseType = '' }) {
   });
 }
 
-export function checkTemplateRevision() {
-  return {
-    checkedAt: new Date().toISOString(),
-    source: 'helplaw24',
-    changedTemplates: [],
-    message: '현재 로컬 프로토타입에서는 변경된 서식이 없습니다.',
-  };
-}
+// checkTemplateRevision(항상 '변경 없음'을 돌려주던 목업)은 제거했습니다.
+// 실제 점검은 ai-api의 GET /forms/revisions(aiApiClient.checkFormRevisions)가 합니다.
+// 목업을 남겨두면 실제로는 점검이 안 되는데 화면에는 정상으로 보이는 상태가 다시 생깁니다.

@@ -1,9 +1,12 @@
+import { readTextStorage, storageKeys } from './storage.js';
+
 const CORE_API_BASE_URL = import.meta.env.VITE_CORE_API_BASE_URL || '/core-api';
 
 const CORE_API_ERROR_CODE = {
   CONNECTION_FAILED: 'CORE_CONNECTION_FAILED',
   SCHEMA_MISMATCH: 'CORE_SCHEMA_MISMATCH',
   ENCRYPTION_DATA_ISSUE: 'CORE_ENCRYPTION_DATA_ISSUE',
+  AUTH_FAILED: 'CORE_AUTH_FAILED',
   REQUEST_FAILED: 'CORE_REQUEST_FAILED',
 };
 
@@ -71,21 +74,47 @@ function classifyCoreError(message, status) {
     };
   }
 
+  // Spring Security가 인증 자체를 막을 때(토큰 없음/무효)는 응답 본문에 JSON이 아니라 "Forbidden"
+  // 같은 HTTP 상태 문구만 담겨 와서, 그 원문 영어 문구가 그대로 화면에 노출됐습니다. 다만 로그인처럼
+  // 백엔드가 직접 사유를 JSON으로 내려주는 403(예: "관리자 승인 대기 중인 계정입니다")까지 이걸로
+  // 덮어쓰면 더 유용한 메시지를 지워버리게 되므로, 진짜로 본문이 빈 HTTP 상태 문구일 때만 바꿉니다.
+  const isBareHttpReasonPhrase = /^(forbidden|unauthorized|access denied)$/i.test((message || '').trim());
+  if ((status === 401 || status === 403) && isBareHttpReasonPhrase) {
+    return {
+      code: CORE_API_ERROR_CODE.AUTH_FAILED,
+      message: '권한이 없습니다. 관리자 권한이 있는 계정으로 로그인했는지 확인해주세요.',
+    };
+  }
+
   return {
     code: CORE_API_ERROR_CODE.REQUEST_FAILED,
     message: message || `Core API 요청 실패 (HTTP ${status})`,
   };
 }
 
+// 로그인할 때 받아둔 JWT를 꺼내옵니다(App.jsx persistAuthToken이 저장).
+// 로그인 전이거나 로그아웃 상태면 빈 값이라 헤더를 붙이지 않습니다.
+export function coreAuthHeader() {
+  const token = readTextStorage(storageKeys.authToken, '');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function requestCoreJson(path, options = {}) {
   const { headers, ...restOptions } = options;
   let response;
   try {
+    // 토큰을 여기 한 곳에서 붙입니다.
+    //
+    // 예전에는 승인·반려처럼 SecurityConfig가 이미 막아둔 9개 함수만 각자 authHeader(token)을
+    // 넘겼고, 상담 생성·조회·분석·첨부·서식은 토큰 없이 나갔습니다. 그래서 core-api를
+    // .authenticated()로 좁히면 앱이 통째로 401이 되는 상태였습니다.
+    // 모든 요청이 이 함수를 거치므로, 함수 40여 개를 각각 고치지 않고 여기서 한 번에 붙입니다.
+    // 개별 함수가 headers로 넘긴 값이 있으면 그쪽을 우선합니다(기존 호출부 동작 유지).
     response = await fetch(`${CORE_API_BASE_URL}${path}`, {
       ...restOptions,
       headers: restOptions.body instanceof FormData
-        ? headers
-        : { 'Content-Type': 'application/json', ...(headers || {}) },
+        ? { ...coreAuthHeader(), ...(headers || {}) }
+        : { 'Content-Type': 'application/json', ...coreAuthHeader(), ...(headers || {}) },
     });
   } catch {
     throw buildCoreApiError(
@@ -279,7 +308,12 @@ function toCoreAnalysisPayload(analysis = {}) {
     eligibility: analysis.eligibility || '',
     extracted_json: buildCoreExtractedJson(analysis),
     missing_info_json: Array.isArray(analysis.missingInfo) ? analysis.missingInfo : [],
-    checklist_json: (analysis.checklist || []).map(normalizeChecklistItem),
+    // checklist_json은 일부러 여기서 보내지 않는다. ai-api가 analyze() 시점에 채운
+    // relief_review_checklist 원본 구조를 그대로 보존하기 위함이다 — core-api의 update()는
+    // 요청에 없는(null) 필드는 기존 DB 값을 그대로 두는 부분수정이라, 이 키를 아예 보내지
+    // 않으면 저장을 여러 번 해도 checklist_json은 분석 시점 그대로 남는다. 체크박스 상태는
+    // 항상 {label, checked}[] 형태만 담는 전용 컬럼인 checklist_status_json에만 싣는다.
+    checklist_status_json: (analysis.checklist || []).map(normalizeChecklistItem),
     recommendation_json: analysis.recommendation || {},
     timeline_json: (analysis.timeline || []).map(normalizeTimelineItem),
     cluster_result_json: analysis.clusterResult || [],
@@ -428,12 +462,17 @@ function normalizeMissingInfoItem(item) {
 // relief_review_checklist 객체 그대로입니다: { eligibility, winnability, executability,
 // appropriateness, requires_lawyer_review, checklist_summary_for_lawyer }
 // (backend/ai-api/app/agents/consult/schemas.py의 ReliefReviewChecklist 참고).
-// 예전엔 이 함수가 배열이 아니면 그냥 []를 반환해서, 실제 AI가 계산한 4대 평가기준 신호가
-// 화면에 전혀 반영되지 않고 항상 로컬 임시 체크리스트만 보이는 상태였습니다.
+//
+// 체크리스트는 AI가 대신 체크해주는 항목이 아니라 상담원이 직접 확인하고 체크하는
+// 항목입니다. 그래서 이 객체에서는 항목 이름(라벨) 5개만 만들고, 체크 여부는 AI의
+// eligible/evidence_status 등 판단 신호로 추정하지 않고 항상 false(미체크)로 둡니다.
+// 실제 체크 상태는 상담원이 화면에서 직접 체크한 뒤 checklist_status_json에 저장된
+// 값(위 mapCoreAnalysisResponse의 분기)이 유일한 출처입니다.
 function mapCoreChecklist(rawChecklist) {
   if (!rawChecklist) return [];
   if (Array.isArray(rawChecklist)) {
-    // 상담원이 저장(create/update)했다가 다시 불러온 경우엔 이미 {label, checked} 배열입니다.
+    // 상담원이 저장(create/update)했다가 다시 불러온 경우엔 이미 {label, checked} 배열이라
+    // 실제 체크 상태를 그대로 보존해야 합니다(옛 버전에서 저장된 데이터와의 호환용).
     return rawChecklist.map((item) => ({
       label: item?.label || item?.name || item?.item || '',
       checked: Boolean(item?.checked),
@@ -442,17 +481,17 @@ function mapCoreChecklist(rawChecklist) {
   const { eligibility, winnability, executability, appropriateness } = rawChecklist;
   const items = [];
   if (eligibility) {
-    items.push({ label: '법률구조 대상 여부 확인', checked: eligibility.eligible === '대상' });
-    items.push({ label: '법률구조 대상자 증빙서류 제출 여부 확인', checked: eligibility.evidence_status === '충족' });
+    items.push({ label: '법률구조 대상 여부 확인', checked: false });
+    items.push({ label: '법률구조 대상자 증빙서류 제출 여부 확인', checked: false });
   }
   if (winnability) {
-    items.push({ label: '승소 가능성 기초자료 확인', checked: Boolean(winnability.submitted_evidence_types?.length) });
+    items.push({ label: '승소 가능성 기초자료 확인', checked: false });
   }
   if (executability) {
-    items.push({ label: '집행 가능성 확인', checked: executability.debtor_asset_status === '재산 확인 언급' });
+    items.push({ label: '집행 가능성 확인', checked: false });
   }
   if (appropriateness) {
-    items.push({ label: '구조 타당성 확인', checked: appropriateness.case_nature === '사회적 약자 보호' });
+    items.push({ label: '구조 타당성 확인', checked: false });
   }
   return items;
 }
@@ -472,7 +511,12 @@ export function mapCoreAnalysisResponse(coreAnalysis = {}) {
     emergencyRatio,
     eligibility: CORE_ELIGIBILITY_LABEL[coreAnalysis.eligibility] || coreAnalysis.eligibility || '검토 필요',
     missingInfo: (coreAnalysis.missing_info_json || []).map(normalizeMissingInfoItem).filter(Boolean),
-    checklist: mapCoreChecklist(coreAnalysis.checklist_json),
+    // checklist_status_json이 있으면(=한 번이라도 저장된 분석) 그 값을 그대로 쓴다 — 이게
+    // 실제 5개 체크박스 상태의 단일 진실 공급원(SSOT)이다. 아직 저장 전(분석 직후)이라
+    // 비어 있을 때만 checklist_json(relief_review_checklist 객체)에서 파생시킨다.
+    checklist: Array.isArray(coreAnalysis.checklist_status_json) && coreAnalysis.checklist_status_json.length
+      ? coreAnalysis.checklist_status_json.map(normalizeChecklistItem)
+      : mapCoreChecklist(coreAnalysis.checklist_json),
     recommendation: coreAnalysis.recommendation_json || {},
     timeline: (coreAnalysis.timeline_json || []).map(normalizeIncomingTimelineItem),
     timelineIssue: classifyTimelineIssue(coreAnalysis.timeline_json),
