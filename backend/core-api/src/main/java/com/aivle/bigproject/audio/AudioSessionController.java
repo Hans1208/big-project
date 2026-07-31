@@ -1,7 +1,7 @@
 package com.aivle.bigproject.audio;
 
-import com.aivle.bigproject.audio.dto.AudioSessionResponse;
 import com.aivle.bigproject.audio.dto.AudioStreamTicketResponse;
+import com.aivle.bigproject.audio.dto.CallResponse;
 import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,19 +11,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class AudioSessionController {
 
-    private final AudioSessionRegistry sessionRegistry;
+    private final CallRegistry callRegistry;
     private final AudioStreamTicketService ticketService;
 
-    public AudioSessionController(AudioSessionRegistry sessionRegistry,
+    public AudioSessionController(CallRegistry callRegistry,
                                    AudioStreamTicketService ticketService) {
-        this.sessionRegistry = sessionRegistry;
+        this.callRegistry = callRegistry;
         this.ticketService = ticketService;
     }
 
-    // GET /api/audio/mulaw/sessions — 현재 연결된 μ-law 오디오 WebSocket 세션 목록
-    @GetMapping("/api/audio/mulaw/sessions")
-    public List<AudioSessionResponse> listSessions() {
-        return sessionRegistry.list();
+    // GET /api/audio/calls — 현재 연결된 통화 목록(WAITING: 오퍼레이터 대기 중, CONNECTED: 통화 중)
+    @GetMapping("/api/audio/calls")
+    public List<CallResponse> listCalls() {
+        return callRegistry.list();
     }
 
     // POST /api/audio/tickets — 오디오 WebSocket에 붙을 때 쓸 1회성 티켓 발급.
