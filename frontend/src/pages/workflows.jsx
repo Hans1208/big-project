@@ -1629,12 +1629,11 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         // '이도형'으로 듣는 일이 있는데, 사람이 확인해 고쳐둔 값을 기계가 되돌리면 안 됩니다.
         const aiName = pickClientName(nextAnalysis);
 
-        // /analyze는 core-api에 분석 행을 만들고 analysis_id를 돌려줍니다. 그동안 이 값을
-        // 버리고 있었고, coreAnalysisId는 '저장'을 눌러야만 채워졌습니다.
-        //
-        // 그래서 분석만 하고 서식 초안으로 넘어가면 추천이 로컬 휴리스틱으로 떨어졌습니다
-        // (RecommendedFormsPanel의 canUseCoreApi가 coreId와 coreAnalysisId를 둘 다 요구).
-        // 서식 추천·초안 생성 API가 이 id를 필요로 하므로 분석 직후에 바로 받아둡니다.
+        // /analyze는 이제 DB에 아무것도 저장하지 않고 결과만 돌려줍니다(analysis_id도 없음) —
+        // "분석 내용 저장"을 눌러야 비로소 ai_analysis 행이 생기고 coreAnalysisId가 채워집니다.
+        // 그래서 저장 전에는 RecommendedFormsPanel의 canUseCoreApi(coreId+coreAnalysisId 필요)가
+        // false라 서식 추천이 로컬 휴리스틱으로 보이는데, 이는 의도된 동작입니다: 상담원이
+        // 검토·저장하기 전 결과를 실제 분석 결과인 양 서버에 미리 쌓아두지 않기 위함입니다.
         const patch = {};
         if (nextAnalysis.analysisId && nextAnalysis.analysisId !== selectedCase.coreAnalysisId) {
           patch.coreAnalysisId = nextAnalysis.analysisId;

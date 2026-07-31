@@ -449,12 +449,17 @@ function normalizeMissingInfoItem(item) {
 // relief_review_checklist 객체 그대로입니다: { eligibility, winnability, executability,
 // appropriateness, requires_lawyer_review, checklist_summary_for_lawyer }
 // (backend/ai-api/app/agents/consult/schemas.py의 ReliefReviewChecklist 참고).
-// 예전엔 이 함수가 배열이 아니면 그냥 []를 반환해서, 실제 AI가 계산한 4대 평가기준 신호가
-// 화면에 전혀 반영되지 않고 항상 로컬 임시 체크리스트만 보이는 상태였습니다.
+//
+// 체크리스트는 AI가 대신 체크해주는 항목이 아니라 상담원이 직접 확인하고 체크하는
+// 항목입니다. 그래서 이 객체에서는 항목 이름(라벨) 5개만 만들고, 체크 여부는 AI의
+// eligible/evidence_status 등 판단 신호로 추정하지 않고 항상 false(미체크)로 둡니다.
+// 실제 체크 상태는 상담원이 화면에서 직접 체크한 뒤 checklist_status_json에 저장된
+// 값(위 mapCoreAnalysisResponse의 분기)이 유일한 출처입니다.
 function mapCoreChecklist(rawChecklist) {
   if (!rawChecklist) return [];
   if (Array.isArray(rawChecklist)) {
-    // 상담원이 저장(create/update)했다가 다시 불러온 경우엔 이미 {label, checked} 배열입니다.
+    // 상담원이 저장(create/update)했다가 다시 불러온 경우엔 이미 {label, checked} 배열이라
+    // 실제 체크 상태를 그대로 보존해야 합니다(옛 버전에서 저장된 데이터와의 호환용).
     return rawChecklist.map((item) => ({
       label: item?.label || item?.name || item?.item || '',
       checked: Boolean(item?.checked),
@@ -463,17 +468,17 @@ function mapCoreChecklist(rawChecklist) {
   const { eligibility, winnability, executability, appropriateness } = rawChecklist;
   const items = [];
   if (eligibility) {
-    items.push({ label: '법률구조 대상 여부 확인', checked: eligibility.eligible === '대상' });
-    items.push({ label: '법률구조 대상자 증빙서류 제출 여부 확인', checked: eligibility.evidence_status === '충족' });
+    items.push({ label: '법률구조 대상 여부 확인', checked: false });
+    items.push({ label: '법률구조 대상자 증빙서류 제출 여부 확인', checked: false });
   }
   if (winnability) {
-    items.push({ label: '승소 가능성 기초자료 확인', checked: Boolean(winnability.submitted_evidence_types?.length) });
+    items.push({ label: '승소 가능성 기초자료 확인', checked: false });
   }
   if (executability) {
-    items.push({ label: '집행 가능성 확인', checked: executability.debtor_asset_status === '재산 확인 언급' });
+    items.push({ label: '집행 가능성 확인', checked: false });
   }
   if (appropriateness) {
-    items.push({ label: '구조 타당성 확인', checked: appropriateness.case_nature === '사회적 약자 보호' });
+    items.push({ label: '구조 타당성 확인', checked: false });
   }
   return items;
 }
