@@ -1,4 +1,4 @@
-# ai/forms/drafter.py — 서식 초안 생성 모듈 (정형 치환 + 예시문단 재서술)
+﻿# ai/forms/drafter.py — 서식 초안 생성 모듈 (정형 치환 + 예시문단 재서술)
 #
 # 두 종류의 채우기를 명확히 분리:
 #   A. 정형 치환: 자리표시자(○○○ 등) 주변 라벨로 값 치환. GPT가 before/after 생성.
@@ -24,7 +24,16 @@ from app.ai.forms.verifier import llm_judge
 
 load_dotenv()
 MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
-client = OpenAI()
+_client = None
+
+
+def _get_openai_client():
+    global _client
+
+    if _client is None:
+        _client = OpenAI()
+
+    return _client
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
 HWPX_ROOT = ROOT / "서식_hwpx"
@@ -83,7 +92,7 @@ def _generate_fields(markdown: str, extracted: dict, summary: str) -> dict:
                 f"[사건 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": FIELD_PROMPT},
                       {"role": "user", "content": user_msg}],
@@ -161,7 +170,7 @@ def _generate_table_fields(tables_meta: list, extracted: dict, summary: str) -> 
                 f"[사건 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": TABLE_FIELD_PROMPT},
                       {"role": "user", "content": user_msg}],
@@ -236,7 +245,7 @@ def _classify_table_rows_batch(row_descs: list, extracted: dict, summary: str) -
                 f"[사건 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": TABLE_CLASSIFY_PROMPT},
                       {"role": "user", "content": user_msg}],
@@ -358,7 +367,7 @@ CLASSIFY_PROMPT = """너는 법률 서식 원문에서 '서식 제작자가 넣�
 def _classify_is_example(texts: list) -> bool:
     joined = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": CLASSIFY_PROMPT},
                       {"role": "user", "content": f"[문단들]\n{joined}"}],
@@ -396,7 +405,7 @@ def _classify_examples_batch(texts: list) -> list:
         return []
     numbered = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": CLASSIFY_BATCH_PROMPT},
                       {"role": "user", "content": f"[문단들]\n{numbered}"}],
@@ -523,7 +532,7 @@ def _rewrite_examples(example_texts: list, extracted: dict, summary: str) -> lis
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}\n\n"
                 f"위 사실만으로 문단 {n}개를 작성하라. 사실이 부족하면 뒤 문단은 \"\".")
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": REWRITE_PROMPT},
                       {"role": "user", "content": user_msg}],
@@ -576,7 +585,7 @@ def _selfcheck_and_revise(paragraphs: list, extracted: dict, summary: str) -> li
                 f"[상담 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": REVISE_PROMPT},
                       {"role": "user", "content": user_msg}],
@@ -665,7 +674,7 @@ def _classify_short_fields_batch(texts: list, extracted: dict, summary: str) -> 
                 f"[사건 요약]\n{summary}\n\n"
                 f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False, indent=2)}")
     try:
-        resp = client.chat.completions.create(
+        resp = _get_openai_client().chat.completions.create(
             model=MODEL,
             messages=[{"role": "system", "content": SHORT_FIELD_CLASSIFY_PROMPT},
                       {"role": "user", "content": user_msg}],
