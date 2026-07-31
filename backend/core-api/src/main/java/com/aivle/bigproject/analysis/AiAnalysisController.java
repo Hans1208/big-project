@@ -24,15 +24,16 @@ public class AiAnalysisController {
     }
 
     // POST /api/consultations/{consultationId}/analyze — ai-api 분석 파이프라인을 실제로 실행하고
-    // 그 결과를 새 AiAnalysis row로 저장한다. "분석 시작"/"구조대상 판정"/"누락자료 점검" 버튼이 부르는 엔드포인트.
+    // 그 결과를 돌려준다("분석 시작"/"구조대상 판정"/"누락자료 점검" 버튼이 부르는 엔드포인트). DB에는
+    // 아무것도 저장하지 않는다 — 상담원이 화면에서 결과를 확인/수정한 뒤 "분석 내용 저장"을 눌러야
+    // (아래 create()/update()) 비로소 AiAnalysis row가 생긴다.
     @PostMapping("/api/consultations/{consultationId}/analyze")
-    @ResponseStatus(HttpStatus.CREATED)
     public AiAnalysisResponse analyze(@PathVariable Long consultationId) {
         return aiAnalysisService.analyze(consultationId);
     }
 
-    // POST /api/consultations/{consultationId}/analyses — 이미 만들어진 분석 결과(위 /analyze 응답을
-    // 상담원/변호사가 화면에서 수정한 버전 등)를 새 스냅샷으로 그대로 저장. ai-api를 다시 호출하지 않음.
+    // POST /api/consultations/{consultationId}/analyses — 상담원이 "분석 내용 저장"을 눌렀을 때 위
+    // /analyze 결과(화면에서 수정했을 수 있음)를 처음으로 AiAnalysis row에 저장. ai-api를 다시 호출하지 않음.
     @PostMapping("/api/consultations/{consultationId}/analyses")
     @ResponseStatus(HttpStatus.CREATED)
     public AiAnalysisResponse create(@PathVariable Long consultationId, @RequestBody AiAnalysisRequest request) {

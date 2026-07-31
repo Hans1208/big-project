@@ -51,8 +51,13 @@ public class AiAnalysisService {
         this.auditLogService = auditLogService;
     }
 
-    // 상담 텍스트 + 첨부파일(S3 key)을 ai-api에 보내 실제 분석 파이프라인(/consult/analyze)을 돌리고,
-    // 그 결과를 새 AiAnalysis row로 저장한다. "분석 시작" 버튼이 호출하는 진입점.
+    // 상담 텍스트 + 첨부파일(S3 key)을 ai-api에 보내 실제 분석 파이프라인(/consult/analyze)을 돌리고
+    // 그 결과를 돌려준다. "분석 시작" 버튼이 호출하는 진입점.
+    //
+    // 여기서는 AiAnalysis row를 만들지 않는다. 예전엔 analyze()가 결과를 바로 저장해서, 상담원이
+    // 화면만 보고 "분석 내용 저장"을 누르기 전인데도(심지어 재분석·구조대상 판정·누락자료 점검을
+    // 누를 때마다) ai_analysis 테이블에 행이 쌓였다. 실제 저장은 상담원이 결과를 확인하고
+    // "분석 내용 저장"을 눌렀을 때(create()/update()) 한 번만 일어나야 한다.
     @Transactional
     public AiAnalysisResponse analyze(Long consultationId) {
         Consultation consultation = consultationService.findById(consultationId);
@@ -92,11 +97,10 @@ public class AiAnalysisService {
                 caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
                 null, null, timelineJson, null, null, aiResponse.rawInput().toString());
 
-        AiAnalysis saved = aiAnalysisRepository.save(analysis);
         consultation.setStatus(ConsultationStatus.COMPLETED);
-        auditLogService.record(AuditAction.AI_ANALYSIS_EXECUTE, "AI_ANALYSIS", saved.getId(),
+        auditLogService.record(AuditAction.AI_ANALYSIS_EXECUTE, "AI_ANALYSIS", null,
                 "consultationId=" + consultationId);
-        return toResponse(saved);
+        return toResponse(analysis);
     }
 
     // Consultation -> ai-api RawInput 변환. title/inputText는 그대로, 첨부파일은 storageKey(S3 key) 목록으로.
