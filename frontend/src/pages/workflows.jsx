@@ -7,6 +7,7 @@ import { appendAuditLog, getFavoriteTemplates, readStorage, storageKeys, toggleF
 import {
   approveCoreDocument,
   buildCoreDocumentDownloadUrl,
+  coreAuthHeader,
   createCoreAnalysis,
   createCoreConsultation,
   deleteCoreAttachment,
@@ -3282,17 +3283,44 @@ function generatedFileName(path = '') {
 // consultationId+documentId를 넘기면(=core-api에 실제 저장된 문서) 새로 생긴 다운로드 API로
 // 진짜 파일을 받는 링크를 만듭니다. 없으면(로컬 전용 문서) 예전처럼 draft_file_path 자체를
 // 링크로 쓸 수 있는지만 확인합니다(blob: URL 등).
+// core-api가 인증을 요구하게 되면서 <a href>로는 더 이상 받을 수 없습니다. 브라우저가 주소만
+// 열고 Authorization 헤더를 실어주지 않아 401이 나기 때문입니다.
+// fetch로 받아 blob으로 만든 뒤, 그 blob을 가리키는 임시 링크를 클릭시켜 저장합니다.
+// 사용자가 보는 동작(눌러서 내려받기)은 그대로입니다.
 function ServerDocumentDownloadButton({ url, fileName, className = '' }) {
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState('');
   if (!url) return null;
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    setError('');
+    try {
+      const response = await fetch(url, { headers: coreAuthHeader() });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fileName || '첨부파일';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // 브라우저가 저장을 시작할 시간을 준 뒤 해제합니다. 바로 지우면 받다 말고 끊깁니다.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    } catch (downloadError) {
+      setError(`다운로드 실패 (${downloadError.message})`);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <span className="serverDocumentDownload">
-      <a
-        className={className || undefined}
-        href={url}
-        download={fileName || true}
-      >
-        다운로드
-      </a>
+      <button type="button" className={className || undefined} onClick={handleDownload} disabled={downloading}>
+        {downloading ? '내려받는 중…' : '다운로드'}
+      </button>
+      {error ? <span className="formError">{error}</span> : null}
     </span>
   );
 }
