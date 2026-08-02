@@ -57,6 +57,15 @@ public class User {
     @Column(name = "approval_status", nullable = false)
     private ApprovalStatus approvalStatus = ApprovalStatus.PENDING;
 
+    // 개인정보 수집·이용에 동의한 시각 (개인정보 보호법 제15조 제2항).
+    //
+    // 화면에서 동의를 받는 것만으로는 부족하다 — 분쟁이 생기면 "동의를 받았다"는 증빙이
+    // 있어야 한다. 동의 없이 가입할 수 없으므로 신규 가입은 항상 값이 채워지고,
+    // 이 컬럼이 비어 있는 계정은 이 기능이 생기기 전에 만들어진 것이다(소급 기록은 하지 않는다 —
+    // 받지 않은 동의를 받은 것처럼 남기면 증빙이 아니라 위조가 된다).
+    @Column(name = "privacy_agreed_at")
+    private LocalDateTime privacyAgreedAt;
+
     @CreatedDate
     @Column(nullable = false, updatable = false) // 생성 시 한 번만 기록, 이후 수정 불가
     private LocalDateTime createdAt;

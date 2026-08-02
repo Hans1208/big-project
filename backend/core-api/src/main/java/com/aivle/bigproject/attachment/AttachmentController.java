@@ -36,7 +36,8 @@ public class AttachmentController {
     // (frontend/src/services/s3UploadClient.js가 상담 등록 화면에서 파일 선택 즉시 호출)
     @PostMapping("/api/attachments/presigned-upload")
     public AttachmentPresignedUploadResponse presignedUpload(@RequestBody AttachmentPresignedUploadRequest request) {
-        var presigned = s3FileStorageService.presignUpload(request.fileName(), request.contentType(), Duration.ofMinutes(15));
+        var presigned = s3FileStorageService.presignUpload(
+                request.fileName(), request.contentType(), request.sizeBytes(), Duration.ofMinutes(15));
         return new AttachmentPresignedUploadResponse(presigned.uploadUrl(), presigned.key(), presigned.publicUrl());
     }
 
