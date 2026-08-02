@@ -1,9 +1,7 @@
 package com.aivle.bigproject.document;
 
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
@@ -12,20 +10,22 @@ import tools.jackson.databind.JsonNode;
 // 응답 형태가 아직 유동적(ai-api draft()가 계속 필드를 추가/변경해왔음)이라 고정 DTO 대신
 // JsonNode로 그대로 받고, 필요한 필드만 Service에서 뽑아 쓴다.
 //
-// RestClient가 기본으로 고르는 JDK java.net.http.HttpClient는 POST에 "Expect: 100-continue"를
-// 붙이는데, uvicorn(ai-api)이 이를 제대로 처리 못 해서 본문이 아예 전달 안 되고 연결이
-//끊기는 문제가 있었다(ai-api 쪽엔 "body 필드 없음"으로만 찍혀서 원인 파악이 오래 걸림).
-// HttpURLConnection 기반의 SimpleClientHttpRequestFactory로 명시해서 우회한다.
+// AiApiClientConfig의 공유 RestClient 빈을 쓴다. 예전에는 여기서 클라이언트를 따로 만들었는데,
+// 그쪽에는 타임아웃 설정이 없어서 ai-api가 응답하지 않으면 호출한 스레드가 무한정 붙잡혔다.
+// 서식 추천과 초안 생성은 둘 다 LLM을 거치는 느린 경로라, 그런 요청이 쌓이면 톰캣 스레드가
+// 모두 묶여 로그인·상담 조회 같은 무관한 기능까지 함께 멈춘다.
+//
+// 두 클라이언트는 같은 uvicorn 문제를 각자 다르게 우회하고 있었다. 여기는
+// SimpleClientHttpRequestFactory(HttpURLConnection)로, 공유 빈은 JDK HttpClient를 HTTP/1.1로
+// 고정해서 풀었다. 공유 빈 쪽이 이미 /consult/analyze의 POST 본문 전송에 쓰이며 문제없이
+// 동작하므로, 우회 방법을 하나로 합치고 타임아웃·Jackson 설정도 함께 물려받는다.
 @Component
 public class AiApiClient {
 
     private final RestClient restClient;
 
-    public AiApiClient(@Value("${app.ai-api.base-url}") String baseUrl) {
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(new SimpleClientHttpRequestFactory())
-                .build();
+    public AiApiClient(RestClient aiApiRestClient) {
+        this.restClient = aiApiRestClient;
     }
 
     public JsonNode recommendForms(String caseType, String caseSubtype, String summary, JsonNode extractedJson) {
