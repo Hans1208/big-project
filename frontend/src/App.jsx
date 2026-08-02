@@ -851,7 +851,10 @@ function App() {
     if (registerPending) return;
     setRegisterPending(true);
     try {
-      const raw = await registerCoreUser({ name: user.name, role: user.role, email: user.email, password: user.password });
+      const raw = await registerCoreUser({
+        name: user.name, role: user.role, email: user.email, password: user.password,
+        privacyAgreed: user.privacyAgreed,
+      });
       // 상담원/변호사는 '대기' 상태로 가입되어 관리자 승인 전까지 로그인할 수 없고,
       // 관리자는 승인 절차 없이 즉시 사용 가능하도록(초기 관리자 부트스트랩 문제 방지) '승인'으로 등록합니다.
       // (백엔드도 AuthService.register에서 같은 규칙으로 approvalStatus를 정합니다)

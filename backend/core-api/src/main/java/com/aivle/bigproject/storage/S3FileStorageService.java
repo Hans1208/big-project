@@ -49,13 +49,16 @@ public class S3FileStorageService {
     // 실제 오브젝트는 아직 존재하지 않음 — key는 여기서 미리 채번만 함.
     public record PresignedUpload(String key, String uploadUrl, String publicUrl) {}
 
-    // TODO(규제): 파일명·contentType을 클라이언트가 준 그대로 서명하고 있음 — 검증 필요.
-    //   시큐어코딩 가이드 "위험한 형식 파일 업로드" 항목. 확장자 화이트리스트, 확장자와
-    //   contentType 일치 확인, 파일명의 경로문자(/ \)·개행 제거가 필요하다.
-    //   실제 바이트는 S3로 직행해 서버를 거치지 않으므로 Spring의 multipart 제한이 걸리지 않는다.
-    //   크기는 프론트 file.size 검사와 application.yaml 양쪽으로 막아야 한다.
-    public PresignedUpload presignUpload(String originalFileName, String contentType, Duration expiration) {
-        String key = "consult-attachments/" + UUID.randomUUID() + "__" + originalFileName;
+    // 파일 바이트는 브라우저가 S3로 직접 올려서 서버를 지나지 않는다. 그래서 서버가 개입할 수
+    // 있는 유일한 지점이 여기다 — 허용하지 않을 파일이면 presigned URL 자체를 내주지 않는다.
+    // 검증 규칙은 UploadFilePolicy 참고.
+    public PresignedUpload presignUpload(String originalFileName, String contentType, Long sizeBytes,
+                                          Duration expiration) {
+        UploadFilePolicy.validate(originalFileName, contentType, sizeBytes);
+        // key에는 정리된 이름을 쓴다. 원본에 '/'나 개행이 있으면 의도하지 않은 위치에
+        // 오브젝트가 생기거나 응답 헤더가 쪼개질 수 있다.
+        String safeFileName = UploadFilePolicy.sanitizeFileName(originalFileName);
+        String key = "consult-attachments/" + UUID.randomUUID() + "__" + safeFileName;
         try (S3Presigner presigner = S3Presigner.builder().region(Region.of(region)).credentialsProvider(credentialsProvider).build()) {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucket)
@@ -77,7 +80,9 @@ public class S3FileStorageService {
     // 파일을 {상담ID}/{uuid}_{원본파일명} 형태의 key로 S3에 업로드하고, 그 key를 돌려줌
     // (로컬 버전의 "rootDir 기준 상대경로"에 대응하는 개념 — 이 key를 DB(Attachment.fileUrl)에 저장)
     public String store(Long consultationId, MultipartFile file) {
-        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
+        // presigned 경로와 같은 규칙으로 막는다. 이쪽은 서버를 거치므로 실제 크기를 알 수 있다.
+        UploadFilePolicy.validate(file.getOriginalFilename(), file.getContentType(), file.getSize());
+        String originalName = UploadFilePolicy.sanitizeFileName(file.getOriginalFilename());
         String key = consultationId + "/" + UUID.randomUUID() + "__" + originalName;
 
         try {

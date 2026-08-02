@@ -153,10 +153,12 @@ function authHeader(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export function registerCoreUser({ name, role, email, password }) {
+// privacyAgreed(개인정보 수집·이용 동의)를 함께 보냅니다. 서버가 이 값을 확인하고
+// 동의 시각을 users.privacy_agreed_at에 남깁니다 — 화면에서만 받으면 증빙이 남지 않습니다.
+export function registerCoreUser({ name, role, email, password, privacyAgreed }) {
   return requestCoreJson('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ name, role: toCoreRole(role), email, password }),
+    body: JSON.stringify({ name, role: toCoreRole(role), email, password, privacyAgreed: Boolean(privacyAgreed) }),
   });
 }
 
