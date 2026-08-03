@@ -2081,7 +2081,41 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
           </div>
         ) : null}
         {analyzed ? (
+          <>
+          <div className="resultInlineRow">
+                <h3>AI 응답 검증</h3>
+                <span className={`statusChip ${analysis.verification?.format ? 'tone-success' : 'tone-danger'}`}>형식 검증 {analysis.verification?.format ? '통과' : '오류'}</span>
+                <span className={`statusChip ${analysis.verification?.grounded ? 'tone-success' : 'tone-warn'}`}>근거 검증 {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
+                <span className={`statusChip ${analysis.verification?.hallucinationRisk ? 'tone-danger' : 'tone-success'}`}>환각 탐지 {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
+              </div>
+              <div className="resultInlineRow">
+                <h3>받은 자료</h3>
+                {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
+                    병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
+                {(analysis.modalities || []).map((item) => (
+                  <span key={item.key} className="modalityStat">
+                    <span className={`statusChip ${item.count > 0 ? 'tone-info' : 'tone-muted'}`}>{item.key}</span>
+                    <strong className="modalityValue">{item.count}건</strong>
+                  </span>
+                ))}
+              </div>
+              <div className="resultInlineRow">
+                <h3>자료 읽기 결과</h3>
+                {analysis.extractionDetail?.length ? analysis.extractionDetail.map((item, index) => (
+                  <span
+                    key={`${item.fileLink}-${index}`}
+                    className={`extractChip status-${item.status}`}
+                    title={[item.fileLink, item.note].filter(Boolean).join(' · ')}
+                  >
+                    <strong>{extractionStatusLabel(item.status)}</strong>
+                    <span>{item.fileLink || '(파일명 없음)'}</span>
+                    {item.note ? <em>{item.note}</em> : null}
+                  </span>
+                )) : <span className="resultInlineEmpty">첨부파일 없음 · 메모만 분석</span>}
+              </div>
+          
           <div className="analysisControlBar">
+            
             <div>
               <strong>AI 자동 확인</strong>
               <span>결과 확인 · 저장 · 검토 요청</span>
@@ -2106,6 +2140,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               </button>
             </div>
           </div>
+          </>
         ) : null}
         {activeReviewAction ? (
           <section className={`reviewRequestBanner tone-${reviewActionTone(activeReviewAction.status)}`}>
@@ -2177,37 +2212,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               
               <h3>인공지능 분석 요약</h3>
               <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
-              <div className="resultInlineRow">
-                <h3>AI 응답 검증</h3>
-                <span className={`statusChip ${analysis.verification?.format ? 'tone-success' : 'tone-danger'}`}>형식 검증 {analysis.verification?.format ? '통과' : '오류'}</span>
-                <span className={`statusChip ${analysis.verification?.grounded ? 'tone-success' : 'tone-warn'}`}>근거 검증 {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
-                <span className={`statusChip ${analysis.verification?.hallucinationRisk ? 'tone-danger' : 'tone-success'}`}>환각 탐지 {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
-              </div>
-              <div className="resultInlineRow">
-                <h3>받은 자료</h3>
-                {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
-                    병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
-                {(analysis.modalities || []).map((item) => (
-                  <span key={item.key} className="modalityStat">
-                    <span className={`statusChip ${item.count > 0 ? 'tone-info' : 'tone-muted'}`}>{item.key}</span>
-                    <strong className="modalityValue">{item.count}건</strong>
-                  </span>
-                ))}
-              </div>
-              <div className="resultInlineRow">
-                <h3>자료 읽기 결과</h3>
-                {analysis.extractionDetail?.length ? analysis.extractionDetail.map((item, index) => (
-                  <span
-                    key={`${item.fileLink}-${index}`}
-                    className={`extractChip status-${item.status}`}
-                    title={[item.fileLink, item.note].filter(Boolean).join(' · ')}
-                  >
-                    <strong>{extractionStatusLabel(item.status)}</strong>
-                    <span>{item.fileLink || '(파일명 없음)'}</span>
-                    {item.note ? <em>{item.note}</em> : null}
-                  </span>
-                )) : <span className="resultInlineEmpty">첨부파일 없음 · 메모만 분석</span>}
-              </div>
+              
               <h3>개인정보는 자동으로 가려집니다</h3>
               <div className="resultCard">
                 <div className="segmented compactSegmented">
