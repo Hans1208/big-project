@@ -7,6 +7,7 @@ import { appendAuditLog, getFavoriteTemplates, readStorage, storageKeys, toggleF
 import {
   approveCoreDocument,
   buildCoreDocumentDownloadUrl,
+  changeCorePassword,
   coreAuthHeader,
   createCoreAnalysis,
   createCoreConsultation,
@@ -3375,10 +3376,12 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
     email: currentUser?.email || '',
     organization: currentUser?.organization || '',
     phone: currentUser?.phone || '',
+    currentPassword: '',
     password: '',
     confirmPassword: '',
   });
   const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
   const mismatch = form.confirmPassword && form.password !== form.confirmPassword;
   const roleLabel = role === 'counselor' ? '상담원' : role === 'lawyer' ? '변호사' : '관리자';
   // 상담원/변호사는 가입 시 등록된 이메일·소속기관이 계정 식별/조직 배정 기준이라
@@ -3390,7 +3393,7 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
   const branchValue = currentUser?.branch || savedBranch || '';
   const departmentValue = currentUser?.department || savedDepartmentParts.join(' / ');
 
-  const save = () => {
+  const save = async () => {
     if (!form.email) {
       setMessage('이메일을 입력해주세요.');
       return;
@@ -3399,17 +3402,41 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
       setMessage('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
       return;
     }
-    onUpdateProfile({
-      // 잠긴 필드는 화면에서 수정이 막혀 있지만, 혹시 모를 우회를 방지하고자 저장 시에도
-      // 원래 계정 값(currentUser)을 그대로 사용하고 form 값은 무시합니다.
-      email: lockContactFields ? (currentUser?.email || '') : form.email,
-      password: form.password || currentUser?.password || '',
-      organization: lockContactFields ? (currentUser?.organization || '') : form.organization,
-      // 연락처는 신원·소속 확인용 정보가 아니라 실무 연락 목적이라 역할과 무관하게 본인이 직접 수정할 수 있습니다.
-      phone: form.phone,
-    });
-    setMessage('프로필이 저장되었습니다.');
-    setForm((current) => ({ ...current, password: '', confirmPassword: '' }));
+    // 비밀번호는 core-api로 따로 보냅니다.
+    //
+    // 예전에는 이 값을 onUpdateProfile에 함께 넘겼는데, 받는 쪽(App.updateProfile)이
+    // 실제로는 저장하지 않으면서 감사 로그에는 '비밀번호 변경'으로 남겼습니다. 그래서
+    // 어떤 값을 넣어도 바뀌지 않는데 화면에는 저장됐다고 뜨는 상태였습니다.
+    const wantsPasswordChange = Boolean(form.password);
+    if (wantsPasswordChange && !form.currentPassword) {
+      setMessage('비밀번호를 바꾸려면 현재 비밀번호를 입력해주세요.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (wantsPasswordChange) {
+        // 서버가 현재 비밀번호 확인·동일 비밀번호 차단·작성규칙 검사를 모두 담당합니다.
+        // 실패하면 여기서 멈춰, 연락처만 저장되고 비밀번호는 안 바뀐 채 성공 메시지가
+        // 뜨는 일이 없게 합니다.
+        await changeCorePassword({ currentPassword: form.currentPassword, newPassword: form.password });
+      }
+      onUpdateProfile({
+        // 잠긴 필드는 화면에서 수정이 막혀 있지만, 혹시 모를 우회를 방지하고자 저장 시에도
+        // 원래 계정 값(currentUser)을 그대로 사용하고 form 값은 무시합니다.
+        email: lockContactFields ? (currentUser?.email || '') : form.email,
+        organization: lockContactFields ? (currentUser?.organization || '') : form.organization,
+        // 연락처는 신원·소속 확인용 정보가 아니라 실무 연락 목적이라 역할과 무관하게 본인이 직접 수정할 수 있습니다.
+        phone: form.phone,
+        passwordChanged: wantsPasswordChange,
+      });
+      setMessage(wantsPasswordChange ? '프로필과 비밀번호가 저장되었습니다.' : '프로필이 저장되었습니다.');
+      setForm((current) => ({ ...current, currentPassword: '', password: '', confirmPassword: '' }));
+    } catch (error) {
+      setMessage(error.message || '비밀번호를 변경하지 못했습니다.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -3450,8 +3477,14 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
       </label>
       <div className="formGrid">
         <label className="field">
+          <span>현재 비밀번호</span>
+          <input value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} type="password" placeholder="비밀번호를 바꿀 때만 입력" autoComplete="current-password" />
+        </label>
+      </div>
+      <div className="formGrid">
+        <label className="field">
           <span>새 비밀번호</span>
-          <input value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} type="password" placeholder="변경할 때만 입력" />
+          <input value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} type="password" placeholder="변경할 때만 입력" autoComplete="new-password" />
         </label>
         <label className="field">
           <span>새 비밀번호 확인</span>
@@ -3460,7 +3493,7 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
       </div>
       {mismatch ? <p className="formError">비밀번호와 비밀번호 확인이 일치하지 않습니다.</p> : null}
       {message ? <p className={message.includes('저장') ? 'helperText success' : 'formError'}>{message}</p> : null}
-      <button className="primaryButton" type="button" onClick={save}>프로필 수정 저장</button>
+      <button className="primaryButton" type="button" onClick={save} disabled={saving}>{saving ? '저장 중...' : '프로필 수정 저장'}</button>
       </div>
       </div>
     </section>

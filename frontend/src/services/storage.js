@@ -8,6 +8,9 @@ export const storageKeys = {
   registeredRole: 'registeredRole',
   authToken: 'authToken',
   consultations: `${STORAGE_PREFIX}:consultations`,
+  // 위 consultations를 마지막으로 채운 계정. 다른 계정으로 로그인하면 남의 상담이
+  // 그대로 보이므로, 이 값이 바뀌면 목록을 비우고 서버에서 다시 받는다(App.jsx 참고).
+  consultationsOwner: `${STORAGE_PREFIX}:consultationsOwner`,
   reviews: `${STORAGE_PREFIX}:reviews`,
   accounts: `${STORAGE_PREFIX}:accounts`,
   auditLogs: `${STORAGE_PREFIX}:auditLogs`,

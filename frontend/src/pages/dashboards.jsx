@@ -870,12 +870,24 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   const [lawyerComment, setLawyerComment] = useState('');
   const [editedSummary, setEditedSummary] = useState(analysis.summary || '');
   const summaryEdited = editedSummary.trim() !== (analysis.summary || '').trim();
-  const completeDecision = () => {
+  // 확정은 core-api 호출이 끝나야 화면이 넘어갑니다(decideReview가 await 후 setActiveReview(null)).
+  // 그동안 아무 표시가 없으면 안 눌린 줄 알고 '검토 확정'을 다시 누르게 되고, 그 사이 첫 요청은
+  // 이미 처리되고 있어 승인이 두 번 나갈 수 있습니다. 진행 중임을 버튼에 드러내고 잠급니다.
+  const [submitting, setSubmitting] = useState(false);
+  const completeDecision = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     setShowFinalHitlConfirm(false);
-    onDecide(review.id, decision, trimmedReason, recipientEmail, {
-      lawyerComment: lawyerComment.trim(),
-      editedSummary: summaryEdited ? editedSummary.trim() : '',
-    });
+    try {
+      await onDecide(review.id, decision, trimmedReason, recipientEmail, {
+        lawyerComment: lawyerComment.trim(),
+        editedSummary: summaryEdited ? editedSummary.trim() : '',
+      });
+    } finally {
+      // 성공하면 이 화면 자체가 사라지지만(setActiveReview(null)), 실패해 남아 있을 때는
+      // 다시 시도할 수 있어야 하므로 잠금을 푼다.
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -1122,7 +1134,7 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
 
         <div className="inlineControls statusConfirmActions">
           <button className="smallButton light" type="button" onClick={onClose}>취소</button>
-          <button className="primaryButton hitlSubmitButton" type="button" disabled={!canSubmit} onClick={() => setShowFinalHitlConfirm(true)}>검토 확정</button>
+          <button className="primaryButton hitlSubmitButton" type="button" disabled={!canSubmit || submitting} onClick={() => setShowFinalHitlConfirm(true)}>{submitting ? '확정 처리 중...' : '검토 확정'}</button>
         </div>
         <p className="helperText">결정자 {reviewer} · 감사 로그/알림 반영</p>
         {showFinalHitlConfirm ? (

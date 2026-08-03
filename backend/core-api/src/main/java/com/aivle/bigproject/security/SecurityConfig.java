@@ -33,6 +33,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // 비밀번호 변경은 로그인한 본인만 — 아래 permitAll보다 먼저 와야 한다.
+                        // (순서가 뒤바뀌면 /api/auth/** 규칙이 먼저 걸려 인증 없이 통과한다)
+                        .requestMatchers(HttpMethod.POST, "/api/auth/password").authenticated()
                         .requestMatchers("/api/auth/**").permitAll()
                         // 가입 승인/거절/대기목록은 관리자 권한 로직의 핵심이라 실제로 막아둔다.
                         // 토큰 없이 호출하면 인증 자체가 안 잡혀 401, LAWYER/CONSULTANT 토큰으로
