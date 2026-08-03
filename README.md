@@ -64,7 +64,7 @@ py -3.12 -m venv venv
 pip install -r requirements.txt
 
 cd app
-uvicorn main:app --reload --port 8002
+uvicorn main:app --reload --port 8000
 ```
 
 ```
@@ -78,7 +78,7 @@ set WHISPER_COMPUTE_TYPE=float16
 `VITE_STT_MASK_API_URL`을 배포 주소로 맞춘다.
 
 프론트는 `frontend/.env`(또는 `.env.local`)의 `VITE_STT_MASK_API_URL`로 이 서버 주소를 읽는다.
-기본값은 `http://127.0.0.1:8002`.
+기본값은 `http://127.0.0.1:8000`.
 
 ### 4. Spring Boot (core-api)
 

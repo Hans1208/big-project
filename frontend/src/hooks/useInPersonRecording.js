@@ -10,7 +10,7 @@ const CHUNK_INTERVAL_MS = 5000;
 
 // mic-stt 서버 주소는 VPC 내부망일 수 있어 하드코딩하지 않고, coreApiClientV2.js/
 // realtimeAudioStream.js와 같은 방식으로 환경변수에서 읽는다.
-export const MIC_STT_WS_URL = import.meta.env.VITE_MIC_STT_WS_URL || 'ws://127.0.0.1:8002/ws/consult';
+export const MIC_STT_WS_URL = import.meta.env.VITE_MIC_STT_WS_URL || 'ws://127.0.0.1:8000/ws/consult';
 
 export function useInPersonRecording({ wsUrl }) {
   const [status, setStatus] = useState('idle'); // idle | connecting | recording | processing | done | error
