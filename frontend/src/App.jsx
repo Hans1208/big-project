@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // 화면 전환과 전역 상태를 관리하는 프론트엔드 최상위 컴포넌트입니다.
 import { Header, Footer, DashboardHeader } from './components/layout.jsx';
 import { initialConsultations, initialReviews, today } from './constants.jsx';
 import { LoginPage, RegisterPage, PasswordFindPage } from './pages/auth.jsx';
 import { CounselorDashboard, LawyerDashboard, AdminDashboard } from './pages/dashboards.jsx';
-import { hydrateAnalysisForDisplay } from './pages/workflows.jsx';
+import { hydrateAnalysisForDisplay, runConsultationAnalysis } from './pages/workflows.jsx';
 import { appendAuditLog, readStorage, readTextStorage, storageKeys, writeStorage, writeTextStorage } from './services/storage.js';
 import { LoadingProvider } from './components/loading.jsx';
 import { FeedbackProvider, useToast } from './components/feedback.jsx';
@@ -368,6 +368,60 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     }, ...items]);
   };
 
+  // AI 분석 실행을 화면이 아니라 여기서 맡습니다.
+  //
+  // 분석은 40~70초 걸리는데, 그동안 상담원이 다른 상담을 보거나 새 전화를 받을 수 있어야
+  // 합니다. 분석 화면 안에서 기다리면 화면을 옮기는 순간 컴포넌트와 함께 사라져서, 서버는
+  // 계속 돌지만 결과를 받을 곳이 없어 그대로 버려집니다. App은 화면이 바뀌어도 살아있으므로
+  // 여기서 돌리면 끝까지 진행되고, 끝났을 때 알림으로 알려줄 수 있습니다.
+  //
+  // 진행 중인 작업은 상담별로 들고 있습니다(여러 상담을 동시에 분석할 수 있음).
+  const [analysisRuns, setAnalysisRuns] = useState({});
+  // 중복 실행 검사에 state를 쓰면 직전 렌더의 값을 보게 되어(연타 시) 같은 분석이 두 번
+  // 시작될 수 있습니다. 검사는 항상 최신인 ref로 합니다.
+  const analysisRunIdsRef = useRef(new Set());
+
+  const startConsultationAnalysis = async (consultation) => {
+    const id = consultation?.id;
+    if (!id || analysisRunIdsRef.current.has(id)) return { ok: false, alreadyRunning: true };
+
+    analysisRunIdsRef.current.add(id);
+    setAnalysisRuns((runs) => ({ ...runs, [id]: { elapsedSec: 0 } }));
+    try {
+      const { analysis, patch } = await runConsultationAnalysis(consultation, {
+        onProgress: ({ elapsedMs }) => setAnalysisRuns((runs) => (
+          runs[id] ? { ...runs, [id]: { elapsedSec: Math.floor(elapsedMs / 1000) } } : runs
+        )),
+      });
+      setConsultations((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+      addNotification({
+        roles: 'counselor',
+        title: 'AI 분석 완료',
+        message: `${consultation.caseNo || ''} ${consultation.title || ''}`.trim() || '상담 분석이 끝났습니다.',
+        target: consultation.caseNo || '',
+        view: '기타',
+      });
+      return { ok: true, analysis };
+    } catch (error) {
+      // 실패도 알림으로 남깁니다 — 다른 화면에 가 있으면 화면 안 메시지를 볼 수 없습니다.
+      addNotification({
+        roles: 'counselor',
+        title: 'AI 분석 실패',
+        message: `${consultation.caseNo || ''} ${error.message || '분석에 실패했습니다.'}`.trim(),
+        target: consultation.caseNo || '',
+        view: '기타',
+      });
+      return { ok: false, error };
+    } finally {
+      analysisRunIdsRef.current.delete(id);
+      setAnalysisRuns((runs) => {
+        const next = { ...runs };
+        delete next[id];
+        return next;
+      });
+    }
+  };
+
   const markNotificationsRead = (targetRole, targetEmail) => {
     const personalKey = notificationUserKey(targetRole, targetEmail);
     setNotifications((items) => items.map((item) => isNotificationVisible(item, targetRole, targetEmail) ? {
@@ -647,7 +701,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
           setActiveView('기타');
         }}
       />
-      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} /> : null}
+      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
       {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} focusedAdminView={focusedAdminView} /> : null}
     </div>

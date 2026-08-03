@@ -61,6 +61,37 @@ async function fetchAnalysisWithFallback(selectedCase, options = {}) {
   }
 }
 
+// 분석 실행을 화면 밖(App)에서 돌릴 수 있게 떼어낸 입구입니다.
+//
+// 분석은 40~70초 걸립니다. 이걸 AnalysisWorkbench 안에서 await하면 상담원이 다른 메뉴로
+// 옮기는 순간 컴포넌트가 언마운트되면서 기다리던 것도 같이 사라집니다. 서버(analysis_job)는
+// 계속 돌지만 결과를 받을 주체가 없어 그대로 버려집니다.
+//
+// App이 이 함수를 호출하면 화면을 옮겨 다녀도 끝까지 진행되고, 끝났을 때 알림을 띄울 수
+// 있습니다. 화면에 그릴 analysis와 상담에 반영할 patch를 함께 돌려줍니다.
+export async function runConsultationAnalysis(consultation, options = {}) {
+  const analysis = await fetchAnalysisWithFallback(consultation, options);
+
+  // 분석 결과 자체를 상담에 실어 보관합니다 — 화면 상태에만 두면 페이지를 옮길 때 사라집니다.
+  // 서버 저장과는 무관합니다: ai_analysis 행은 상담원이 "분석 내용 저장"을 눌러야 생깁니다.
+  const patch = { analysis };
+  if (analysis.analysisId && analysis.analysisId !== consultation.coreAnalysisId) {
+    patch.coreAnalysisId = analysis.analysisId;
+  }
+
+  // 통화에서 확인된 상담자 이름을 AI가 채웁니다. 전화를 받자마자 상담이 만들어지므로
+  // 시작 시점에는 이름을 모르고, 분석이 끝나야 알 수 있습니다.
+  //
+  // 상담원이 직접 입력·수정한 이름은 덮어쓰지 않습니다. Whisper가 '이도영'을 '이도형'으로
+  // 듣는 일이 있는데, 사람이 확인해 고쳐둔 값을 기계가 되돌리면 안 됩니다.
+  const aiName = pickClientName(analysis);
+  if (aiName && !consultation.name && consultation.nameSource !== 'counselor') {
+    patch.name = aiName;
+    patch.nameSource = 'ai';
+  }
+  return { analysis, patch };
+}
+
 // 저장된 분석(core-api 응답)을 화면이 쓸 수 있는 모양으로 되살립니다.
 //
 // 분석을 방금 돌린 경로(fetchAnalysisWithFallback)와 같은 병합을 거치게 해서, 새로고침 후
@@ -1617,10 +1648,13 @@ function RecommendedFormsPanel({ selectedCase, onSaveBeforeOpen, saving }) {
   );
 }
 
-function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, currentUser, onGoToDashboard, onOpenDraft, focusedConsultationId }) {
+function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, currentUser, onGoToDashboard, onOpenDraft, focusedConsultationId, analysisRuns = {}, onStartAnalysis }) {
   const [selectedId, setSelectedId] = useState(focusedConsultationId || caseOptions(consultations)[0].id);
   const [analyzed, setAnalyzed] = useState(false);
   const selectedCase = consultations.find((item) => String(item.id) === String(selectedId));
+  // 이 상담의 분석이 App에서 돌고 있는지. 화면을 떠났다 돌아와도 App이 계속 들고 있으므로
+  // 여기서는 그 값을 읽기만 하면 됩니다("분석 중... 1:53" 표시가 그대로 이어집니다).
+  const activeRun = analysisRuns[selectedCase?.id];
   // 통화 시작/종료 상태입니다. 실제 전화 연동 전까지는 상담원이 직접 누르는 버튼으로 관리하고,
   // 사건을 바꾸면(다른 상담을 고르면) 이전 통화 상태가 남아있지 않도록 초기화합니다.
   const [callStatus, setCallStatus] = useState('idle');
@@ -1672,9 +1706,16 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   const [aiTaskMessage, setAiTaskMessage] = useState('');
   const [aiResultSummary, setAiResultSummary] = useState(null);
   const [analysisSaved, setAnalysisSaved] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  // 분석이 몇 분씩 걸리므로, 멈춘 것처럼 보이지 않게 경과 시간을 버튼에 보여줍니다.
-  const [analysisElapsedSec, setAnalysisElapsedSec] = useState(0);
+  // 구조대상·누락자료 버튼처럼 이 화면 안에서 끝나는 짧은 작업의 진행 상태입니다.
+  // 사건 분석 자체는 App이 돌리므로(analysisRuns) 여기서 관리하지 않습니다.
+  const [isLocalTaskRunning, setIsLocalTaskRunning] = useState(false);
+  // 분석 버튼을 잠글지 판단하는 값 — App에서 도는 사건 분석과 이 화면의 짧은 작업 둘 다 포함.
+  const isAnalyzing = Boolean(activeRun) || isLocalTaskRunning;
+  // 구조대상·누락자료 버튼은 보통 분석 시작에서 받아둔 결과를 재사용해 즉시 끝나지만,
+  // 분석 전에 이 버튼부터 누르면 실제로 분석이 돌아 몇십 초가 걸립니다. 그때도 멈춘 것처럼
+  // 보이지 않도록 경과 시간을 따로 셉니다.
+  const [localElapsedSec, setLocalElapsedSec] = useState(0);
+  const analysisElapsedSec = activeRun?.elapsedSec ?? localElapsedSec;
   const [isStartingQuickSession, setIsStartingQuickSession] = useState(false);
   // useAsyncAction(전역 로딩 오버레이)은 여기서 더 이상 쓰지 않습니다 — 분석이 몇 분씩 걸려서,
   // 화면 전체를 덮으면 그동안 다른 상담을 볼 수도 접수할 수도 없었습니다(startAnalysis 주석 참고).
@@ -1724,62 +1765,48 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   // 그 오버레이는 화면 전체를 덮어 클릭을 막는데, 분석은 녹취 길이에 따라 몇 분씩 걸립니다.
   // 그동안 상담원이 다른 상담을 보거나 새 전화를 접수하는 것까지 전부 막힙니다.
   // 대신 아래 progress 콜백으로 경과 시간만 받아 버튼에 표시합니다.
-  const trackAnalysisProgress = { onProgress: ({ elapsedMs }) => setAnalysisElapsedSec(Math.floor(elapsedMs / 1000)) };
+  const trackAnalysisProgress = { onProgress: ({ elapsedMs }) => setLocalElapsedSec(Math.floor(elapsedMs / 1000)) };
 
+  // 실행은 App이 맡습니다(startConsultationAnalysis) — 상담원이 분석을 걸어두고 다른 메뉴로
+  // 옮겨도 끝까지 진행되고, 끝나면 알림이 뜹니다. 이 화면은 시작만 시키고, 결과는 상담 객체에
+  // 실려 돌아오는 것을 아래 effect가 받아 그립니다.
   const startAnalysis = async () => {
     if (!selectedCase || isAnalyzing) return;
-    setIsAnalyzing(true);
-    setAnalysisElapsedSec(0);
     setAiTaskMessage('');
-    try {
-      const nextAnalysis = await fetchAnalysisWithFallback(selectedCase, trackAnalysisProgress);
-      setAnalysis(nextAnalysis);
-      // 통화에서 확인된 상담자 이름을 AI가 채웁니다. 통화 시작 시점에는 이름을 모르고
-      // 시작하므로(전화를 받자마자 상담이 만들어짐), 분석이 끝나야 알 수 있습니다.
-      //
-      // 상담원이 이미 직접 입력·수정한 이름은 덮어쓰지 않습니다. Whisper가 '이도영'을
-      // '이도형'으로 듣는 일이 있는데, 사람이 확인해 고쳐둔 값을 기계가 되돌리면 안 됩니다.
-      const aiName = pickClientName(nextAnalysis);
-
-      // /analyze는 이제 DB에 아무것도 저장하지 않고 결과만 돌려줍니다(analysis_id도 없음) —
-      // "분석 내용 저장"을 눌러야 비로소 ai_analysis 행이 생기고 coreAnalysisId가 채워집니다.
-      // 그래서 저장 전에는 RecommendedFormsPanel의 canUseCoreApi(coreId+coreAnalysisId 필요)가
-      // false라 서식 추천이 로컬 휴리스틱으로 보이는데, 이는 의도된 동작입니다: 상담원이
-      // 검토·저장하기 전 결과를 실제 분석 결과인 양 서버에 미리 쌓아두지 않기 위함입니다.
-      const patch = {};
-      if (nextAnalysis.analysisId && nextAnalysis.analysisId !== selectedCase.coreAnalysisId) {
-        patch.coreAnalysisId = nextAnalysis.analysisId;
-      }
-      if (aiName && !selectedCase.name && selectedCase.nameSource !== 'counselor') {
-        patch.name = aiName;
-        patch.nameSource = 'ai';
-      }
-      if (Object.keys(patch).length) onUpdateConsultation(selectedCase.id, patch);
-
-      setAnalyzed(true);
-      setAnalysisSaved(false);
-      setSavedMessage('');
-      setReviewMessage('');
-      setAiTaskMessage('AI 분석 반영 완료');
-      setAiResultSummary({
-        title: '사건 분석 AI 결과',
-        description: '사건 유형 · 긴급도 · 무료 법률구조 대상 검토',
-        metrics: [
-          { label: '사건 유형', value: nextAnalysis.caseType || '미분류' },
-          { label: '긴급도', value: nextAnalysis.urgency || '미확인' },
-          { label: '구조대상', value: nextAnalysis.eligibility || '검토 필요' },
-        ],
-        items: (nextAnalysis.missingInfo || []).slice(0, 4).map((item) => `확인 필요: ${item}`),
-      });
-    } catch (error) {
-      // 분석이 실패하면 화면에 남깁니다. 예전에는 실패도 목업 결과로 덮여 있어서
-      // 실패한 사실 자체가 보이지 않았습니다(fetchAnalysisWithFallback 주석 참고).
-      setAiTaskMessage(error.message || 'AI 분석에 실패했습니다.');
-      showToast(error.message || 'AI 분석에 실패했습니다.', 'warn');
-    } finally {
-      setIsAnalyzing(false);
-    }
+    const result = await onStartAnalysis(selectedCase);
+    if (result?.ok || result?.alreadyRunning) return;
+    // 분석이 실패하면 화면에 남깁니다. 예전에는 실패도 목업 결과로 덮여 있어서
+    // 실패한 사실 자체가 보이지 않았습니다(fetchAnalysisWithFallback 주석 참고).
+    const message = result?.error?.message || 'AI 분석에 실패했습니다.';
+    setAiTaskMessage(message);
+    showToast(message, 'warn');
   };
+
+  // App이 돌린 분석이 끝나면 상담 객체에 결과가 실려 들어옵니다. 화면이 그걸 이어받습니다.
+  // 분석 중에 다른 메뉴에 가 있었더라도, 돌아오면 이 effect가 결과를 그려줍니다.
+  useEffect(() => {
+    const incoming = selectedCase?.analysis;
+    if (!incoming || incoming === analysis) return;
+    setAnalysis(incoming);
+    setAnalyzed(true);
+    setAnalysisSaved(false);
+    setSavedMessage('');
+    setReviewMessage('');
+    setAiTaskMessage('AI 분석 반영 완료');
+    setAiResultSummary({
+      title: '사건 분석 AI 결과',
+      description: '사건 유형 · 긴급도 · 무료 법률구조 대상 검토',
+      metrics: [
+        { label: '사건 유형', value: incoming.caseType || '미분류' },
+        { label: '긴급도', value: incoming.urgency || '미확인' },
+        { label: '구조대상', value: incoming.eligibility || '검토 필요' },
+      ],
+      items: (incoming.missingInfo || []).slice(0, 4).map((item) => `확인 필요: ${item}`),
+    });
+    // analysis를 의존성에 넣으면 사용자가 화면에서 값을 고칠 때마다 이 effect가 다시 돌아
+    // 방금 고친 값을 상담에 저장된 것으로 되돌려버립니다. 들어오는 결과만 감시합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCase?.analysis]);
   const selectCase = (caseId) => {
     const nextCase = consultations.find((item) => String(item.id) === String(caseId));
     setSelectedId(caseId);
@@ -1847,11 +1874,13 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   const runEligibilityCheck = async () => {
     if (!selectedCase || !analysis || isAnalyzing) return;
     setAiTaskMessage('');
-    setIsAnalyzing(true);
-    setAnalysisElapsedSec(0);
+    setIsLocalTaskRunning(true);
+    setLocalElapsedSec(0);
     try {
       const result = await requestEligibilityCandidate(selectedCase, analysis, trackAnalysisProgress);
       setAnalysis(result);
+      // startAnalysis와 같은 이유로 상담에도 반영합니다 — 화면을 벗어났다 와도 남아 있도록.
+      onUpdateConsultation(selectedCase.id, { analysis: result });
       setAnalysisSaved(false);
       setAiTaskMessage('구조대상 판정 반영 완료');
       setAiResultSummary(buildAiResultSummary('eligibility', result));
@@ -1859,18 +1888,20 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       setAiTaskMessage(error.message);
       showToast(error.message, 'warn');
     } finally {
-      setIsAnalyzing(false);
+      setIsLocalTaskRunning(false);
     }
   };
 
   const runMissingDataCheck = async () => {
     if (!selectedCase || !analysis || isAnalyzing) return;
     setAiTaskMessage('');
-    setIsAnalyzing(true);
-    setAnalysisElapsedSec(0);
+    setIsLocalTaskRunning(true);
+    setLocalElapsedSec(0);
     try {
       const result = await requestMissingDataCandidate(selectedCase, analysis, trackAnalysisProgress);
       setAnalysis(result);
+      // startAnalysis와 같은 이유로 상담에도 반영합니다 — 화면을 벗어났다 와도 남아 있도록.
+      onUpdateConsultation(selectedCase.id, { analysis: result });
       setAnalysisSaved(false);
       setAiTaskMessage('누락자료 점검 반영 완료');
       setAiResultSummary(buildAiResultSummary('missing', result));
@@ -1878,7 +1909,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       setAiTaskMessage(error.message);
       showToast(error.message, 'warn');
     } finally {
-      setIsAnalyzing(false);
+      setIsLocalTaskRunning(false);
     }
   };
 
@@ -3380,7 +3411,7 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
   );
 }
 
-function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, focusedConsultationId, onOpenAnalysis, onOpenDraft }) {
+function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, focusedConsultationId, onOpenAnalysis, onOpenDraft, analysisRuns, onStartAnalysis }) {
   // '상담 등록'은 상담원 고유 업무입니다. 다른 역할에서 실수로 activeView가 넘어와도
   // 접수 화면이 열리지 않도록 역할을 한 번 더 확인합니다. (네비게이션 메뉴 구성과 이중 방어)
   if (view === '상담 등록') return role === 'counselor' ? (
@@ -3406,7 +3437,7 @@ function UtilityPanel({ view, role, consultations, onCreateConsultation, onReque
   );
   if (view === '알림') return <NotificationPanel role={role} currentUser={currentUser} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} />;
   if (view === '기타' && role === 'lawyer') return <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
-  if (view === '기타') return <AnalysisWorkbench consultations={consultations} onCreateConsultation={onCreateConsultation} onUpdateConsultation={onUpdateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} currentUser={currentUser} onGoToDashboard={onGoToDashboard} onOpenDraft={onOpenDraft} focusedConsultationId={focusedConsultationId} />;
+  if (view === '기타') return <AnalysisWorkbench consultations={consultations} onCreateConsultation={onCreateConsultation} onUpdateConsultation={onUpdateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} currentUser={currentUser} onGoToDashboard={onGoToDashboard} onOpenDraft={onOpenDraft} focusedConsultationId={focusedConsultationId} analysisRuns={analysisRuns} onStartAnalysis={onStartAnalysis} />;
   return <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
 }
 
