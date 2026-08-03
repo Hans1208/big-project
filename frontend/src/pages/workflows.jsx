@@ -245,6 +245,23 @@ function buildAiResultSummary(kind, result) {
   };
 }
 
+// 구조대상 확인·누락자료 점검은 '분석 시작'에서 받은 결과를 그대로 씁니다.
+//
+// /consult/analyze는 사건분석·구조대상·누락자료를 항상 한 번에 계산해 돌려주므로, 버튼마다
+// 다시 호출하면 같은 것을 세 번 계산하게 됩니다. 시간(매회 40~70초)과 API 비용도 문제지만
+// 진짜 이유는 따로 있습니다: LLM은 같은 입력에도 응답이 흔들려서, 세 번 부르면 세 개의 서로
+// 다른 판단이 나옵니다. 그러면 한 화면에 사건유형은 1회차 결과, 구조대상은 2회차 결과가
+// 섞여 들어가 상담 기록이 앞뒤가 안 맞게 됩니다.
+//
+// 아직 분석 전이라 쓸 결과가 없으면(상담원이 이 버튼부터 누른 경우) 그때만 새로 돌립니다.
+// aiAnalysisResponse는 mergeContractAnalysisResponse가 실제 백엔드 응답을 받았을 때만
+// 채우므로, 백엔드가 꺼져 로컬 목업으로 돌아간 분석을 실제 결과로 착각할 일은 없습니다.
+async function resolveAnalysisResponse(selectedCase, analysis, options = {}) {
+  const alreadyAnalyzed = analysis?.extractedJson?.aiAnalysisResponse;
+  if (alreadyAnalyzed) return alreadyAnalyzed;
+  return triggerCoreAnalysis(selectedCase, options);
+}
+
 async function requestEligibilityCandidate(selectedCase, analysis, options = {}) {
   // 상담 등록 데이터를 근거로 대상여부·증빙·긴급도를 확정 계산합니다.
   // (백엔드 mock이 이 값들을 채워주지 않아도 버튼 한 번으로 실제 반영되도록 로컬 계산을 기본값으로 씁니다)
@@ -255,7 +272,8 @@ async function requestEligibilityCandidate(selectedCase, analysis, options = {})
   let response = null;
   try {
     // /consult/analyze는 단일화된 파이프라인이라 부분 출력만 요청하는 개념이 없음 — 항상 전체를 반환받음.
-    response = await triggerCoreAnalysis(selectedCase, options);
+    // 그래서 분석 시작 때 받아둔 응답을 재사용합니다(resolveAnalysisResponse 주석 참고).
+    response = await resolveAnalysisResponse(selectedCase, analysis, options);
     mapped = mapCoreAnalysisResponse(response);
   } catch (error) {
     // 백엔드가 꺼져 있으면 위에서 계산한 로컬 값만으로 진행합니다.
@@ -309,7 +327,8 @@ async function requestMissingDataCandidate(selectedCase, analysis, options = {})
   let mapped = {};
   let response = null;
   try {
-    response = await triggerCoreAnalysis(selectedCase, options);
+    // 분석 시작 때 받아둔 응답을 재사용합니다(resolveAnalysisResponse 주석 참고).
+    response = await resolveAnalysisResponse(selectedCase, analysis, options);
     mapped = mapCoreAnalysisResponse(response);
   } catch (error) {
     // 백엔드가 꺼져 있으면 아래 로컬 제안 목록을 씁니다.
