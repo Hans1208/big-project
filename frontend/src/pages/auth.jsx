@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BadgeCheck, Clock, FileText, ShieldCheck } from 'lucide-react';
 import { roleOptions, today } from '../constants.jsx';
 import { caseCategories, legalAidBranchOffices } from '../data/domain.js';
@@ -43,57 +43,73 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
   const inProgressCount = consultations.filter((item) => item.status === '진행 중').length;
   const onHoldCount = consultations.filter((item) => item.status === '보류').length;
   const completedCount = consultations.filter((item) => item.status === '완료').length;
-  const maxCount = Math.max(1, inProgressCount, onHoldCount, completedCount);
+  const maxPreviewCount = Math.max(inProgressCount, onHoldCount, completedCount, 1);
   return (
     <div className="screen loginScreen">
       <div className="loginSplit">
         <section className="loginHeroPanel" aria-labelledby="main-copy-title">
-          <div className="loginHeroCopy">
-            <p className="heroEyebrow">상담·검토 업무를 한 흐름으로</p>
-            <h1 id="main-copy-title">
-              상담부터 변호사 검토까지, 한 흐름으로
-            </h1>
-            <p>실시간 상담 · 자료 정리 · 서식 초안 · 검토 전달</p>
-          </div>
-          <div className="heroFeatureGrid" aria-label="주요 지원 기능">
-            <span><FileText size={16} /> 통화 메모 바로 정리</span>
-            <span><ShieldCheck size={16} /> 검토 누락 줄이기</span>
-          </div>
-          <div className="heroScopeNotice" aria-label="현재 지원하는 사건 범위">
-            <p className="heroScopeLabel">현재 지원 범위 · 가사법 4대 분류</p>
-            <div className="heroScopeChips">
-              {caseCategories.map((category) => <span className="heroScopeChip" key={category.key}>{category.key}</span>)}
+          <video
+            className="loginHeroVideo"
+            src="/login-hero.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-hidden="true"
+          />
+          <div className="loginHeroOverlay" aria-hidden="true" />
+          <div className="loginHeroContentPanel">
+            <div className="loginHeroCopy">
+              <p className="heroEyebrow">상담·검토 업무를 한 흐름으로</p>
+              <h1 id="main-copy-title">
+                상담부터 변호사 검토까지, 한 흐름으로
+              </h1>
+              <p>실시간 상담 · 자료 정리 · 서식 초안 · 검토 전달</p>
             </div>
-            <p className="heroScopeText">
-              가사법 4대 분류 · 전국 {legalAidBranchOffices.length}개 지부 우선 운영
-            </p>
-          </div>
-          <div className="heroPreviewCard" aria-hidden="true">
-            <div className="heroPreviewHeader">
-              <strong>오늘의 상담 현황</strong>
-              <span className="heroPreviewDate">{formatDotDate(today)}</span>
+            <div className="heroFeatureGrid" aria-label="주요 지원 기능">
+              <span><FileText size={16} /> 통화 메모 바로 정리</span>
+              <span><ShieldCheck size={16} /> 검토 누락 줄이기</span>
             </div>
-            {consultations.length ? (
-              <div className="heroPreviewStats">
-                <div className="heroPreviewStat">
+            <div className="heroScopeNotice" aria-label="현재 지원하는 사건 범위">
+              <p className="heroScopeLabel">현재 지원 범위 · 가사법 4대 분류</p>
+              <div className="heroScopeChips">
+                {caseCategories.map((category) => <span className="heroScopeChip" key={category.key}>{category.key}</span>)}
+              </div>
+              <p className="heroScopeText">
+                가사법 4대 분류 · 전국 {legalAidBranchOffices.length}개 지부 우선 운영
+              </p>
+            </div>
+            <div className="heroPreviewCard" aria-hidden="true">
+              <div className="heroPreviewHeader">
+                <strong>오늘의 상담 현황</strong>
+                <span className="heroPreviewDate">{formatDotDate(today)}</span>
+              </div>
+              {/* 상태별 색 점·라벨·막대·건수를 한 줄에 보여줘 상담 현황을 빠르게 비교합니다. */}
+              {consultations.length ? (
+                <div className="heroPreviewStats">
+                  <div className="heroPreviewStat">
+                  <span className="heroPreviewStatDot tone-info" aria-hidden="true" />
                   <span className="heroPreviewStatLabel">진행 중</span>
-                  <div className="heroPreviewBarTrack"><div className="heroPreviewBar tone-info" style={{ width: `${Math.max(4, (inProgressCount / maxCount) * 100)}%` }} /></div>
+                  <span className="heroPreviewBarTrack" aria-hidden="true"><span className="heroPreviewBarFill tone-info" style={{ width: `${(inProgressCount / maxPreviewCount) * 100}%` }} /></span>
                   <span className="heroPreviewStatValue">{inProgressCount}건</span>
                 </div>
                 <div className="heroPreviewStat">
+                  <span className="heroPreviewStatDot tone-warn" aria-hidden="true" />
                   <span className="heroPreviewStatLabel">보류</span>
-                  <div className="heroPreviewBarTrack"><div className="heroPreviewBar tone-warn" style={{ width: `${Math.max(4, (onHoldCount / maxCount) * 100)}%` }} /></div>
+                  <span className="heroPreviewBarTrack" aria-hidden="true"><span className="heroPreviewBarFill tone-warn" style={{ width: `${(onHoldCount / maxPreviewCount) * 100}%` }} /></span>
                   <span className="heroPreviewStatValue">{onHoldCount}건</span>
                 </div>
                 <div className="heroPreviewStat">
+                  <span className="heroPreviewStatDot tone-success" aria-hidden="true" />
                   <span className="heroPreviewStatLabel">완료</span>
-                  <div className="heroPreviewBarTrack"><div className="heroPreviewBar tone-success" style={{ width: `${Math.max(4, (completedCount / maxCount) * 100)}%` }} /></div>
+                  <span className="heroPreviewBarTrack" aria-hidden="true"><span className="heroPreviewBarFill tone-success" style={{ width: `${(completedCount / maxPreviewCount) * 100}%` }} /></span>
                   <span className="heroPreviewStatValue">{completedCount}건</span>
                 </div>
-              </div>
-            ) : <p className="heroPreviewEmpty">상담 데이터 없음</p>}
+                </div>
+              ) : <p className="heroPreviewEmpty">상담 데이터 없음</p>}
+            </div>
+            <p className="loginHeroNote">대한법률구조공단 내부 상담 업무 보조 시스템</p>
           </div>
-          <p className="loginHeroNote">대한법률구조공단 내부 상담 업무 보조 시스템</p>
         </section>
 
         <section className="loginFormPanel" aria-labelledby="login-title">

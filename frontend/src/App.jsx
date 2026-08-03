@@ -92,6 +92,9 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
   const defaultView = role === 'counselor' ? '기타' : '대시보드';
   const [activeView, setActiveView] = useState(defaultView);
   const [focusedConsultationId, setFocusedConsultationId] = useState(null);
+  // 추천 서식 카드에서 특정 서식의 '저장하고 초안 만들기'를 눌렀을 때, 서식 생성 화면이
+  // 어떤 서식을 열어야 하는지 함께 전달합니다(코치 피드백: 추천 3개가 모두 같은 동작이었음).
+  const [focusedTemplateName, setFocusedTemplateName] = useState(null);
   const [focusedReviewCaseNo, setFocusedReviewCaseNo] = useState(null);
   const [focusedAdminView, setFocusedAdminView] = useState(null);
 
@@ -233,7 +236,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
               status: '진행 중',
               date: (row.createdAt || '').slice(0, 10) || today,
               registeredTime: '',
-              workflowStatus: '상담 완료',
+              workflowStatus: '상담 접수',
               counselor: null,
               logs: [],
               analysis: null,
@@ -520,7 +523,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       ...(coreSync || {}),
       date: today,
       registeredTime,
-      workflowStatus: '상담 완료',
+      workflowStatus: '상담 접수',
       counselor: {
         name: currentUser?.name || '상담원',
         email: currentUser?.email || '',
@@ -718,7 +721,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
           setActiveView('기타');
         }}
       />
-      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
+      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id, templateName) => { setFocusedConsultationId(id); setFocusedTemplateName(templateName || null); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
       {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} focusedAdminView={focusedAdminView} /> : null}
     </div>
