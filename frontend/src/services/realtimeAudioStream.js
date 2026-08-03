@@ -1,7 +1,9 @@
-// Core API의 /ws/audio/operator로 마이크 오디오를 전송합니다.
-// 브라우저 MediaRecorder의 webm/opus 대신, 백엔드가 기대하는 8kHz G.711 μ-law
-// 바이너리 프레임으로 변환해 선택한 통화에 연결합니다. 백엔드는 외부 전화 레그와
-// 오퍼레이터 레그 사이의 오디오를 중계하며, STT 텍스트는 기존 상담 메모 흐름을 유지합니다.
+// Core API의 /ws/audio/operator로 마이크 오디오를 전송하고, 상대방(외부 통화 레그) 오디오를
+// 받아 재생합니다. 브라우저 MediaRecorder의 webm/opus 대신, 백엔드가 기대하는 8kHz G.711
+// μ-law 바이너리 프레임으로 변환해 보냅니다. 백엔드는 이 오퍼레이터 레그를 같은 callId로 붙은
+// 외부 통화 레그(ExternalCallWebSocketHandler)와 서로 중계하는 교환대 역할을 하며, 소켓으로
+// 들어오는 바이너리 메시지도 같은 8비트 μ-law 프레임이므로 디코딩해서 스피커로 내보냅니다.
+// 어떤 통화에 붙을지는 GET /api/audio/calls로 받은 목록의 첫 번째 항목으로 정합니다.
 
 import { CORE_API_BASE_URL, coreAuthHeader } from './coreApiClientV2.js';
 
@@ -65,6 +67,30 @@ async function requestAudioTicket() {
   return body.ticket;
 }
 
+// 붙을 통화를 고르기 전에 현재 연결되어 있는 통화 목록을 조회합니다.
+// 여러 건이 와 있어도 지금은 목록의 첫 번째 통화에 자동으로 붙습니다.
+async function requestFirstCallId() {
+  let response;
+  try {
+    response = await fetch(`${CORE_API_BASE_URL}/api/audio/calls`, {
+      headers: { ...coreAuthHeader() },
+    });
+  } catch {
+    throw new Error('통화 서버에 연결할 수 없습니다. Core API 서버가 켜져 있는지 확인해주세요.');
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('통화 목록을 조회할 권한이 없습니다. 다시 로그인해주세요.');
+  }
+  if (!response.ok) {
+    throw new Error(`통화 목록을 가져오지 못했습니다 (HTTP ${response.status})`);
+  }
+  const calls = await response.json();
+  if (!Array.isArray(calls) || calls.length === 0) {
+    throw new Error('현재 연결된 통화가 없습니다.');
+  }
+  return calls[0].callId;
+}
+
 function downsample(buffer, inputSampleRate, outputSampleRate = 8000) {
   if (inputSampleRate === outputSampleRate) return buffer;
   if (inputSampleRate < outputSampleRate) return buffer;
@@ -98,6 +124,27 @@ function linearToMuLaw(sample) {
   return (~(sign | (exponent << 4) | mantissa)) & 0xff;
 }
 
+const MU_LAW_DECODE_BIAS = 0x84;
+
+function muLawToLinear(encoded) {
+  const mu = (~encoded) & 0xff;
+  const sign = mu & 0x80;
+  const exponent = (mu >> 4) & 0x07;
+  const mantissa = mu & 0x0f;
+  const magnitude = ((mantissa << 3) + MU_LAW_DECODE_BIAS) << exponent;
+  const sample = magnitude - MU_LAW_DECODE_BIAS;
+  return sign !== 0 ? -sample : sample;
+}
+
+// 상대방 오디오 바이트(μ-law)를 Web Audio가 재생할 수 있는 -1..1 범위 Float32로 바꿉니다.
+function decodeMuLawBytes(bytes) {
+  const samples = new Float32Array(bytes.length);
+  for (let index = 0; index < bytes.length; index += 1) {
+    samples[index] = muLawToLinear(bytes[index]) / 32768;
+  }
+  return samples;
+}
+
 // 서버가 오디오를 받는 것과 별개로 실시간 자막(STT 중간/최종 결과) 텍스트 프레임을 같은
 // 소켓으로 돌려보내 줄 때 화면에 뿌리기 위한 자리입니다. 백엔드가 아직 이 프레임을 보내지
 // 않아 지금은 항상 빈 채로 남지만(코치 피드백: "실시간 통화 기술" 중 프론트가 먼저 준비해둘
@@ -126,6 +173,7 @@ export class RealtimeAudioStream {
     this.source = null;
     this.processor = null;
     this.silentGain = null;
+    this.playbackCursor = 0;
   }
 
   async start({ callId } = {}) {
@@ -140,27 +188,32 @@ export class RealtimeAudioStream {
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
     try {
+      const callId = await requestFirstCallId();
       // 티켓은 30초짜리라 연결할 때마다 새로 받습니다(재사용도 막혀 있습니다).
       const ticket = await requestAudioTicket();
-      this.socket = new WebSocket(audioWebSocketUrl({ callId, ticket }));
+      const url = `${audioWebSocketUrl()}?callId=${encodeURIComponent(callId)}&ticket=${encodeURIComponent(ticket)}`;
+      this.socket = new WebSocket(url);
       this.socket.binaryType = 'arraybuffer';
       await new Promise((resolve, reject) => {
         this.socket.addEventListener('open', resolve, { once: true });
         this.socket.addEventListener('error', () => reject(new Error('오디오 스트림 서버에 연결할 수 없습니다.')), { once: true });
       });
-      this.socket.addEventListener('close', () => {
-        if (this.socket) this.onStatus('ended');
+
+      // 핸드셰이크가 성공해도, 백엔드가 그 직후 이 통화에 이미 다른 오퍼레이터가 붙어 있거나
+      // 통화가 끝나버린 걸 알게 되면 곧바로 소켓을 닫습니다(정책 위반 close). stop()이 보내는
+      // 정상 종료(코드 1000)가 아니면 오류로 알립니다.
+      this.socket.addEventListener('close', (event) => {
+        this.onStatus('idle');
+        if (event.code !== 1000) {
+          this.onError(new Error(event.reason || '통화 연결이 종료되었습니다.'));
+        }
       });
-      // 오디오는 binaryType('arraybuffer')로 보내고, 자막 프레임은 텍스트(JSON)로 온다고
-      // 가정합니다. 백엔드가 아직 아무 텍스트 프레임도 안 보내므로 지금은 항상 조용히
-      // 넘어가지만, 자막 연동이 붙으면 이 리스너가 그대로 받아 화면에 흘려보냅니다.
-      this.socket.addEventListener('message', (event) => {
-        const transcript = parseTranscriptFrame(event.data);
-        if (transcript) this.onTranscript(transcript);
-      });
+
+      this.socket.addEventListener('message', (event) => this.playIncomingAudio(event.data));
 
       this.audioContext = new AudioContext();
       await this.audioContext.resume();
+      this.playbackCursor = this.audioContext.currentTime;
       this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
       this.silentGain = this.audioContext.createGain();
@@ -183,6 +236,22 @@ export class RealtimeAudioStream {
     }
   }
 
+  // 상대방 μ-law 프레임 하나를 디코딩해 재생 큐 뒤에 이어 붙입니다.
+  // playbackCursor가 현재 시각보다 과거로 밀려 있으면(끊김 후 재개 등) 밀린 구간을
+  // 몰아서 재생하지 않고 지금 시각부터 다시 이어 붙입니다.
+  playIncomingAudio(data) {
+    if (!this.audioContext || !(data instanceof ArrayBuffer) || data.byteLength === 0) return;
+    const samples = decodeMuLawBytes(new Uint8Array(data));
+    const buffer = this.audioContext.createBuffer(1, samples.length, 8000);
+    buffer.copyToChannel(samples, 0);
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.audioContext.destination);
+    const startAt = Math.max(this.audioContext.currentTime, this.playbackCursor);
+    source.start(startAt);
+    this.playbackCursor = startAt + buffer.duration;
+  }
+
   stop() {
     if (this.processor) this.processor.disconnect();
     if (this.source) this.source.disconnect();
@@ -196,6 +265,7 @@ export class RealtimeAudioStream {
     this.audioContext = null;
     this.socket = null;
     this.mediaStream = null;
+    this.playbackCursor = 0;
     this.onStatus('idle');
   }
 }
