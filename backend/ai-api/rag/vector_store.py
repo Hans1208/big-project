@@ -1,4 +1,4 @@
-﻿"""ChromaDB 기반 로컬 벡터 저장소."""
+"""ChromaDB 기반 로컬 벡터 저장소."""
 
 from __future__ import annotations
 
@@ -6,6 +6,25 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import chromadb
+
+
+STATUTE_METADATA_FIELDS: tuple[str, ...] = (
+    "law_id",
+    "mst",
+    "law_key",
+    "law_name",
+    "law_type",
+    "ministry",
+    "effective_date",
+    "promulgation_date",
+    "promulgation_number",
+    "article_key",
+    "article_number",
+    "article_branch_number",
+    "article_label",
+    "article_title",
+    "article_effective_date",
+)
 
 
 class ChromaVectorStore:
@@ -124,6 +143,18 @@ class ChromaVectorStore:
                     document.get("source", "")
                 ),
             }
+
+            for field_name in STATUTE_METADATA_FIELDS:
+                if field_name not in document:
+                    continue
+
+                field_value = document[field_name]
+
+                metadata[field_name] = (
+                    ""
+                    if field_value is None
+                    else str(field_value)
+                )
 
             if "chunk_index" in document:
                 metadata["chunk_index"] = int(
@@ -246,6 +277,14 @@ class ChromaVectorStore:
                     ),
                     "distance": numeric_distance,
                     "similarity": 1.0 - numeric_distance,
+                    **{
+                        field_name: safe_metadata.get(
+                            field_name,
+                            "",
+                        )
+                        for field_name
+                        in STATUTE_METADATA_FIELDS
+                    },
                     "metadata": safe_metadata,
                 }
             )
