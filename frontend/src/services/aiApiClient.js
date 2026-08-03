@@ -4,10 +4,7 @@
 const AI_API_BASE_URL = import.meta.env.VITE_AI_API_BASE_URL || '/ai-api';
 
 // 엔드포인트별 요청 제한 시간(ms). 지정하지 않으면 기본값을 씁니다.
-// /consult/analyze는 첨부 녹취파일을 S3에서 받아 Whisper로 음성 인식까지 마친 뒤에야 응답하므로
-// 다른 엔드포인트보다 훨씬 오래 걸릴 수 있어 별도로 더 긴 제한을 둡니다.
 const DEFAULT_TIMEOUT_MS = 30_000;
-const CASE_ANALYSIS_TIMEOUT_MS = 90_000;
 
 // 요청이 timeoutMs를 넘기면 fetch 자체를 중단합니다.
 // 이게 없으면 백엔드가 응답 없이 멈춰 있을 때 화면이 '분석 중…' 상태로 무한정 멈춰 보입니다.
@@ -34,6 +31,18 @@ async function requestJson(path, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
 
   if (!response.ok) {
     const errorDetail = await response.text().catch(() => '');
+    if (response.status === 502 || /bad gateway/i.test(errorDetail)) {
+      if (path.startsWith('/forms/revisions')) {
+        throw new Error(
+          'AI API 서버는 연결됐지만 서식 개정 점검 대상에서 응답을 받지 못했습니다 (HTTP 502). '
+          + '잠시 후 다시 시도하거나 ai-api 터미널의 서식 점검 오류를 확인해주세요.',
+        );
+      }
+      throw new Error(
+        'AI API 서버가 정상 응답하지 않습니다 (HTTP 502). '
+        + 'ai-api가 http://127.0.0.1:8001에서 실행 중인지 확인한 뒤 다시 시도해주세요.',
+      );
+    }
     throw new Error(`AI API 요청 실패 (HTTP ${response.status}): ${errorDetail || response.statusText}`);
   }
 
@@ -49,15 +58,6 @@ export function checkAiApiHealth() {
 // requestConsultAnalysis(POST /consult/analyze 직접 호출)도 있었지만, 현재 아키텍처에서는
 // core-api가 /consult/analyze 호출을 오케스트레이션하므로(triggerCoreAnalysis 참고) 두 함수 모두
 // 프론트 어디서도 쓰이지 않는 죽은 코드였습니다. 그래서 제거했습니다.
-
-export async function generateAiDraft(payload) {
-  const response = await requestJson('/forms/draft', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }, CASE_ANALYSIS_TIMEOUT_MS);
-  if (response?.error) throw new Error(response.error);
-  return response;
-}
 
 // 서식 개정 점검 (요구사항 AI-05-04-01).
 // helplaw24 서식 목록 22페이지를 순회하며 받아오므로 기본 제한(30초)으로는 모자랍니다.

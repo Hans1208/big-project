@@ -60,6 +60,13 @@ function isEncryptionDataIssueMessage(message = '') {
 }
 
 function classifyCoreError(message, status) {
+  if (status === 502 || /ai-api|bad gateway/i.test(message)) {
+    return {
+      code: CORE_API_ERROR_CODE.CONNECTION_FAILED,
+      message: 'AI API 서버에 연결할 수 없습니다. ai-api가 http://127.0.0.1:8001에서 실행 중인지 확인해주세요.',
+    };
+  }
+
   if (isSchemaMismatchMessage(message)) {
     return {
       code: CORE_API_ERROR_CODE.SCHEMA_MISMATCH,
@@ -549,8 +556,10 @@ export function isCoreConnectionError(error) {
 // 부르는 쪽에서 보면 예전과 똑같이 "분석 결과를 돌려주는 함수"입니다.
 // 접수와 대기를 안에서 처리하므로 호출부는 바꿀 필요가 없습니다.
 export async function triggerCoreAnalysis(consultation, options = {}) {
+  const { onSubmitted, ...waitOptions } = options;
   const job = await submitCoreAnalysisJob(consultation);
-  return waitForCoreAnalysisJob(job, options);
+  onSubmitted?.(job);
+  return waitForCoreAnalysisJob(job, waitOptions);
 }
 
 function normalizeMissingInfoItem(item) {
@@ -685,16 +694,6 @@ export async function updateCoreAnalysis({ consultation, analysisId, analysis })
   });
 }
 
-export function uploadCoreAttachment(consultationId, file, fileType) {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('fileType', fileType || '기타');
-  return requestCoreJson(`/api/consultations/${consultationId}/attachments`, {
-    method: 'POST',
-    body: formData,
-  });
-}
-
 // 이미 presigned URL로 S3에 올라간 파일의 메타데이터를 "기존" 상담에 등록합니다(DB에만 기록,
 // 재업로드 없음). 상담원이 "기존 상담에 자료 추가 → 자료 저장"을 눌렀을 때 새로 고른 파일마다 호출됩니다.
 // (상담을 새로 만들 때는 createCoreConsultation의 attachments 필드로 한 번에 같이 등록되므로 이 호출이 필요 없음.)
@@ -736,7 +735,7 @@ export function mapCoreAttachmentToLocal(item = {}) {
     storageBucket: item.storageBucket || '',
     fileKey: item.fileKey || '',
     uploadedUrl: item.fileUrl || item.downloadUrl || item.uploadedUrl || '',
-    status: item.id != null ? '서버 저장' : (item.fileKey || item.fileUrl) ? 'S3 업로드 완료' : '',
+    status: item.id != null ? '서버 저장' : (item.fileKey || item.fileUrl) ? '업로드 완료' : '',
   };
 }
 
@@ -784,17 +783,6 @@ export function approveCoreDocument(consultationId, documentId, note, token) {
     method: 'POST',
     headers: authHeader(token),
     body: JSON.stringify({ note: note || '' }),
-  });
-}
-
-export function requestCoreDocumentRevision(consultationId, documentId, note, requestedMaterials, token) {
-  return requestCoreJson(`/api/consultations/${consultationId}/documents/${documentId}/request-revision`, {
-    method: 'POST',
-    headers: authHeader(token),
-    body: JSON.stringify({
-      note: note || '',
-      requested_materials: requestedMaterials || [],
-    }),
   });
 }
 

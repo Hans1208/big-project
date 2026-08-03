@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 
 // 브라우저 기본 alert/confirm은 OS 창이라 이 시스템의 글꼴·색·모서리와 전혀 다르게 보이고,
