@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 // 사이트 전역에서 공통으로 쓸 "1초 이상 걸리면 로딩 표시" 규칙의 기준 시간입니다.
 const DEFAULT_LOADING_DELAY_MS = 1000;

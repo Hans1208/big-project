@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, ClipboardList, ChevronDown, ChevronRight, FileText, Info, Search, Check, FileAudio2, Mic, PhoneCall, Radio } from 'lucide-react';
+import {
+  ShieldCheck, ClipboardList, ChevronDown, ChevronRight, FileText, Info, Search, Check, FileAudio2, Mic, PhoneCall, Radio, Headphones,
+  FileSearch, Paperclip, EyeOff, BadgeCheck, Scale, ListChecks, Sparkles, Clock, Inbox,
+  FolderOpen, MessageSquareText, CheckCircle2, XCircle, UploadCloud, Trash2, Star, Send, Plus, AlertTriangle,
+  Bell, BellOff, User, Lock, TrendingUp, Gavel, Award, BookOpen, Download,
+} from 'lucide-react';
 import { today } from '../constants.jsx';
+import { validatePassword, PASSWORD_RULE_TEXT } from './auth.jsx';
 import { formatDateTimeLabel } from '../utils/date.js';
 import { createAttachmentMetadata, generateDraftText, recommendTemplates, searchReferenceCandidates, validateAnalysisResult } from '../services/legalAidApi.js';
 import { appendAuditLog, getFavoriteTemplates, readStorage, storageKeys, toggleFavoriteTemplate, writeStorage } from '../services/storage.js';
@@ -14,7 +20,9 @@ import {
   deleteCoreAttachment,
   deleteUnregisteredCoreAttachment,
   fetchCoreDocuments,
+  findActiveCoreAnalysisJob,
   generateCoreDraft,
+  getCoreAnalysisJob,
   recommendCoreForms,
   registerCoreAttachment,
   submitCoreAnalysisForReview,
@@ -23,16 +31,18 @@ import {
   isCoreConnectionError,
   mapCoreAnalysisResponse,
   timelineEmptyMessage,
+  waitForCoreAnalysisJob,
 } from '../services/coreApiClientV2.js';
 import { cacheFormRecommendations, hydrateDraftDocument, readCachedFormRecommendations, rememberDraftDocumentSnapshot } from '../services/draftDocumentStore.js';
 import { readLawyerDraftEdit, saveLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { createClientHwpxDraft } from '../services/clientHwpxGenerator.js';
 import { isHwpxTemplateAlias, resolveHwpxTemplateName } from '../services/formTemplateResolver.js';
 import { uploadFileToS3, S3UploadUnavailableError } from '../services/s3UploadClient.js';
-import { createRealtimeAudioStream } from '../services/realtimeAudioStream.js';
+import { transcribeAudio } from '../services/sttApiClient.js';
+import { createRealtimeAudioStream, fetchAvailableAudioCalls } from '../services/realtimeAudioStream.js';
 import { useInPersonRecording, MIC_STT_WS_URL } from '../hooks/useInPersonRecording.js';
 import { caseCategories, isKnownCaseType, legalTemplateSeed } from '../data/domain.js';
-import { HitlConfirmModal, InlineEmptyNotice, WorkPageHeader } from '../components/common.jsx';
+import { CollapsibleSection, HitlConfirmModal, InlineEmptyNotice, WorkPageHeader, friendlyErrorMessage } from '../components/common.jsx';
 import { useAsyncAction } from '../components/loading.jsx';
 import { useConfirm, useToast } from '../components/feedback.jsx';
 
@@ -404,7 +414,7 @@ function caseOptions(consultations) {
 // (legalTemplateSeed의 caseType 필드가 실제로는 '가사소송일반' 같은 소분류 값입니다.)
 // AI 분석은 대분류(caseType)와 소분류(caseSubtype)를 따로 주므로, 소분류가 있으면 그걸 우선 쓰고
 // 없거나 이 시스템이 모르는 값이면 대분류로, 그마저 없으면 상담 등록 때 고른 유형으로 내려갑니다.
-function resolveConfirmedCaseType(selectedCase) {
+export function resolveConfirmedCaseType(selectedCase) {
   const analysis = selectedCase?.analysis;
   if (isKnownCaseType(analysis?.caseSubtype)) return analysis.caseSubtype;
   if (isKnownCaseType(analysis?.caseType)) return analysis.caseType;
@@ -438,9 +448,14 @@ function CasePicker({ consultations, value, onChange, placeholder = '사건을 �
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const options = caseOptions(consultations);
-  const selected = options.find((item) => String(item.id) === String(value)) || options[0];
+  const matchedSelection = options.find((item) => String(item.id) === String(value));
+  const selected = matchedSelection || options[0];
   const filteredOptions = options.filter((item) => matchesCasePickerQuery(item, query));
-  const hasSelectableCase = selected && selected.id !== 'empty';
+  // matchedSelection이 없으면(예: value가 아직 존재하지 않는 사건을 가리킴) 목록의 첫 항목을
+  // 화면에 마치 선택된 것처럼 보여주면 안 됩니다 — 실제로는 아무 사건도 선택되지 않은
+  // 상태라 통화/메모 컨트롤이 비활성 상태로 남는데, 여기서 첫 사건 정보를 그대로 보여주면
+  // 사용자는 사건이 선택된 것으로 착각하고 왜 입력이 안 되는지 알 수 없습니다.
+  const hasSelectableCase = Boolean(matchedSelection) && matchedSelection.id !== 'empty';
 
   const selectCase = (item) => {
     if (item.id === 'empty') return;
@@ -462,12 +477,12 @@ function CasePicker({ consultations, value, onChange, placeholder = '사건을 �
           <span>{hasSelectableCase ? `${selected.name || '상담자 미지정'} · ${selected.title || '상담 제목 미입력'}` : selected?.title || '등록된 상담이 없습니다.'}</span>
           {hasSelectableCase ? <small>{casePickerDateLabel(selected)}</small> : null}
         </span>
-        <ChevronDown size={18} aria-hidden="true" />
+        <ChevronDown size={18} strokeWidth={2.2} aria-hidden="true" />
       </button>
       {open ? (
         <div className="casePickerPopover">
           <label className="casePickerSearch">
-            <Search size={15} aria-hidden="true" />
+            <Search size={15} strokeWidth={2.2} aria-hidden="true" />
             <input
               autoFocus
               value={query}
@@ -536,12 +551,12 @@ function ChoicePicker({ options, value, onChange, placeholder = '선택하세요
           <strong>{selected?.label || placeholder}</strong>
           {selected?.description ? <small>{selected.description}</small> : null}
         </span>
-        <ChevronDown size={18} aria-hidden="true" />
+        <ChevronDown size={18} strokeWidth={2.2} aria-hidden="true" />
       </button>
       {open && !disabled ? (
         <div className="choicePickerPopover">
           <label className="choicePickerSearch">
-            <Search size={15} aria-hidden="true" />
+            <Search size={15} strokeWidth={2.2} aria-hidden="true" />
             <input
               autoFocus
               value={query}
@@ -603,7 +618,7 @@ function getEligibilityHelperText(isApplicant, evidenceSubmitted) {
 
 // 업로드 상태 문자열을 상태 칩 색 톤으로 매핑합니다.
 function uploadStatusTone(status) {
-  if (status === 'S3 업로드 완료' || status === '서버 저장') return 'tone-success';
+  if (status === '업로드 완료' || status === '업로드·텍스트 변환 완료' || status === '서버 저장') return 'tone-success';
   if (status === '업로드 실패') return 'tone-danger';
   if (status === '업로드 중') return 'tone-info';
   return 'tone-warn'; // 로컬 보관 (S3 대기) 등
@@ -635,7 +650,11 @@ function CounselorFlowStage({ current = 'realtime', onNavigate }) {
       <div className="flowStageCopy">
         <span className="flowStageEyebrow">상담원 업무 흐름</span>
         <strong>{current === 'upload' ? '통화 후 자료를 정리합니다.' : '통화 중 바로 기록합니다.'}</strong>
-        <p>{current === 'upload' ? '상담을 선택하고 자료를 추가한 뒤 변호사 검토로 전달하세요.' : '통화를 시작하고 메모한 뒤 상담이 끝나면 AI 분석을 실행하세요.'}</p>
+        <p>
+          {current === 'upload'
+            ? '녹취·이미지·문서를 추가하고 저장하면, 오른쪽 2단계에서 바로 변호사 검토로 전달할 수 있어요.'
+            : '통화를 시작하고 메모를 남기면, 상담이 끝난 뒤 다음 단계(자료 올리기)로 이어집니다.'}
+        </p>
       </div>
       <div className="flowStageSteps">
         {stages.map((stage, index) => {
@@ -717,6 +736,7 @@ function fileMatchesCategory(file, category) {
 
 function FileDropzone({ category, onCategoryChange, onAddFiles }) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [fileError, setFileError] = useState('');
   const inputId = React.useId();
   const showToast = useToast();
   const handleFiles = (fileList) => {
@@ -731,6 +751,7 @@ function FileDropzone({ category, onCategoryChange, onAddFiles }) {
         `${category}에는 ${uploadCategoryAccept[category]} 파일만 올릴 수 있습니다 (제외: ${rejected.map((file) => file.name).join(', ')})`,
         'warn',
       );
+      setFileError(`${category}에는 허용된 파일 형식만 추가할 수 있습니다.`);
     }
     if (accepted.length) onAddFiles(category, accepted);
   };
@@ -744,39 +765,43 @@ function FileDropzone({ category, onCategoryChange, onAddFiles }) {
         setIsDragOver(false);
         handleFiles(event.dataTransfer.files);
       }}
-    >
+      >
       <div className="fileDropzoneCopy">
-        <strong>자료 유형을 고른 뒤 파일을 추가하세요.</strong>
-        <span>{category ? `${category}: ${uploadCategoryAccept[category] || '모든 형식'}` : '녹취, 이미지, 문서를 추가할 수 있습니다.'}</span>
+        <strong>자료 유형을 선택한 뒤 파일을 추가하세요.</strong>
       </div>
       <div className="fileDropzoneControls">
-        <div className="fileCategoryChoices" role="group" aria-label="자료 유형 선택">
-          {uploadCategoryOptions.map((option) => (
-            <button
-              className={category === option ? 'active' : ''}
-              type="button"
-              key={option}
-              aria-pressed={category === option}
-              onClick={() => onCategoryChange(option)}
-            >
-              {option}
-            </button>
-          ))}
+        <div className="fileDropzoneStep">
+          <div className="fileCategoryChoices" role="group" aria-label="자료 유형 선택">
+            {uploadCategoryOptions.map((option) => (
+              <button
+                className={category === option ? 'active' : ''}
+                type="button"
+                key={option}
+                aria-pressed={category === option}
+                onClick={() => { onCategoryChange(option); setFileError(''); }}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
-        <label className="fileBtn" htmlFor={inputId}>
-          파일 선택
-          <input
-            id={inputId}
-            type="file"
-            multiple
-            accept={uploadCategoryAccept[category] || ''}
-            onChange={(event) => {
-              handleFiles(event.target.files);
-              event.target.value = '';
-            }}
-          />
-        </label>
+        <div className="fileDropzoneStep fileDropzonePickStep">
+          <label className="fileBtn" htmlFor={inputId}>
+            파일 선택
+            <input
+              id={inputId}
+              type="file"
+              multiple
+              accept={uploadCategoryAccept[category] || ''}
+              onChange={(event) => {
+                handleFiles(event.target.files);
+                event.target.value = '';
+              }}
+            />
+          </label>
+        </div>
       </div>
+      {fileError ? <p className="fileDropzoneError" role="alert">{fileError}</p> : null}
     </div>
   );
 }
@@ -794,10 +819,13 @@ function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSubmitted
       <section className="eligibilityPanel">
         <div className="eligibilityHeader">
           <div>
-            <h3>무료 법률구조 대상 확인</h3>
+            <h3><ShieldCheck size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 무료 법률구조 대상 확인</h3>
             <p>대상 유형과 증빙자료 제출 여부</p>
           </div>
-          <span className={isLegalAidApplicant ? 'eligibilityBadge active' : 'eligibilityBadge'}>{eligibilityBadgeText}</span>
+          <span className={`statusChip ${isLegalAidApplicant ? (eligibilityEvidenceSubmitted ? 'tone-success' : 'tone-warn') : 'tone-muted'}`}>
+            {isLegalAidApplicant ? (eligibilityEvidenceSubmitted ? <CheckCircle2 size={13} strokeWidth={2.4} aria-hidden="true" /> : <XCircle size={13} strokeWidth={2.4} aria-hidden="true" />) : null}
+            {eligibilityBadgeText}
+          </span>
         </div>
         <div className="formGrid">
           <label className="field">
@@ -812,21 +840,20 @@ function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSubmitted
           <div className="evidenceBox">
             <span>필요 증빙서류</span>
             <strong>{selectedApplicantType.evidence}</strong>
-            <label className="evidenceCheck">
-              <input
-                className="evidenceCheckInput"
-                type="checkbox"
-                checked={eligibilityEvidenceSubmitted}
-                disabled={!isLegalAidApplicant}
-                onChange={(event) => onChangeEvidenceSubmitted(event.target.checked)}
-              />
-              증빙서류 제출 확인
-              {isLegalAidApplicant ? (
+            {isLegalAidApplicant ? (
+              <label className="evidenceCheck">
+                <input
+                  className="evidenceCheckInput"
+                  type="checkbox"
+                  checked={eligibilityEvidenceSubmitted}
+                  onChange={(event) => onChangeEvidenceSubmitted(event.target.checked)}
+                />
+                증빙서류 제출 확인
                 <em className={eligibilityEvidenceSubmitted ? 'evidenceStatus submitted' : 'evidenceStatus missing'}>
                   {eligibilityEvidenceSubmitted ? '제출 확인' : '미제출'}
                 </em>
-              ) : null}
-            </label>
+              </label>
+            ) : null}
           </div>
         </div>
         <p className={isLegalAidApplicant && !eligibilityEvidenceSubmitted ? 'eligibilityWarning' : 'helperText'}>
@@ -835,20 +862,20 @@ function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSubmitted
       </section>
       <div className="workflowColumns uploadFileWorkspace">
         <div className="uploadDropzoneColumn">
-          <h3>상담 자료 추가</h3>
+          <h3><UploadCloud size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 상담 자료 추가</h3>
           <p className="helperText">녹취 · 이미지 · 문서를 함께 분석합니다. 저장하면 업로드됩니다.</p>
           <FileDropzone category={dropzoneCategory} onCategoryChange={setDropzoneCategory} onAddFiles={onAddFiles} />
         </div>
         <div className="uploadListColumn">
-          <h3>업로드 목록</h3>
+          <h3><Paperclip size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 업로드 목록</h3>
           <div className="scrollBox">
             {files.length ? files.map((file, index) => (
               <button type="button" className="uploadItem" key={file.id || file.fileKey || `${file.name}-${index}`} onClick={() => onRemoveFile(index)}>
                 {/* 서버에 이미 저장된 첨부는 core-api가 파일 크기를 내려주지 않아 file.size가 없습니다.
                     0KB로 표시하면 빈 파일처럼 보이므로, 크기를 알 때만 괄호를 붙입니다. */}
-                <span className="uploadItemName" title={file.name}>[{file.category}] {file.name}{file.size ? ` (${Math.ceil(file.size / 1024)}KB)` : ''}</span>
-                <span className={`uploadItemStatus ${uploadStatusTone(file.status)}`}>{file.status || '대기'}</span>
-                <span className="uploadItemRemove">삭제</span>
+                <span className="uploadItemName" title={file.name}><FileText size={13} strokeWidth={2.2} aria-hidden="true" /> [{file.category}] {file.name}{file.size ? ` (${Math.ceil(file.size / 1024)}KB)` : ''}</span>
+                <span className={`uploadItemStatus statusChip ${uploadStatusTone(file.status)}`}>{file.status || '대기'}</span>
+                <span className="uploadItemRemove"><Trash2 size={12} strokeWidth={2.4} aria-hidden="true" /> 삭제</span>
               </button>
             )) : <p>아직 추가한 파일이 없습니다.</p>}
           </div>
@@ -915,7 +942,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
         await deleteUnregisteredCoreAttachment(target.fileKey);
       }
     } catch (error) {
-      showToast(`삭제 실패: ${error.message}`, 'warn');
+      showToast(`삭제 실패: ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`, 'warn');
       return undefined;
     }
     const nextFiles = files.filter((_, itemIndex) => itemIndex !== index);
@@ -940,7 +967,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
         const saved = await registerCoreAttachment(coreId, item);
         result = result.map((file) => file.id === item.id ? { ...file, attachmentId: saved.id, status: '서버 저장' } : file);
       } catch (error) {
-        showToast(`${item.name} 등록 실패: ${error.message}`, 'warn');
+        showToast(`${item.name} 등록 실패: ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`, 'warn');
       }
     }
     return result;
@@ -960,27 +987,50 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     let result = files;
     let fellBackToLocal = false;
     let failedCount = 0;
+    let sttFailedCount = 0;
     for (const meta of pending) {
+      let sttResult = null;
+      const isAudio = /\.(mp3|wav|m4a|webm)$/i.test(meta.name || '') || /audio\//i.test(meta.mimeType || '');
+      if (isAudio) {
+        try {
+          setMessage(`${meta.name} 음성을 텍스트로 변환 중…`);
+          sttResult = await transcribeAudio(meta.file);
+        } catch (error) {
+          sttFailedCount += 1;
+          showToast(`${meta.name} 음성 텍스트 변환 실패: ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`, 'warn');
+        }
+      }
       try {
         const { fileKey, fileUrl } = await uploadFileToS3(meta.file, meta.category);
-        result = result.map((item) => item.id === meta.id ? { ...item, fileKey, uploadedUrl: fileUrl, status: 'S3 업로드 완료' } : item);
+        result = result.map((item) => item.id === meta.id ? {
+          ...item,
+          fileKey,
+          uploadedUrl: fileUrl,
+          ...(sttResult ? {
+            extractedText: sttResult.originalText,
+            sttOriginalText: sttResult.originalText,
+            sttMaskedText: sttResult.anonymizedText,
+            sttAnonymizationMap: sttResult.anonymizationMap,
+          } : {}),
+          status: sttResult ? '업로드·텍스트 변환 완료' : '업로드 완료',
+        } : item);
       } catch (error) {
         if (error instanceof S3UploadUnavailableError) {
           fellBackToLocal = true;
-          result = result.map((item) => item.id === meta.id ? { ...item, status: 'S3 저장 전)' } : item);
+          result = result.map((item) => item.id === meta.id ? { ...item, status: '로컬 보관 (업로드 대기)' } : item);
         } else {
           failedCount += 1;
           result = result.map((item) => item.id === meta.id ? { ...item, status: '업로드 실패' } : item);
-          showToast(`${meta.name} 업로드 실패: ${error.message}`, 'warn');
+          showToast(`${meta.name} 업로드 실패: ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`, 'warn');
         }
       }
       setFilesState(result);
     }
     setMessage(fellBackToLocal
-      ? '파일 업로드 완료. 일부는 업로드 대기' //업로드 대기=로컬 임시 보관
+      ? `파일 업로드 완료. 일부는 업로드 대기${sttFailedCount ? ` · STT ${sttFailedCount}건 실패` : ''}` //업로드 대기=로컬 임시 보관
       : failedCount
-        ? `파일 업로드 완료. ${failedCount}건 실패`
-        : '파일 업로드 완료.');
+        ? `파일 업로드 완료. ${failedCount}건 실패${sttFailedCount ? ` · STT ${sttFailedCount}건 실패` : ''}`
+        : `파일 업로드 완료${sttFailedCount ? ` · STT ${sttFailedCount}건 실패` : ''}.`);
     return result;
   };
 
@@ -1013,8 +1063,8 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
     }
   };
 
-  const buildAttachmentPayload = (files) => files.map(({ attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }) => (
-    { attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText }
+  const buildAttachmentPayload = (files) => files.map(({ attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText, sttOriginalText, sttMaskedText, sttAnonymizationMap }) => (
+    { attachmentId, category, name, size, mimeType, storageBucket, fileKey, uploadedUrl, extractedText, sttOriginalText, sttMaskedText, sttAnonymizationMap }
   ));
   const buildEligibilityPayload = ({ legalAidType, eligibilityEvidenceSubmitted }) => {
     const selectedApplicantType = legalAidApplicantTypes.find((item) => item.key === legalAidType) || legalAidApplicantTypes[0];
@@ -1090,7 +1140,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
   return (
     <main className="workspacePage">
       <div className="workflowIntro uploadWorkflowIntro">
-        <h1>상담 자료 올리기</h1>
+        <h1><FileText size={22} strokeWidth={2.2} className="workflowIntroIcon" aria-hidden="true" /> 상담 자료 올리기</h1>
         <p>상담을 선택하고 자료를 추가한 뒤 변호사 검토로 전달하세요.</p>
       </div>
       <section className="workflowPanel uploadPanel">
@@ -1108,7 +1158,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
         ) : null}
         {!creatingNew && hasExistingCase ? (
           <label className="field uploadCaseSelector">
-            <span>상담 선택</span>
+            <span><span className="fieldLabelWithIcon"><FolderOpen size={14} strokeWidth={2.4} aria-hidden="true" /> 상담 선택</span></span>
             <CasePicker consultations={consultations} value={selectedId} onChange={(id) => { setSelectedId(id); setMessage(''); }} />
           </label>
         ) : null}
@@ -1116,8 +1166,8 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
         {creatingNew ? (
           <>
             <div className="newUploadGuide">
-              <strong>통화 전 자료를 먼저 등록합니다.</strong>
-              <span>이름과 제목은 실시간 상담에서 입력합니다.</span>
+              <strong><Info size={14} strokeWidth={2.4} aria-hidden="true" /> 통화 전 자료를 먼저 등록합니다.</strong>
+              <span>(이름과 제목은 실시간 상담에서 입력합니다.)</span>
             </div>
             <div className="formGrid">
               <label className="field">
@@ -1170,13 +1220,19 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
           </>
         ) : selectedCase ? (
           <>
-            <div className="analysisCaseMeta">
-              <span>선택한 상담 <strong>{selectedCase.caseNo}</strong></span>
-              <span>상태 <strong>{canUploadAfterAnalysis ? '분석 완료 · 자료 추가 가능' : '분석 전 · 실시간 상담에서 먼저 분석'}</strong></span>
+            <div className="uploadCaseSummary">
+              <div className="uploadCaseSummaryInfo">
+                <span><FolderOpen size={14} strokeWidth={2.4} aria-hidden="true" /> 선택한 상담</span>
+                <strong>{selectedCase.caseNo}</strong>
+              </div>
+              <div className={`uploadCaseSummaryStatus ${canUploadAfterAnalysis ? 'is-ready' : 'is-waiting'}`}>
+                {canUploadAfterAnalysis ? <CheckCircle2 size={16} strokeWidth={2.4} aria-hidden="true" /> : <XCircle size={16} strokeWidth={2.4} aria-hidden="true" />}
+                <span>
+                  <strong>{canUploadAfterAnalysis ? '자료를 추가할 수 있어요' : '분석을 먼저 완료해주세요'}</strong>
+                  <small>{canUploadAfterAnalysis ? '필요한 녹취·이미지·문서를 등록하세요.' : '실시간 상담에서 분석을 완료하면 자료를 저장할 수 있어요.'}</small>
+                </span>
+              </div>
             </div>
-            {!canUploadAfterAnalysis ? (
-              <p className="helperText">상담자 이름과 제목은 실시간 상담에서 자동으로 정리됩니다. 분석이 끝난 뒤 필요한 자료만 추가하세요.</p>
-            ) : null}
             <EligibilityAndFilesSection
               legalAidType={existingEligibility.legalAidType}
               eligibilityEvidenceSubmitted={existingEligibility.eligibilityEvidenceSubmitted}
@@ -1190,6 +1246,7 @@ function UploadWorkbench({ consultations = [], onCreateConsultation, onUpdateCon
               }}
             />
             <div className="uploadActionRow">
+              <span className="uploadSaveHint">{canUploadAfterAnalysis ? '파일을 추가한 뒤 저장하면 변호사 검토에 함께 전달됩니다.' : '분석 완료 전에는 자료를 저장할 수 없습니다.'}</span>
               <button className="primaryButton uploadSubmitButton" type="button" onClick={submitExistingCase} disabled={!canUploadAfterAnalysis}>자료 저장</button>
             </div>
           </>
@@ -1231,8 +1288,10 @@ function buildExtractionDetail(attachments = []) {
       fileName: name,
       fileType,
       status,
-      // 서식 자동 채움은 표/셀 XML 접근이 가능한 hwpx를 기준으로 처리합니다.
-      note: isLegacyHwp ? '레거시 hwp 파일입니다. hwpx 변환 후 자동 채움 대상에 포함됩니다.' : isHwpx ? 'HWPX XML 기반 표/필드 추출 가능' : isAudio ? 'Whisper STT 추출' : '문서 텍스트 추출',
+      // 서식 자동 채움은 표/셀 XML 접근이 가능한 hwpx를 기준으로 처리합니다. 이 note는 화면에
+      // 그대로 노출되는 문구라(코치 피드백: 개발자 용어를 유저 친화적으로), 내부 기술 이름
+      // (Whisper·XML·레거시)은 빼고 상담원이 바로 이해할 수 있는 말로 풀어 씁니다.
+      note: isLegacyHwp ? '예전 형식(.hwp) 파일이에요. 최신 형식(.hwpx)으로 바꾸면 자동 채움에 쓸 수 있어요.' : isHwpx ? '문서의 표·항목에서 자동으로 값을 채울 수 있어요.' : isAudio ? '통화 음성을 텍스트로 변환해 분석했습니다.' : '문서 텍스트 추출',
     };
   });
 }
@@ -1307,6 +1366,9 @@ function buildAnalysisResult(selectedCase) {
   const submittedFileLinks = attachmentLinkValues(attachments);
   const modalities = summarizeAttachmentModalities(attachments);
   const hasMultimodalEvidence = modalities.some((item) => item.count > 0);
+  const audioAttachments = attachments.filter((item) => /mp3|wav|m4a|webm/i.test(item.mimeType || item.name || ''));
+  const sttOriginal = audioAttachments.map((item) => item.sttOriginalText || item.extractedText).filter(Boolean).join('\n\n');
+  const sttMasked = audioAttachments.map((item) => item.sttMaskedText || item.extractedText).filter(Boolean).join('\n\n');
   // 긴급도 등급/점수/근거와 구조대상 판정은 '구조대상 판정' 버튼과 같은 규칙(공용 함수)으로 산출합니다.
   const emergency = computeCaseEmergency(selectedCase);
   const { eligibilityCheck, isTargetCandidate, evidenceSubmitted, eligibility } = resolveEligibilityFromCase(selectedCase);
@@ -1350,8 +1412,8 @@ function buildAnalysisResult(selectedCase) {
     extractionDetail: buildExtractionDetail(attachments),
     // STT 개인정보 마스킹 미리보기 (원문 → 마스킹본)
     sttPreview: {
-      original: '안녕하세요, 저는 홍길동이고 주민번호는 850101-2345678입니다. 연락처는 010-1234-5678이에요.',
-      masked: maskSensitiveText('안녕하세요, 저는 홍길동이고 주민번호는 850101-2345678입니다. 연락처는 010-1234-5678이에요.'),
+      original: sttOriginal || '녹취 파일의 STT 결과가 아직 없습니다.',
+      masked: sttMasked || '녹취 파일의 개인정보 가림 결과가 아직 없습니다.',
     },
     verification: {
       // AI 응답 검증(형식/근거/환각 탐지, 요구사항 AI-07 시리즈)을 화면에서 확인할 수 있도록 만든 mock 검증 결과입니다.
@@ -1391,20 +1453,63 @@ function CallLiveIndicator({ seconds }) {
   );
 }
 
-function RealtimeCallControl({ hasCase, callStatus, callSeconds, audioStatus, onStartCall, onEndCall }) {
+function RealtimeCallControl({
+  hasCase,
+  callStatus,
+  callSeconds,
+  audioStatus,
+  availableAudioCalls,
+  selectedAudioCallId,
+  isLoadingAudioCalls,
+  onSelectAudioCall,
+  onRefreshAudioCalls,
+  onStartCall,
+  onEndCall,
+}) {
   const sttChip = callStatus === 'ongoing'
     ? audioStatus === 'streaming'
       ? { tone: 'tone-success', label: '통화 오디오 전송 중 · 메모로 기록' }
       : audioStatus === 'error'
         ? { tone: 'tone-warn', label: '오디오 연결 실패 · 메모로 기록' }
-        : { tone: 'tone-info', label: '통화 오디오 연결 중 · 메모로 기록' }
-    : { tone: 'tone-muted', label: '통화 내용 자동 받아쓰기 준비 중' };
+        // 연결할 통화를 고르지 않고 시작한 경우(화면 확인용 등)는 오디오 연결 자체를
+        // 시도하지 않으므로, "연결 중"이 아니라 지금 상태를 있는 그대로 알려줍니다.
+        : audioStatus === 'idle'
+          ? { tone: 'tone-muted', label: '오디오 연결 없이 진행 중 · 메모로 기록' }
+          : { tone: 'tone-info', label: '통화 오디오 연결 중 · 메모로 기록' }
+    : audioStatus === 'error'
+      ? { tone: 'tone-warn', label: '통화 연결 실패 · 목록을 새로고침해주세요' }
+      : isLoadingAudioCalls
+        ? { tone: 'tone-info', label: '진행 중인 통화 확인 중' }
+        : availableAudioCalls.length
+          ? { tone: 'tone-info', label: '연결할 통화를 선택해주세요' }
+          : { tone: 'tone-muted', label: '연결 가능한 통화를 기다리는 중' };
   return (
     <div className="realtimeStatusChips">
       {callStatus === 'idle' ? (
-          <button type="button" className="callControlButton start" onClick={onStartCall} disabled={!hasCase}>
+          <>
+            <div className="audioCallPicker">
+              <label htmlFor="audio-call-picker">연결할 통화</label>
+              <div className="audioCallPickerControls">
+                <select
+                  id="audio-call-picker"
+                  value={selectedAudioCallId}
+                  onChange={(event) => onSelectAudioCall(event.target.value)}
+                  disabled={!hasCase || isLoadingAudioCalls}
+                >
+                  <option value="">{isLoadingAudioCalls ? '통화 목록을 불러오는 중...' : '대기 중인 통화 선택'}</option>
+                  {availableAudioCalls.map((call) => (
+                    <option key={call.callId} value={call.callId}>통화 ID · {call.callId}</option>
+                  ))}
+                </select>
+                <button type="button" className="audioCallRefreshButton" onClick={() => onRefreshAudioCalls()} disabled={isLoadingAudioCalls}>
+                  새로고침
+                </button>
+              </div>
+            </div>
+          <button type="button" className="callControlButton start" onClick={onStartCall} disabled={!hasCase || isLoadingAudioCalls}>
             <PhoneCall size={14} strokeWidth={2.4} /> 통화 시작
           </button>
+          </>
         ) : callStatus === 'ongoing' ? (
           <>
             <button type="button" className="callControlButton end" onClick={onEndCall}>
@@ -1418,20 +1523,6 @@ function RealtimeCallControl({ hasCase, callStatus, callSeconds, audioStatus, on
       <span className={`statusChip ${sttChip.tone}`}><Mic size={13} strokeWidth={2.4} /> {sttChip.label}</span>
       <span className={`statusChip ${hasCase ? 'tone-info' : 'tone-muted'}`}><Check size={13} strokeWidth={2.4} /> 메모 · {hasCase ? '입력 가능' : '사건 선택 필요'}</span>
     </div>
-  );
-}
-
-function RealtimeSessionCard({ selectedCase }) {
-  const attachmentCount = selectedCase?.attachments?.length || 0;
-  return (
-    <article className="realtimeSummaryCard">
-      <h3>세션 정보</h3>
-      <dl className="realtimeMetricList">
-        <div><dt>상담 번호</dt><dd>{selectedCase?.caseNo || '미선택'}</dd></div>
-        <div><dt>상담 제목</dt><dd>{selectedCase?.title || '사건을 선택하면 표시됩니다.'}</dd></div>
-        <div><dt>첨부자료</dt><dd>{attachmentCount}건</dd></div>
-      </dl>
-    </article>
   );
 }
 
@@ -1452,16 +1543,22 @@ function RealtimeMemoCard({ selectedCase, onUpdateConsultation }) {
   return (
     <article className="realtimeTranscriptCard">
       <div className="realtimeTranscriptHead">
-        <h3>실시간 상담 메모</h3>
-        <span className={`statusChip ${charCount ? 'tone-info' : 'tone-muted'}`}>{charCount ? `${charCount}자 기록됨` : '작성 전'}</span>
+        <h3><MessageSquareText size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 실시간 상담 메모</h3>
+        <span className={`statusChip ${charCount ? 'tone-info' : 'tone-muted'}`}>
+          {charCount ? <Check size={12} strokeWidth={2.4} aria-hidden="true" /> : <Clock size={12} strokeWidth={2.4} aria-hidden="true" />}
+          {charCount ? `${charCount}자 기록됨` : '작성 전'}
+        </span>
       </div>
+      {/* 이 칸은 실제로는 읽기 전용 기록 로그입니다(입력은 아래 작은 입력창으로). 그런데
+          placeholder가 "여기 바로 적어주세요"라고 말해, 정작 이 칸을 눌러 타이핑을 시도했다가
+          아무 반응이 없는 사람이 있었습니다(코치 피드백). 안내 문구를 실제 동작에 맞춥니다. */}
       <textarea
         className="realtimeMemoTextarea"
         value={memo}
         disabled={!hasCase}
         readOnly
         placeholder={hasCase
-          ? '통화 내용을 바로 적어주세요.'
+          ? '아래 입력창에 적으면 여기에 기록됩니다.'
           : '사건 선택 또는 새 상담 시작'}
       />
       <div className="realtimeMemoComposer">
@@ -1519,8 +1616,8 @@ function RealtimeSuggestedQuestions({ memoText }) {
   return (
     <article className="realtimeQuestionsCard">
       <div className="realtimeTranscriptHead">
-        <h3>AI 추천 추가 질문</h3>
-        <span className="statusChip tone-info">통화 중 참고용</span>
+        <h3><Sparkles size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> AI 추천 추가 질문</h3>
+        <span className="statusChip tone-info"><Info size={12} strokeWidth={2.4} aria-hidden="true" />통화 중 참고용</span>
       </div>
       <p className="helperText">메모 기반 질문 후보 · 상담원이 선택</p>
       <div className="realtimeQuestionList">
@@ -1535,7 +1632,7 @@ function RealtimeSuggestedQuestions({ memoText }) {
               aria-pressed={asked}
             >
               <span>{question}</span>
-              <em>{asked ? '질문함' : '질문하기'}</em>
+              <em>{asked ? <><Check size={12} strokeWidth={2.6} aria-hidden="true" />질문함</> : '질문하기'}</em>
             </button>
           );
         })}
@@ -1544,7 +1641,37 @@ function RealtimeSuggestedQuestions({ memoText }) {
   );
 }
 
-function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, onStartCall, onEndCall, caseMeta }) {
+// 통화 중 실시간 자막이 뜰 자리입니다. 백엔드 STT 연동 전까지는 항상 빈 배열이라 안내
+// 문구만 보이지만, RealtimeAudioStream.onTranscript가 채워주는 값을 그대로 받는 구조라
+// 백엔드가 자막 프레임을 보내기 시작하면 코드 변경 없이 바로 통화 내용이 흘러갑니다.
+function LiveCaptionCard({ callStatus, audioStatus, captions }) {
+  if (callStatus !== 'ongoing') return null;
+  const isStreaming = audioStatus === 'streaming';
+  return (
+    <article className="realtimeCaptionCard">
+      <div className="realtimeTranscriptHead">
+        <h3><Mic size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 실시간 자막</h3>
+        <span className={`statusChip ${isStreaming ? 'tone-info' : 'tone-muted'}`}>
+          {isStreaming ? <Mic size={12} strokeWidth={2.4} aria-hidden="true" /> : <Clock size={12} strokeWidth={2.4} aria-hidden="true" />}
+          {isStreaming ? '연동 준비 중' : '오디오 연결 대기'}
+        </span>
+      </div>
+      {captions.length ? (
+        <div className="realtimeCaptionList" role="log" aria-live="polite">
+          {captions.map((caption, index) => (
+            <p key={index} className={caption.isFinal ? 'realtimeCaptionLine' : 'realtimeCaptionLine pending'}>{caption.text}</p>
+          ))}
+        </div>
+      ) : (
+        <p className="helperText">
+          통화 음성을 실시간 글자로 바꿔 보여줄 자리입니다. 지금은 연동 전이라 비어 있고, 통화 내용은 왼쪽 메모에 직접 적어 주세요.
+        </p>
+      )}
+    </article>
+  );
+}
+
+function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, liveCaptions, availableAudioCalls, selectedAudioCallId, isLoadingAudioCalls, onSelectAudioCall, onRefreshAudioCalls, onStartCall, onEndCall, caseMeta }) {
   const hasCase = Boolean(selectedCase);
   const headline = callStatus === 'ongoing'
     ? '통화 중입니다. 들은 내용을 바로 적으면서 진행하세요.'
@@ -1552,17 +1679,31 @@ function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus,
       ? '통화를 마쳤습니다. 메모를 다듬은 뒤 분석을 시작하세요.'
       : '전화를 받으면 위 ‘통화 시작’을 눌러 진행하세요.';
   return (
-    <section className="realtimeWorkbenchPanel" aria-label="실시간 상담 메모">
+    <section className="realtimeWorkbenchPanel roleAccent-counselor" aria-label="실시간 상담 메모">
       <div className="realtimeWorkbenchHeader">
         <div>
-          <span className="flowStageEyebrow">실시간 상담</span>
+          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
+          <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
           <strong>{headline}</strong>
           <p>통화 내용 자동 받아쓰기를 준비 중입니다. 현재는 메모를 기준으로 분석합니다.</p>
         </div>
-        <RealtimeCallControl hasCase={hasCase} callStatus={callStatus} callSeconds={callSeconds} audioStatus={audioStatus} onStartCall={onStartCall} onEndCall={onEndCall} />
+        <RealtimeCallControl
+          hasCase={hasCase}
+          callStatus={callStatus}
+          callSeconds={callSeconds}
+          audioStatus={audioStatus}
+          availableAudioCalls={availableAudioCalls}
+          selectedAudioCallId={selectedAudioCallId}
+          isLoadingAudioCalls={isLoadingAudioCalls}
+          onSelectAudioCall={onSelectAudioCall}
+          onRefreshAudioCalls={onRefreshAudioCalls}
+          onStartCall={onStartCall}
+          onEndCall={onEndCall}
+        />
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
+          <LiveCaptionCard callStatus={callStatus} audioStatus={audioStatus} captions={liveCaptions} />
           <RealtimeMemoCard selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
           {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}
         </div>
@@ -1793,7 +1934,7 @@ function RecommendedFormsPanel({ selectedCase, onSaveBeforeOpen, saving }) {
     <section className="recommendedFormsPanel">
       <div className="recommendedFormsHeader">
         <div>
-          <h3>추천 서식</h3>
+          <h3><Sparkles size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 추천 서식</h3>
           <p>{draftCaseType ? `${draftCaseType} 기준 추천` : '사건 유형 확정 후 추천'}</p>
         </div>
       </div>
@@ -1803,17 +1944,22 @@ function RecommendedFormsPanel({ selectedCase, onSaveBeforeOpen, saving }) {
           {templateNames.map((name) => (
             <div className="tmplRow" key={name}>
               <span className="tmplRowName">
-                {name}
-                <em className="tmplRowBadge">{usingAiRecommendations ? 'AI 추천' : '추천'}</em>
+                <FileText size={14} strokeWidth={2.2} aria-hidden="true" /> {name}
+                <em className={`tmplRowBadge statusChip ${usingAiRecommendations ? 'tone-info' : 'tone-muted'}`}>
+                  {usingAiRecommendations ? <Star size={11} strokeWidth={2.4} aria-hidden="true" /> : null} {usingAiRecommendations ? 'AI 추천' : '추천'}
+                </em>
               </span>
               {/* 넘어가기 전에 저장까지 합니다. 예전엔 저장을 따로 눌러야 했고, 안 누르고
                   넘어가면 서식 화면에서 분석 결과 없이 시작해 추천이 로컬 휴리스틱으로
                   떨어졌습니다. 저장 버튼과 같은 함수(performSaveAnalysis)를 부르므로
                   저장 경로가 둘로 갈리지 않습니다. */}
+              {/* 예전엔 추천 서식 3개 중 무엇을 눌러도 항상 caseId만 넘겨서, 서식 생성
+                  화면은 어느 걸 눌렀는지 모르고 매번 같은(초기) 서식으로 열렸습니다
+                  (코치 피드백). 어떤 서식을 눌렀는지도 함께 넘깁니다. */}
               <button
                 type="button"
                 className="secondaryActionButton compactAction"
-                onClick={() => onSaveBeforeOpen?.(selectedCase.id)}
+                onClick={() => onSaveBeforeOpen?.(selectedCase.id, name)}
                 disabled={!onSaveBeforeOpen || saving}
               >
                 {saving ? '저장하는 중...' : '저장하고 초안 만들기'}
@@ -1833,11 +1979,29 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   // 이 상담의 분석이 App에서 돌고 있는지. 화면을 떠났다 돌아와도 App이 계속 들고 있으므로
   // 여기서는 그 값을 읽기만 하면 됩니다("분석 중... 1:53" 표시가 그대로 이어집니다).
   const activeRun = analysisRuns[selectedCase?.id];
+  // selectedId가 가리키는 사건이 consultations 목록에 없으면(예: focusedConsultationId로 들어왔다가
+  // 그 사건이 삭제됐거나, 최초 마운트 시점의 목록과 지금 목록이 달라진 경우) selectedCase가
+  // 계속 undefined로 남아 통화 시작·메모 입력이 영구히 비활성화됩니다. CasePicker는 그래도 첫
+  // 사건 정보를 보여줄 수 있어(placeholder가 아니라) 사용자는 사건이 선택된 것처럼 보이는데
+  // 실제로는 아무것도 못 하는 상태가 됩니다. 유효한 사건이 있다면 자동으로 첫 사건으로 되돌립니다.
+  useEffect(() => {
+    if (focusedConsultationId) return;
+    if (!consultations.length) return;
+    const stillExists = consultations.some((item) => String(item.id) === String(selectedId));
+    if (!stillExists) setSelectedId(consultations[0].id);
+  }, [consultations, selectedId, focusedConsultationId]);
   // 통화 시작/종료 상태입니다. 실제 전화 연동 전까지는 상담원이 직접 누르는 버튼으로 관리하고,
   // 사건을 바꾸면(다른 상담을 고르면) 이전 통화 상태가 남아있지 않도록 초기화합니다.
   const [callStatus, setCallStatus] = useState('idle');
   const [callSeconds, setCallSeconds] = useState(0);
   const [audioStatus, setAudioStatus] = useState('idle');
+  const [availableAudioCalls, setAvailableAudioCalls] = useState([]);
+  const [selectedAudioCallId, setSelectedAudioCallId] = useState('');
+  const [isLoadingAudioCalls, setIsLoadingAudioCalls] = useState(false);
+  // 실시간 자막(통화 중 STT) 자리입니다. 백엔드가 아직 자막 프레임을 보내지 않아 항상 빈
+  // 배열로 남지만(코치 피드백: 실시간 통화 기술 중 프론트가 먼저 준비해둘 수 있는 부분),
+  // RealtimeAudioStream의 onTranscript가 연결돼 있어 백엔드가 붙으면 바로 채워집니다.
+  const [liveCaptions, setLiveCaptions] = useState([]);
   const audioStreamRef = useRef(null);
   useEffect(() => {
     audioStreamRef.current?.stop();
@@ -1845,6 +2009,8 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
     setCallStatus('idle');
     setCallSeconds(0);
     setAudioStatus('idle');
+    setSelectedAudioCallId('');
+    setLiveCaptions([]);
   }, [selectedId]);
   useEffect(() => {
     if (callStatus !== 'ongoing') return undefined;
@@ -1855,16 +2021,38 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
     if (!selectedCase) return;
     setCallStatus('ongoing');
     setCallSeconds(0);
+    setLiveCaptions([]);
+    // 연결할 통화를 아직 고르지 않았어도(대기 중인 통화가 없거나, 화면만 확인하려는 경우)
+    // 통화 중 화면 자체는 볼 수 있어야 합니다. 이때는 실제 오디오 스트림 연결 없이
+    // 메모 중심으로만 진행하고, 나중에 통화를 고르면 '통화 시작'을 다시 눌러 오디오까지 붙일 수 있습니다.
+    if (!selectedAudioCallId) {
+      setAudioStatus('idle');
+      return;
+    }
     try {
       const stream = createRealtimeAudioStream({
-        onStatus: setAudioStatus,
+        onStatus: (status) => {
+          setAudioStatus(status);
+          if (status === 'ended') setCallStatus('ended');
+        },
         onError: () => setAudioStatus('error'),
+        // 자막 프레임이 오면 이어붙이고, 아직 확정되지 않은(isFinal:false) 마지막 줄은
+        // 다음 프레임이 올 때 갱신해 덮어씁니다(흔한 스트리밍 STT 관례: 중간 결과는 계속
+        // 바뀌다가 isFinal:true로 확정됩니다).
+        onTranscript: ({ text, isFinal }) => {
+          setLiveCaptions((current) => {
+            const last = current[current.length - 1];
+            if (last && !last.isFinal) return [...current.slice(0, -1), { text, isFinal }];
+            return [...current, { text, isFinal }];
+          });
+        },
       });
       audioStreamRef.current = stream;
-      await stream.start();
+      await stream.start({ callId: selectedAudioCallId });
     } catch (error) {
+      setCallStatus('idle');
       setAudioStatus('error');
-      showToast(error.message || '오디오 연결에 실패했습니다. 메모로 계속 진행할 수 있습니다.', 'warn');
+      showToast(friendlyErrorMessage(error, '오디오 연결에 실패했습니다. 메모로 계속 진행할 수 있습니다.'), 'warn');
     }
   };
   // 통화 종료 버튼을 누르면 곧바로 '분석 시작'을 누를 수 있는 상태가 됩니다(통화 중에는 분석을
@@ -1898,7 +2086,42 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   // useAsyncAction(전역 로딩 오버레이)은 여기서 더 이상 쓰지 않습니다 — 분석이 몇 분씩 걸려서,
   // 화면 전체를 덮으면 그동안 다른 상담을 볼 수도 접수할 수도 없었습니다(startAnalysis 주석 참고).
   const showToast = useToast();
+  const refreshAvailableAudioCalls = async ({ silent = false } = {}) => {
+    setIsLoadingAudioCalls(true);
+    try {
+      const calls = await fetchAvailableAudioCalls();
+      setAvailableAudioCalls(calls);
+      setSelectedAudioCallId((currentCallId) => (
+        calls.some((call) => call.callId === currentCallId)
+          ? currentCallId
+          : ''
+      ));
+    } catch (error) {
+      setAvailableAudioCalls([]);
+      setSelectedAudioCallId('');
+      if (!silent) {
+        showToast(friendlyErrorMessage(error, '진행 중인 통화 목록을 불러오지 못했습니다.'), 'warn');
+      }
+    } finally {
+      setIsLoadingAudioCalls(false);
+    }
+  };
+  useEffect(() => {
+    // 외부 전화 서버가 먼저 통화를 등록하는 구조라, 상담원이 화면을 열어 둔 채로도
+    // 새 통화를 확인할 수 있게 대기 상태에서만 목록을 주기적으로 갱신합니다.
+    // 초기/자동 갱신 실패는 토스트를 띄우지 않고, 직접 새로고침했을 때만 안내합니다.
+    if (callStatus !== 'idle') return undefined;
+    refreshAvailableAudioCalls({ silent: true });
+    const refreshTimer = window.setInterval(() => {
+      refreshAvailableAudioCalls({ silent: true });
+    }, 5000);
+    return () => window.clearInterval(refreshTimer);
+  }, [callStatus]);
   const [showMaskedStt, setShowMaskedStt] = useState(true);
+  // 상담원이 각 분석 섹션(AI 분석 요약 등)을 확인했는지 스스로 표시해두는 용도라, 서버에
+  // 저장하지 않는 화면 전용 상태입니다. 사건을 바꾸면(selectCase/포커스 진입) 같이 비웁니다.
+  const [confirmedSections, setConfirmedSections] = useState({});
+  const toggleSectionConfirmed = (key) => setConfirmedSections((current) => ({ ...current, [key]: !current[key] }));
   const [pendingHitlAction, setPendingHitlAction] = useState(null);
   const activeReviewAction = selectedCase?.reviewAction && !selectedCase.reviewAction.resolved ? selectedCase.reviewAction : null;
   // focusedConsultationId(대시보드/알림에서 특정 사건으로 바로 진입)로 들어왔을 때 한 번만
@@ -1926,6 +2149,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
     setSavedMessage('');
     setReviewMessage('');
     setAnalysisSaved(Boolean(focusedCase?.analysis));
+    setConfirmedSections({});
   }, [focusedConsultationId, consultations]);
   // 이 상담을 진행할 때 도움이 될 후속 작업을 AI가 제안합니다.
   // 각 항목이 '무엇을 하는 것인지' 상담원이 바로 알 수 있도록 설명을 함께 둡니다. (요구사항 AI-04·05 계열)
@@ -1943,7 +2167,82 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   // 그 오버레이는 화면 전체를 덮어 클릭을 막는데, 분석은 녹취 길이에 따라 몇 분씩 걸립니다.
   // 그동안 상담원이 다른 상담을 보거나 새 전화를 접수하는 것까지 전부 막힙니다.
   // 대신 아래 progress 콜백으로 경과 시간만 받아 버튼에 표시합니다.
-  const trackAnalysisProgress = { onProgress: ({ elapsedMs }) => setLocalElapsedSec(Math.floor(elapsedMs / 1000)) };
+  const trackAnalysisProgress = {
+    onProgress: ({ elapsedMs }) => setLocalElapsedSec(Math.floor(elapsedMs / 1000)),
+    // 작업 번호를 상담 상태에 남겨 두면 화면을 나갔다 돌아와도 같은 분석 작업을 다시 조회할 수 있습니다.
+    onSubmitted: (job) => {
+      const jobId = job?.job_id ?? job?.jobId;
+      if (jobId != null) onUpdateConsultation(selectedCase.id, { analysisJobId: jobId });
+    },
+  };
+
+  const applyCompletedAnalysis = (nextAnalysis, { notify = false } = {}) => {
+    setAnalysis(nextAnalysis);
+    // 통화에서 확인된 상담자 이름을 AI가 채웁니다. 상담원이 직접 입력한 값은 덮어쓰지 않습니다.
+    const aiName = pickClientName(nextAnalysis);
+    const patch = { analysisJobId: '' };
+    if (nextAnalysis.analysisId && nextAnalysis.analysisId !== selectedCase.coreAnalysisId) {
+      patch.coreAnalysisId = nextAnalysis.analysisId;
+    }
+    if (aiName && !selectedCase.name && selectedCase.nameSource !== 'counselor') {
+      patch.name = aiName;
+      patch.nameSource = 'ai';
+    }
+    onUpdateConsultation(selectedCase.id, patch);
+
+    setAnalyzed(true);
+    setAnalysisSaved(false);
+    setSavedMessage('');
+    setReviewMessage('');
+    setAiTaskMessage('AI 분석 반영 완료');
+    setAiResultSummary({
+      title: '사건 분석 AI 결과',
+      description: '사건 유형 · 긴급도 · 무료 법률구조 대상 검토',
+      metrics: [
+        { label: '사건 유형', value: nextAnalysis.caseType || '미분류' },
+        { label: '긴급도', value: nextAnalysis.urgency || '미확인' },
+        { label: '구조대상', value: nextAnalysis.eligibility || '검토 필요' },
+      ],
+      items: (nextAnalysis.missingInfo || []).slice(0, 4).map((item) => `확인 필요: ${item}`),
+    });
+    if (notify) showToast('백그라운드 AI 분석이 완료되었습니다.', 'success');
+  };
+
+  // 페이지를 이동했다가 돌아온 경우에도, 서버에 남아 있는 분석 작업을 다시 붙잡아 결과를 표시합니다.
+  // 완료된 작업은 analysisJobId로 조회하고, 진행 중 작업은 active 엔드포인트로 찾아 이어받습니다.
+  useEffect(() => {
+    if (!selectedCase?.coreId || selectedCase?.analysis || isAnalyzing) return undefined;
+    let cancelled = false;
+
+    const resumeAnalysis = async () => {
+      try {
+        const knownJob = selectedCase.analysisJobId
+          ? await getCoreAnalysisJob(selectedCase.analysisJobId)
+          : await findActiveCoreAnalysisJob(selectedCase);
+        if (!knownJob || cancelled) return;
+
+        setIsAnalyzing(true);
+        setLocalElapsedSec(0);
+        setAiTaskMessage('진행 중인 AI 분석 결과를 확인하고 있습니다.');
+        const coreResult = await waitForCoreAnalysisJob(knownJob, trackAnalysisProgress);
+        if (cancelled) return;
+        applyCompletedAnalysis(mergeContractAnalysisResponse(buildAnalysisResult(selectedCase), coreResult), { notify: true });
+      } catch (error) {
+        if (!cancelled) {
+          const message = friendlyErrorMessage(error, '진행 중인 AI 분석 결과를 확인하지 못했습니다.');
+          setAiTaskMessage(message);
+          showToast(message, 'warn');
+        }
+      } finally {
+        if (!cancelled) setIsAnalyzing(false);
+      }
+    };
+
+    resumeAnalysis();
+    return () => { cancelled = true; };
+    // selectedCase가 바뀌었을 때만 기존 작업을 다시 붙잡습니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCase?.id, selectedCase?.coreId, selectedCase?.analysisJobId]);
 
   // 실행은 App이 맡습니다(startConsultationAnalysis) — 상담원이 분석을 걸어두고 다른 메뉴로
   // 옮겨도 끝까지 진행되고, 끝나면 알림이 뜹니다. 이 화면은 시작만 시키고, 결과는 상담 객체에
@@ -1997,6 +2296,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
     setAiTaskMessage('');
     setAiResultSummary(null);
     setAnalysisSaved(Boolean(nextCase?.analysis));
+    setConfirmedSections({});
   };
   // 132콜센터처럼 전화를 받자마자 바로 이야기를 들으며 진행하는 상담은, 상담 문서 업로드 화면에서
   // 이름·제목을 먼저 채우고 오는 절차를 기다릴 수 없습니다. 최소 정보만으로 사건을 즉시 만들고
@@ -2063,8 +2363,9 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       setAiTaskMessage('구조대상 판정 반영 완료');
       setAiResultSummary(buildAiResultSummary('eligibility', result));
     } catch (error) {
-      setAiTaskMessage(error.message);
-      showToast(error.message, 'warn');
+      const message = friendlyErrorMessage(error, '구조대상 확인에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      setAiTaskMessage(message);
+      showToast(message, 'warn');
     } finally {
       setIsLocalTaskRunning(false);
     }
@@ -2084,8 +2385,9 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       setAiTaskMessage('누락자료 점검 반영 완료');
       setAiResultSummary(buildAiResultSummary('missing', result));
     } catch (error) {
-      setAiTaskMessage(error.message);
-      showToast(error.message, 'warn');
+      const message = friendlyErrorMessage(error, '누락자료 점검에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      setAiTaskMessage(message);
+      showToast(message, 'warn');
     } finally {
       setIsLocalTaskRunning(false);
     }
@@ -2144,7 +2446,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       syncMessage = syncResult?.message ? ` ${syncResult.message}` : '';
       syncFailed = syncResult ? syncResult.ok === false : false;
     } catch (error) {
-      syncMessage = ` ${error.message}`;
+      syncMessage = ` ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`;
       syncFailed = true;
     }
     setSavedMessage(syncFailed
@@ -2188,12 +2490,12 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   // 저장을 기다린 뒤에 넘어가야 하는 이유: 서식 화면은 coreAnalysisId로 추천·초안 API를
   // 부르는데, 저장이 끝나기 전에 넘어가면 그 값이 아직 없어 로컬 휴리스틱으로 떨어집니다.
   const [savingBeforeDraft, setSavingBeforeDraft] = useState(false);
-  const saveThenOpenDraft = async (caseId) => {
+  const saveThenOpenDraft = async (caseId, templateName) => {
     if (!selectedCase || !analysis || savingBeforeDraft) return;
     setSavingBeforeDraft(true);
     try {
       if (!analysisSaved) await performSaveAnalysis();
-      onOpenDraft?.(caseId);
+      onOpenDraft?.(caseId, templateName);
     } finally {
       setSavingBeforeDraft(false);
     }
@@ -2214,7 +2516,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
       return { synced: true };
     } catch (error) {
       console.warn('[분석 검토 요청] core-api 동기화 실패:', error.message);
-      return { synced: false, reason: 'error', message: error.message };
+      return { synced: false, reason: 'error', message: friendlyErrorMessage(error, '서버 연결에 실패했습니다.') };
     }
   };
 
@@ -2273,7 +2575,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 // 몇 분씩 걸리는 작업이라 경과 시간을 같이 보여줍니다 — 없으면 멈춘 것처럼 보입니다.
                 `분석 중... ${formatElapsed(analysisElapsedSec)}`
               ) : analyzed ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.6} /> 재분석 실행</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 재분석 실행</span>
               ) : '분석 시작'}
             </button>
             {/* 툴팁이 아니라 항상 보이는 캡션으로 둬서, 왜 눌리지 않는지 바로 알 수 있게 합니다. */}
@@ -2286,6 +2588,12 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
           callStatus={callStatus}
           callSeconds={callSeconds}
           audioStatus={audioStatus}
+          liveCaptions={liveCaptions}
+          availableAudioCalls={availableAudioCalls}
+          selectedAudioCallId={selectedAudioCallId}
+          isLoadingAudioCalls={isLoadingAudioCalls}
+          onSelectAudioCall={setSelectedAudioCallId}
+          onRefreshAudioCalls={refreshAvailableAudioCalls}
           onStartCall={startCall}
           onEndCall={endCall}
           caseMeta={selectedCase ? (
@@ -2293,6 +2601,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
               <label className={`analysisCaseMetaEdit realtimeRequiredNameField${selectedCase.name ? '' : ' missing'}`}>
                 <span>
+                  {!selectedCase.name ? <AlertTriangle size={13} strokeWidth={2.4} className="realtimeRequiredNameFieldIcon" aria-hidden="true" /> : null}
                   상담받은 사람
                   {selectedCase.name
                     ? (selectedCase.nameSource === 'ai' ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em> : null)
@@ -2397,7 +2706,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   <strong>무료 법률구조 대상 확인</strong>
                   <small>대상 · 증빙 · 긴급도</small>
                 </span>
-                {analysis?.aiLinked?.eligibility ? <em><Check size={13} strokeWidth={3} /> 완료</em> : null}
+                {analysis?.aiLinked?.eligibility ? <em><Check size={13} strokeWidth={2.4} /> 완료</em> : null}
               </button>
               <button className={`aiActionCard tone-missing${analysis?.aiLinked?.missing ? ' done' : ''}`} type="button" onClick={runMissingDataCheck}>
                 <ClipboardList size={22} strokeWidth={2.2} />
@@ -2405,7 +2714,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   <strong>누락자료 점검</strong>
                   <small>더 받아야 할 서류 찾기</small>
                 </span>
-                {analysis?.aiLinked?.missing ? <em><Check size={13} strokeWidth={3} /> 완료</em> : null}
+                {analysis?.aiLinked?.missing ? <em><Check size={13} strokeWidth={2.4} /> 완료</em> : null}
               </button>
             </div>
           </div>
@@ -2468,8 +2777,8 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         ) : null}
         {!analyzed ? (
           <div className="emptyState">
-            <ClipboardList size={22} strokeWidth={2} aria-hidden="true" />
-            <p>{callStatus === 'ongoing' ? '통화가 끝나면 분석을 시작할 수 있습니다.' : '메모를 작성하면 분석을 시작할 수 있습니다.'}</p>
+            <ClipboardList size={22} strokeWidth={2.2} aria-hidden="true" />
+            <p>{callStatus === 'ongoing' ? '통화가 끝나면 분석을 시작할 수 있습니다.' : (selectedCase?.memo || '').trim() ? '메모 작성 완료 · 분석을 시작하세요.' : '메모를 작성하면 분석을 시작할 수 있습니다.'}</p>
             <span className="emptyStateHint">현재 메모를 바탕으로 사건 유형과 확인할 자료를 정리합니다.</span>
             <button type="button" className="emptyStateAction callAnalyzeButton" onClick={startAnalysis} disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing'}>
               {isAnalyzing ? `분석 중... ${formatElapsed(analysisElapsedSec)}` : '분석 시작'}
@@ -2478,21 +2787,60 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         ) : (
           <div className="workflowColumns">
             <div>
-              
-              <h3>인공지능 분석 요약</h3>
-              <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
-              
-              <h3>개인정보는 자동으로 가려집니다</h3>
-              <div className="resultCard">
-                <div className="segmented compactSegmented">
-                  <button type="button" className={showMaskedStt ? 'active' : ''} onClick={() => setShowMaskedStt(true)}>마스킹본</button>
-                  <button type="button" className={!showMaskedStt ? 'active' : ''} onClick={() => setShowMaskedStt(false)}>원문</button>
-                </div>
-                {!showMaskedStt ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
-                <p className="sttPreviewText">{showMaskedStt ? analysis.sttPreview?.masked : analysis.sttPreview?.original}</p>
-                <p className="helperText">기본값: 마스킹본 · 원문: 오류 확인용</p>
+              {/* AI 출력은 참고용이며 최종 확정은 담당자가 수행합니다. (사람이 검토·확정하는 원칙) */}
+              <div className="hitlBanner">
+                <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
+                <span>
+                  <strong>AI가 정리한 내용은 참고용이에요.</strong>
+                  <small>분류 · 긴급도 · 구조대상은 사람이 확정</small>
+                </span>
               </div>
-              <h3>무료 법률구조 대상 검토</h3>
+              {/* 코치 피드백 반영: AI 분석 요약(pinned) → 아코디언 그룹(부수적인 세부 내용,
+                  무료 법률구조 대상 검토 포함) → 체크리스트(pinned)를 맨 마지막에 두는
+                  '북엔드' 순서로 정리합니다. 펼쳐 고정된 섹션이 앞뒤로 하나씩만 있고
+                  가운데는 전부 아코디언이라 섞여 보이지 않습니다. */}
+              {/* 같은 화면의 다른 요소들('AI 자동 확인', 'AI 응답 검증' 등)은 모두 줄임말 'AI'를
+                  쓰는데 이 제목만 '인공지능'으로 풀어 써서 표기가 튀었습니다. 맞춥니다. */}
+              <CollapsibleSection icon={Sparkles} title="AI 분석 요약" pinned confirmed={Boolean(confirmedSections.summary)} onToggleConfirm={() => toggleSectionConfirmed('summary')}>
+                <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
+              </CollapsibleSection>
+              <CollapsibleSection icon={Inbox} title="받은 자료" confirmed={Boolean(confirmedSections.modalities)} onToggleConfirm={() => toggleSectionConfirmed('modalities')}>
+                <div className="resultCard">
+                  {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
+                      병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
+                  {(analysis.modalities || []).map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
+                </div>
+              </CollapsibleSection>
+              <CollapsibleSection icon={FileSearch} title="자료 읽기 결과" confirmed={Boolean(confirmedSections.extraction)} onToggleConfirm={() => toggleSectionConfirmed('extraction')}>
+                <div className="resultCard">
+                  {analysis.extractionDetail?.length ? analysis.extractionDetail.map((item, index) => (
+                    <div key={`${item.fileLink}-${index}`} className="extractRow">
+                      <span className={`extractStatus status-${item.status}`}>{extractionStatusLabel(item.status)}</span>
+                      <span className="extractName"><Paperclip size={12} strokeWidth={2.4} aria-hidden="true" /> {item.fileLink || '(파일명 없음)'}</span>
+                      <span className="extractNote">{item.note}</span>
+                    </div>
+                  )) : <p>첨부파일 없음 · 메모만 분석</p>}
+                </div>
+              </CollapsibleSection>
+              <CollapsibleSection icon={EyeOff} title="개인정보는 자동으로 가려집니다" confirmed={Boolean(confirmedSections.stt)} onToggleConfirm={() => toggleSectionConfirmed('stt')}>
+                <div className="resultCard">
+                  <div className="segmented compactSegmented">
+                    <button type="button" className={showMaskedStt ? 'active' : ''} onClick={() => setShowMaskedStt(true)}>개인정보 가림</button>
+                    <button type="button" className={!showMaskedStt ? 'active' : ''} onClick={() => setShowMaskedStt(false)}>원문</button>
+                  </div>
+                  {!showMaskedStt ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
+                  <p className="sttPreviewText">{showMaskedStt ? analysis.sttPreview?.masked : analysis.sttPreview?.original}</p>
+                  <p className="helperText">기본값: 개인정보 가림 · 원문: 오류 확인용</p>
+                </div>
+              </CollapsibleSection>
+              <CollapsibleSection icon={BadgeCheck} title="AI 응답 검증" confirmed={Boolean(confirmedSections.verification)} onToggleConfirm={() => toggleSectionConfirmed('verification')}>
+                <div className="resultCard">
+                  <span className="miniField">형식 검증: {analysis.verification?.format ? '통과' : '오류'}</span>
+                  <span className="miniField">근거 검증: {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
+                  <span className="miniField">환각 탐지: {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
+                </div>
+              </CollapsibleSection>
+              <CollapsibleSection icon={Scale} title="무료 법률구조 대상 검토" confirmed={Boolean(confirmedSections.eligibility)} onToggleConfirm={() => toggleSectionConfirmed('eligibility')}>
               <div className={analysis.aiLinked?.eligibility ? 'resultCard aiLinkedCard' : 'resultCard'}>
                 {analysis.aiLinked?.eligibility ? (
                   <div className="fieldSyncNotice">
@@ -2500,27 +2848,17 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     <span>대상 · 증빙 · 긴급도 · 체크리스트 갱신</span>
                   </div>
                 ) : null}
-                <div className="fieldPairRow">
-                  <div>
-                    <label className="miniField">사건 유형<input value={analysis.caseType} onChange={(event) => setAnalysis({ ...analysis, caseType: event.target.value })} /></label>
-                    <p className="reasonText">분류 근거: {analysis.caseTypeReason}</p>
-                  </div>
-                  <div>
-                    <label className="miniField">긴급도 등급
-                      <select value={analysis.urgency} onChange={(event) => setAnalysis({ ...analysis, urgency: event.target.value, emergency: { ...analysis.emergency, level: event.target.value } })}><option>상</option><option>중</option><option>하</option></select>
-                    </label>
-                    <div className="urgencyGauge">
-                      {/* 트랙 전체를 하(초록)~중(주황)~상(빨강) 그라디언트로 항상 보여주고, 지금
-                          점수 이후 구간만 회색으로 덮어 '전체 스펙트럼 중 지금 어디쯤인지'가
-                          한눈에 들어오게 합니다. 등급과 점수를 한 줄로 같이 표시합니다. */}
-                      <div className="urgencyGaugeTrack">
-                        <div className="urgencyGaugeMask" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
-                        <div className="urgencyGaugeMarker" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
-                      </div>
-                      <span className="urgencyGaugeValue">긴급도 {analysis.emergency?.level || '미확인'} 등급 · 점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}%</span>
-                    </div>
-                    <p className="reasonText">긴급도 근거: {analysis.emergency?.reason}</p>
-                  </div>
+                <label className="miniField">사건 유형<input value={analysis.caseType} onChange={(event) => setAnalysis({ ...analysis, caseType: event.target.value })} /></label>
+                <p className="reasonText">분류 근거: {analysis.caseTypeReason}</p>
+                <label className="miniField">긴급도 등급
+                  <select value={analysis.urgency} onChange={(event) => setAnalysis({ ...analysis, urgency: event.target.value, emergency: { ...analysis.emergency, level: event.target.value } })}><option>상</option><option>중</option><option>하</option></select>
+                </label>
+                {/* 예전엔 이 자리에 그라디언트 막대(게이지)와 점수를 함께 보여줬는데, 막대와
+                    숫자를 같이 보는 게 불편하다는 피드백에 따라 막대를 걷어내고 등급 배지 +
+                    점수 숫자만 남깁니다(위 select의 상/중/하와 같은 값을 배지로도 확인). */}
+                <div className="urgencyGauge">
+                  <span className={`statusChip tone-${{ 상: 'danger', 중: 'warn', 하: 'success' }[analysis.emergency?.level] || 'muted'}`}>긴급도 {analysis.emergency?.level || '미확인'}</span>
+                  <span className="urgencyGaugeValue">점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}점</span>
                 </div>
                 <hr />
                 <div className="fieldPairRow">
@@ -2534,57 +2872,69 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                   <label className="miniField">무료 법률구조 대상<select value={analysis.eligibility} onChange={(event) => setAnalysis({ ...analysis, eligibility: event.target.value })}><option>검토 필요</option><option>구조 가능</option><option>부적합</option><option>보류</option></select></label>
                 </div>
               </div>
-              
-              
+              </CollapsibleSection>
               {analysis.reliefReviewDetail ? (
-                <>
-                  <h3>체크리스트 AI 분석 상세</h3>
+                <CollapsibleSection icon={ListChecks} title="체크리스트 AI 분석 상세" confirmed={Boolean(confirmedSections.reliefDetail)} onToggleConfirm={() => toggleSectionConfirmed('reliefDetail')}>
                   <div className="resultCard">
                     <ReliefReviewDetailTabs detail={analysis.reliefReviewDetail} />
                   </div>
-                </>
+                </CollapsibleSection>
               ) : null}
-              <h3>체크리스트</h3>
-              <div className="resultCard checklistBox">
-                {(analysis.checklist || []).map((item, index) => {
-                  const note = checklistItemNote(item, analysis.reliefReviewDetail);
-                  const flag = checklistItemFlag(item, analysis.reliefReviewDetail);
-                  return (
-                    <div className="checklistItem" key={item.label}>
-                      <label>
-                        <input type="checkbox" checked={item.checked} onChange={() => updateChecklist(index)} />
-                        {item.label}
-                      </label>
-                      {note ? <p className="checklistItemNote">{note}</p> : null}
-                      {flag ? <span className={`statusChip ${flag.tone}`}>{flag.text}</span> : null}
-                    </div>
-                  );
-                })}
-              </div>
-              <h3>체크리스트 AI 분석 결과</h3>
-              <div className="resultCard">
-                {analysis.reliefReviewDetail ? (
-                  <ReliefLawyerSummaryCard detail={analysis.reliefReviewDetail} />
-                ) : (
-                  <InlineEmptyNotice>AI 분석 결과 없음 · 분석을 다시 실행하세요</InlineEmptyNotice>
-                )}
-              </div>
+              <CollapsibleSection icon={Sparkles} title="체크리스트 AI 분석 결과" confirmed={Boolean(confirmedSections.reliefResult)} onToggleConfirm={() => toggleSectionConfirmed('reliefResult')}>
+                <div className="resultCard">
+                  {analysis.reliefReviewDetail ? (
+                    <ReliefLawyerSummaryCard detail={analysis.reliefReviewDetail} />
+                  ) : (
+                    <InlineEmptyNotice>AI 분석 결과 없음 · 분석을 다시 실행하세요</InlineEmptyNotice>
+                  )}
+                </div>
+              </CollapsibleSection>
+              <CollapsibleSection icon={ListChecks} title="체크리스트" pinned confirmed={Boolean(confirmedSections.checklist)} onToggleConfirm={() => toggleSectionConfirmed('checklist')}>
+                <div className="resultCard checklistBox">
+                  {(analysis.checklist || []).map((item, index) => {
+                    const note = checklistItemNote(item, analysis.reliefReviewDetail);
+                    const flag = checklistItemFlag(item, analysis.reliefReviewDetail);
+                    return (
+                      <div className={`checklistItem${item.checked ? ' is-checked' : ''}`} key={item.label}>
+                        <label>
+                          <input type="checkbox" checked={item.checked} onChange={() => updateChecklist(index)} />
+                          {item.checked ? <Check size={14} strokeWidth={2.4} className="checklistItemCheckIcon" aria-hidden="true" /> : <span className="checklistItemCheckIcon checklistItemCheckIconEmpty" aria-hidden="true" />}
+                          {item.label}
+                        </label>
+                        {note ? <p className="checklistItemNote">{note}</p> : null}
+                        {flag ? <span className={`statusChip ${flag.tone}`}>{flag.text}</span> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CollapsibleSection>
             </div>
             <div className="analysisActionRail">
-              <div className="railIntro">
-                <strong>검토 조치 패널</strong>
-                <span>필요 항목만 채택</span>
-              </div>
+              {/* '검토 조치 패널 / 필요 항목만 채택' 안내 카드는 없앴습니다 — 아래 네 섹션이
+                  이미 아이콘+제목으로 각자 무엇을 하는지 보여주고, "필요 항목만 채택"이
+                  전달하려던 메시지도 AI 추천 후속 작업 섹션의 안내문("채택한 항목만
+                  검토에 반영")에 그대로 남아 있어 정보 손실 없이 자리만 절약합니다. */}
               {/* 누락자료 확인 → AI 추천 채택 → 반영 항목의 3단계가 구분선 없이 이어지면
                   하나의 목록처럼 섞여 보여서, 단계마다 소제목 아래 구분선을 둬 눈으로도
                   단계가 갈라지게 합니다. */}
-              <section className="railSection">
-                <h3>누락 자료 확인</h3>
+              {/* 코치 피드백("가장 유용한 부분은 아코디언을 하지 않는 게 어떨까요")에 따라, 이
+                  목록은 상담원이 실제로 챙겨야 할 가장 중요한 항목이라 아예 접고 펴는 동작을
+                  없애 항상 펼친 상태로 고정합니다(pinned). 배지는 그대로 두어 미제출 건수를
+                  다른 보조 섹션과 시각적으로 구분합니다. */}
+              <CollapsibleSection
+                icon={Paperclip}
+                title="누락 자료 확인"
+                className="railSection railSection-important"
+                pinned
+                badge={<span className="statusChip tone-warn">{(analysis.missingInfo || []).filter((item) => analysis.evidenceStatus?.[item] !== 'submitted').length}건 미제출</span>}
+                confirmed={Boolean(confirmedSections.missingInfo)}
+                onToggleConfirm={() => toggleSectionConfirmed('missingInfo')}
+              >
                 <p className="railHint">자료를 받으면 ‘제출’로 변경</p>
-                <div className={analysis.aiLinked?.missing ? 'scrollBox small aiLinkedList' : 'scrollBox small'}>
-                  {analysis.aiLinked?.missing ? (
-                    <p className="fieldSyncNotice compactNotice"><strong>누락자료 반영됨</strong><span>보완 자료 목록 갱신</span></p>
-                  ) : null}
+                {analysis.aiLinked?.missing ? (
+                  <p className="fieldSyncNotice compactNotice"><strong>누락자료 반영됨</strong><span>보완 자료 목록 갱신</span></p>
+                ) : null}
+                <div className={analysis.aiLinked?.missing ? 'scrollBox small noCap aiLinkedList' : 'scrollBox small noCap'}>
                   {(analysis.missingInfo || []).length ? analysis.missingInfo.map((item) => {
                     const submitted = analysis.evidenceStatus?.[item] === 'submitted';
                     return (
@@ -2595,11 +2945,13 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     );
                   }) : <p>누락 자료 없음</p>}
                 </div>
-              </section>
-              <section className="railSection">
-                <h3>AI 추천 후속 작업</h3>
+              </CollapsibleSection>
+              {/* 누락 자료 확인은 상담 진행 중 바로바로 체크해야 하는 핵심 목록이라 스크롤
+                  박스로 계속 보이게 두고, AI 추천 후속 작업은 참고용 제안 목록이라 평소엔
+                  접어 두고 필요할 때만 펼치는 아코디언으로 둡니다. */}
+              <CollapsibleSection icon={Sparkles} title="AI 추천 후속 작업" className="railSection" confirmed={Boolean(confirmedSections.suggestions)} onToggleConfirm={() => toggleSectionConfirmed('suggestions')}>
                 <p className="railHint">채택한 항목만 검토에 반영</p>
-                <div className="scrollBox">
+                <div className="scrollBox noCap">
                   {suggestions.map((item) => {
                     const picked = chosen.includes(item.label);
                     return (
@@ -2610,19 +2962,22 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     );
                   })}
                 </div>
-              </section>
-              <section className="railSection">
-                <h3>검토 반영 항목</h3>
-                <div className="scrollBox small chosenBox">{chosen.length ? chosen.map((item) => (
+              </CollapsibleSection>
+              {/* 예전엔 '검토 반영 항목'이 위아래 두 군데에 같은 chosen 목록을 그대로
+                  중복 렌더링하고 있었습니다(복사 과정에서 생긴 실수로 보임) — 라벨만 다르고
+                  내용·동작은 완전히 같아 자리만 두 배로 차지했습니다. 하나로 합칩니다.
+                  이 목록과 타임라인은 대부분 비어 있는 채로 쓰이는 보조 정보라 접어 두고,
+                  펼치지 않아도 몇 건인지는 배지로 바로 보이게 합니다. */}
+              <CollapsibleSection icon={ListChecks} title="검토 반영 항목" className="railSection" badge={<span className="statusChip tone-muted">{chosen.length}건</span>} confirmed={Boolean(confirmedSections.chosenItems)} onToggleConfirm={() => toggleSectionConfirmed('chosenItems')}>
+                <div className="scrollBox small noCap chosenBox">{chosen.length ? chosen.map((item) => (
                   <button type="button" key={item} onClick={() => setChosen(chosen.filter((value) => value !== item))}>
                     <span className="chosenItemName">{item}</span>
                     <em className="chosenItemDrop">제외</em>
                   </button>
                 )) : <p>채택 항목 없음</p>}</div>
-              </section>
-              <section className="railSection">
-                <h3>사실관계 타임라인</h3>
-                <div className="scrollBox small">
+              </CollapsibleSection>
+              <CollapsibleSection icon={Clock} title="사실관계 타임라인" className="railSection" badge={<span className="statusChip tone-muted">{(analysis.timeline || []).length}건</span>} confirmed={Boolean(confirmedSections.timeline)} onToggleConfirm={() => toggleSectionConfirmed('timeline')}>
+                <div className="scrollBox small noCap">
                   {/* 없을 때 안내를 보여주는 건 master 쪽 동작을 그대로 살리고,
                       timeline이 아예 undefined인 경우(복원 경로)에도 죽지 않게 감쌉니다. */}
                   {(analysis.timeline || []).length
@@ -2637,16 +2992,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     setTimelineText('');
                   }}>추가</button>
                 </div>
-              </section>
-              <section className="railSection">
-                <h3>검토 반영 항목</h3>
-                <div className="scrollBox small chosenBox">{chosen.length ? chosen.map((item) => (
-                  <button type="button" key={item} onClick={() => setChosen(chosen.filter((value) => value !== item))}>
-                    <span className="chosenItemName">{item}</span>
-                    <em className="chosenItemDrop">제외</em>
-                  </button>
-                )) : <p>검토에 반영할 항목이 없습니다.</p>}</div>
-              </section>
+              </CollapsibleSection>
             </div>
           </div>
         )}
@@ -2668,13 +3014,13 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         ) : null}
         {savedMessage ? (
           <p className={savedMessage.startsWith('저장 실패') ? 'formError' : 'successBanner'} role="status">
-            {savedMessage.startsWith('저장 실패') ? null : <span className="successBannerBadge">저장 완료</span>}
+            {savedMessage.startsWith('저장 실패') ? null : <span className="successBannerBadge"><CheckCircle2 size={12} strokeWidth={2.4} aria-hidden="true" />저장 완료</span>}
             {savedMessage.replace(/^저장 (완료|실패): /, '')}
           </p>
         ) : null}
         {reviewMessage ? (
           <p className={reviewMessage.includes('찾을 수') || reviewMessage.includes('먼저 저장') ? 'formError' : 'successBanner'} role="status">
-            {reviewMessage.includes('찾을 수') || reviewMessage.includes('먼저 저장') ? null : <span className="successBannerBadge">요청 완료</span>}
+            {reviewMessage.includes('찾을 수') || reviewMessage.includes('먼저 저장') ? null : <span className="successBannerBadge"><CheckCircle2 size={12} strokeWidth={2.4} aria-hidden="true" />요청 완료</span>}
             {reviewMessage}
           </p>
         ) : null}
@@ -2692,7 +3038,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
   );
 }
 
-function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation, onNotify, focusedConsultationId }) {
+function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation, onNotify, focusedConsultationId, focusedTemplateName }) {
   const showToast = useToast();
   const [step, setStep] = useState('select');
   // 분석 화면에서 '초안 만들기'로 넘어오면 focusedConsultationId가 그 사건을 가리킵니다.
@@ -2717,6 +3063,16 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
       setStep('select');
     }
   }, [focusedConsultationId, consultations]);
+
+  // '추천 서식' 목록에서 특정 서식의 '저장하고 초안 만들기'를 눌러 들어오면, 어떤 서식을
+  // 눌렀는지와 상관없이 항상 같은(초기) 서식으로 열려 있었습니다(코치 피드백: 3개 추천
+  // 버튼이 다 똑같이 동작). 눌렀던 서식을 그대로 선택된 채로 열어 줍니다.
+  const appliedFocusTemplateRef = useRef(null);
+  useEffect(() => {
+    if (!focusedTemplateName || appliedFocusTemplateRef.current === focusedTemplateName) return;
+    appliedFocusTemplateRef.current = focusedTemplateName;
+    setTemplate(focusedTemplateName);
+  }, [focusedTemplateName]);
 
   // 아직 core-api에 상담/분석이 저장되지 않은 사건(로컬 프로토타입 진행 중)이면, 초안을 실제로
   // 생성하기 직전에 한 번 밀어 넣습니다. 이미 저장돼 있으면(canUseCoreApi) 그대로 씁니다.
@@ -2817,7 +3173,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
       setReviewingDocumentId(null);
       reloadCaseDocuments();
     } catch (error) {
-      showToast(`처리에 실패했습니다: ${error.message}`, 'warn');
+      showToast(`처리에 실패했습니다: ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`, 'warn');
     } finally {
       setReviewPending(false);
     }
@@ -2832,7 +3188,10 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
   const [minorFilter, setMinorFilter] = useState('전체');
   const [searchText, setSearchText] = useState('');
   // 선택한 사건의 확정 분류에 맞는 서식만 볼지 여부. 291개를 매번 손으로 좁히지 않아도 되게 합니다.
-  const [onlyForCase, setOnlyForCase] = useState(false);
+  // 코치 피드백(직접 화면 확인): 이 토글이 기본 꺼짐이라, 정작 처음 들어오면 291개를 필터 없이
+  // 그대로 보여줬습니다. 사건 분류를 이미 아는 경우 기본으로 켜서, 화면을 열자마자 좁혀진
+  // 목록부터 보이게 합니다(분류를 모르는 사건이면 scopeToCase가 자동으로 꺼진 것과 같게 동작).
+  const [onlyForCase, setOnlyForCase] = useState(true);
   const activeMajor = caseCategories.find((category) => category.key === majorFilter);
   const minorOptions = ['전체', ...(activeMajor ? activeMajor.subTypes : [])];
 
@@ -2987,7 +3346,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
       });
       showToast('변호사 검토 요청 완료', 'success');
     } catch (error) {
-      showToast(`검토 요청에 실패했습니다: ${error.message}`, 'warn');
+      showToast(`검토 요청에 실패했습니다: ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`, 'warn');
     } finally {
       setSubmitReviewPending(false);
     }
@@ -3030,7 +3389,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
     return (
       <main className="workspacePage">
         <section className="workflowPanel draftPanel">
-          <h2>서식 초안</h2>
+          <h2><FileText size={18} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 서식 초안</h2>
           <div className="draftPreviewHeader">
             <div>
               <strong>{selectedTemplate?.templateName || '선택 서식'}</strong>
@@ -3057,12 +3416,12 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
               disabled={submitReviewPending || !canRequestDocumentReview}
               title={reviewRequestGuide || undefined}
             >
-              {submitReviewPending ? '검토 요청하는 중…' : draftDocument?.status === 'SUBMITTED_FOR_REVIEW' ? '검토 요청됨' : '변호사 검토 요청'}
+              <Send size={13} strokeWidth={2.4} aria-hidden="true" /> {submitReviewPending ? '검토 요청하는 중…' : draftDocument?.status === 'SUBMITTED_FOR_REVIEW' ? '검토 요청됨' : '변호사 검토 요청'}
             </button>
-            <button className="secondaryActionButton compactAction" type="button" onClick={regenerateDraftDocument}>HWPX 다시 생성</button>
+            <button className="secondaryActionButton compactAction" type="button" onClick={regenerateDraftDocument}><Download size={13} strokeWidth={2.4} aria-hidden="true" /> HWPX 다시 생성</button>
           </div>
           {reviewRequestGuide ? <p className="helperText">{reviewRequestGuide}</p> : null}
-          {savedMessage ? <p className="successBanner"><span className="successBannerBadge">저장 완료</span>{savedMessage}</p> : null}
+          {savedMessage ? <p className="successBanner"><span className="successBannerBadge"><CheckCircle2 size={12} strokeWidth={2.4} aria-hidden="true" />저장 완료</span>{savedMessage}</p> : null}
           {generatedFileMessage ? <p className="apiPendingMessage" role="status">{generatedFileMessage}</p> : null}
           {/* consultationId는 selectedCase.coreId보다 draftDocument.consultationId(방금 생성 응답이 실제로
               알려준 값)를 우선 씁니다. 사건을 core-api에 처음 동기화하면서 같은 함수 실행 중 초안까지
@@ -3107,7 +3466,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
         {selectedCase ? (
           <section className="documentReviewPanel">
             <div className="panelTitleRow">
-              <h3>{isLawyerReviewer ? '제출된 서식 검토' : '제출한 서식 상태'}</h3>
+              <h3><ClipboardList size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> {isLawyerReviewer ? '제출된 서식 검토' : '제출한 서식 상태'}</h3>
               {documentsLoading ? <span className="helperText">불러오는 중…</span> : null}
             </div>
             {!selectedCase.coreId ? (
@@ -3120,7 +3479,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                   return (
                     <div className="documentReviewRow" key={doc.document_id}>
                       <div className="documentReviewInfo">
-                        <strong>{doc.form_name}</strong>
+                        <strong><FileText size={14} strokeWidth={2.2} aria-hidden="true" /> {doc.form_name}</strong>
                         <span className={`statusChip tone-${documentStatusTone(doc.status)}`}>{DOCUMENT_STATUS_LABEL[doc.status] || doc.status}</span>
                         {lawyerEdit ? <span className="statusChip tone-warn">변호사 수정본</span> : null}
                         <GeneratedFileLink
@@ -3176,8 +3535,10 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                             </div>
                           </div>
                         ) : (
+                          // 실제 승인 확정 버튼(3001-3008줄)과 같은 '검토 완료' 문구를 여기 편집 시작
+                          // 버튼에도 쓰면 눌러도 아무 것도 끝나지 않아 헷갈립니다(코치 피드백).
                           <div className="inlineControls">
-                            <button className="secondaryActionButton" type="button" onClick={() => startDocumentReview(doc)}>검토 완료</button>
+                            <button className="secondaryActionButton" type="button" onClick={() => startDocumentReview(doc)}>검토하기</button>
                           </div>
                         )
                       ) : null}
@@ -3195,7 +3556,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
           <div className="draftSelectCard">
             <div className="workflowColumns">
               <div>
-                <h3>서식 선택</h3>
+                <h3><FileText size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 서식 선택</h3>
                 {/* 0단계: 이 사건 분류에 맞는 서식만 보기.
                     291개에서 손으로 좁히지 않아도 되게, 확정된 소분류로 한 번에 걸러줍니다. */}
                 <div className="templateScopeRow">
@@ -3264,7 +3625,7 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                         <span className="templateRowText">
                           <span className="templateRowName">
                             {item.templateName}
-                            {aiMatch ? <em className="templateAiBadge" title={aiMatch.reason || 'AI 추천 서식'}>AI 추천</em> : null}
+                            {aiMatch ? <em className="templateAiBadge" title={aiMatch.reason || 'AI 추천 서식'}><Sparkles size={10} strokeWidth={2.4} aria-hidden="true" />AI 추천</em> : null}
                           </span>
                           <span className="templateRowMeta">{item.caseCategory} · {item.caseType}</span>
                         </span>
@@ -3275,7 +3636,9 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                           aria-label={favorites.includes(item.templateName) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
                           onClick={(event) => handleToggleFavorite(item.templateName, event)}
                         >
-                          {favorites.includes(item.templateName) ? '★' : '+'}
+                          {favorites.includes(item.templateName)
+                            ? <Star size={13} strokeWidth={2.2} fill="currentColor" aria-hidden="true" />
+                            : <Plus size={13} strokeWidth={2.4} aria-hidden="true" />}
                         </span>
                       </button>
                     );
@@ -3283,9 +3646,9 @@ function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation
                 </div>
               </div>
               <div>
-                <h3>추출 필드 자동 채움</h3>
+                <h3><ListChecks size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 추출 필드 자동 채움</h3>
                 <div className="draftApiPlan">
-                  <strong>API 요청 예정 데이터</strong>
+                  <strong>자동 채움에 쓰이는 정보</strong>
                   <span>서식명, 상담 번호, 분석 요약, 누락 필드, 첨부자료 정보</span>
                 </div>
                 <div className="scrollBox">
@@ -3328,7 +3691,7 @@ function SearchWorkbench({ consultations }) {
   const [referenceMessage, setReferenceMessage] = useState('');
   const label = referenceType === 'precedent' ? '판례' : referenceType === 'similar' ? '유사 상담사례' : '법령';
   const selectedCase = consultations.find((item) => String(item.id) === String(caseId));
-  const results = searched || mode === '추천' ? searchReferenceCandidates({ type: referenceType, query, caseType: selectedCase?.type }) : [];
+  const results = searched || mode === '추천' ? searchReferenceCandidates({ type: referenceType, query, caseType: selectedCase?.analysis?.caseType || selectedCase?.type }) : [];
   const selectedTitles = selected.map((item) => item.title);
   const runAiReferenceSearch = () => {
     setSearched(true);
@@ -3341,9 +3704,12 @@ function SearchWorkbench({ consultations }) {
   return (
     <main className="workspacePage">
       <section className="workflowPanel searchPanel">
+        {/* 세 번째 탭 '유사 상담사례'는 법령·판례가 아닌데도 제목·설명이 법령·판례만
+            가리켜, 이 탭이 여기 왜 있는지 헷갈릴 수 있습니다(코치 피드백). 설명 문구에
+            유사 사례도 포함되어 있음을 밝힙니다. */}
         <WorkPageHeader
           title="법령·판례"
-          description="사건에 맞는 근거를 찾아 검토 자료에 반영하세요."
+          description="사건에 맞는 법령·판례와 유사 상담사례를 찾아 검토 자료에 반영하세요."
         />
         <div className="inlineControls">
           <CasePicker
@@ -3401,26 +3767,46 @@ function SearchWorkbench({ consultations }) {
             <span>{selected.length ? `${selected.length}개 선택됨` : '검토에 쓸 후보 선택'}</span>
           </div>
           <div className="referenceActionButtons">
-            <button className="secondaryActionButton compactAction" type="button" onClick={runAiReferenceSearch}>AI 추천 실행</button>
-            <button className="primaryButton compactAction" type="button" onClick={() => setReferenceMessage('선택 항목 반영 완료')} disabled={!selected.length}>선택 항목 반영</button>
+            {/* '추천' 모드에서는 사건을 고르는 순간 results가 이미 자동으로 채워져 있어
+                (위 results 계산 참고), 이 버튼을 눌러도 화면이 바뀌지 않는 빈 동작이었습니다
+                (코치 피드백). 직접 검색 모드에서만 다시 불러오는 의미가 있으므로 그때만 보여줍니다. */}
+            {mode === '직접 검색' ? (
+              <button className="secondaryActionButton compactAction" type="button" onClick={runAiReferenceSearch}>AI 추천 실행</button>
+            ) : null}
+            <button
+              className="primaryButton compactAction"
+              type="button"
+              // '반영 완료'라고 말했지만 실제로는 저장 없이 이 화면 상태에만 남아, 화면을
+              // 나가면 선택이 사라졌습니다(코치 피드백). 저장하지 않는다는 사실을 문구로
+              // 정확히 알립니다.
+              onClick={() => setReferenceMessage('이 화면에 임시로 담아뒀어요 · 서식 작성 화면으로 이동하면 사라져요')}
+              disabled={!selected.length}
+            >
+              선택 항목 담기
+            </button>
           </div>
         </div>
         {referenceMessage ? <p className="apiPendingMessage" role="status">{referenceMessage}</p> : null}
         <div className="workflowColumns">
           <div>
-            <h3>{label} 목록</h3>
+            <h3><BookOpen size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> {label} 목록</h3>
             <div className="referenceList">
-              {results.length ? results.map((item) => (
-                <button className={selectedTitles.includes(item.title) ? 'referenceCard selected' : 'referenceCard'} type="button" key={item.id} onClick={() => adoptReference(item)}>
-                  <span className="referenceCardTitle">{item.title}</span>
-                  <span className="referenceCardMeta">{item.source} · {item.caseType}</span>
-                  <strong>{selectedTitles.includes(item.title) ? '선택됨' : '선택'}</strong>
-                </button>
-              )) : <InlineEmptyNotice>조건 일치 {label} 없음</InlineEmptyNotice>}
+              {results.length ? results.map((item) => {
+                const isSelected = selectedTitles.includes(item.title);
+                return (
+                  <button className={isSelected ? 'referenceCard selected' : 'referenceCard'} type="button" key={item.id} onClick={() => adoptReference(item)}>
+                    <span className="referenceCardTitle"><Gavel size={13} strokeWidth={2.2} aria-hidden="true" /> {item.title}</span>
+                    <span className="referenceCardMeta">{item.source} · {item.caseType}</span>
+                    <strong className={`statusChip ${isSelected ? 'tone-success' : 'tone-muted'}`}>
+                      {isSelected ? <CheckCircle2 size={12} strokeWidth={2.4} aria-hidden="true" /> : null} {isSelected ? '선택됨' : '선택'}
+                    </strong>
+                  </button>
+                );
+              }) : <InlineEmptyNotice>조건 일치 {label} 없음</InlineEmptyNotice>}
             </div>
           </div>
           <div>
-            <h3>검토에 반영할 자료</h3>
+            <h3><ClipboardList size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 검토에 반영할 자료</h3>
             <div className="referenceSelectedPanel">
               {selected.length ? selected.map((item) => (
                 <button type="button" key={item.id} onClick={() => setSelected(selected.filter((value) => value.id !== item.id))}>
@@ -3469,7 +3855,7 @@ function NotificationPanel({ role, currentUser, notifications = [], onReadNotifi
             <span className="notificationCount">새 알림 {unreadCount}건</span>
             {/* 알림이 쌓일수록 이 버튼을 찾아 목록 맨 아래까지 내려야 했던 문제를 없애기 위해
                 목록 위(헤더 옆)로 옮겼습니다. */}
-            <button className="ghostActionButton compactAction" type="button" onClick={() => onReadNotifications?.(role, currentUser?.email)} disabled={!unreadCount}>전체 읽음 처리</button>
+            <button className="ghostActionButton compactAction" type="button" onClick={() => onReadNotifications?.(role, currentUser?.email)} disabled={!unreadCount}><BellOff size={13} strokeWidth={2.4} aria-hidden="true" /> 전체 읽음 처리</button>
           </span>
         )}
       />
@@ -3492,6 +3878,7 @@ function NotificationPanel({ role, currentUser, notifications = [], onReadNotifi
                   <div className="notificationItemTop">
                     <strong className="notificationItemTitle">
                       <i className="notificationDot" aria-hidden="true" />
+                      {unread ? <Bell size={13} strokeWidth={2.4} aria-hidden="true" /> : <BellOff size={13} strokeWidth={2.2} aria-hidden="true" />}
                       {item.title}
                     </strong>
                     <span className="notificationItemTime">{formatDateTimeLabel(item.createdAt)}</span>
@@ -3499,7 +3886,7 @@ function NotificationPanel({ role, currentUser, notifications = [], onReadNotifi
                   <p className="notificationItemMessage">{item.message}</p>
                   <div className="notificationActions">
                     <span className="notificationState">{unread ? '바로 처리 ›' : '내용 보기'}</span>
-                    <button className="notificationDelete" type="button" onClick={(event) => handleDelete(event, item, unread)}>삭제</button>
+                    <button className="notificationDelete" type="button" onClick={(event) => handleDelete(event, item, unread)}><Trash2 size={12} strokeWidth={2.4} aria-hidden="true" /> 삭제</button>
                   </div>
                 </article>
               );
@@ -3543,6 +3930,12 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
       setMessage('이메일을 입력해주세요.');
       return;
     }
+    // 관리자만 이메일을 직접 고칠 수 있는데(상담원·변호사는 잠긴 필드), 회원가입 화면의
+    // emailInvalid 검사가 여기엔 없어서 '@' 없는 값도 그대로 저장되던 문제가 있었습니다.
+    if (!lockContactFields && !form.email.includes('@')) {
+      setMessage('올바른 이메일 형식이 아닙니다.');
+      return;
+    }
     if (mismatch) {
       setMessage('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
       return;
@@ -3556,6 +3949,16 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
     if (wantsPasswordChange && !form.currentPassword) {
       setMessage('비밀번호를 바꾸려면 현재 비밀번호를 입력해주세요.');
       return;
+    }
+
+    const effectiveEmail = lockContactFields ? (currentUser?.email || '') : form.email;
+    // 가입 화면과 동일한 비밀번호 규칙을 프로필 변경에도 적용합니다.
+    if (wantsPasswordChange) {
+      const passwordRuleError = validatePassword(form.password, effectiveEmail);
+      if (passwordRuleError) {
+        setMessage(passwordRuleError);
+        return;
+      }
     }
 
     setSaving(true);
@@ -3593,7 +3996,7 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
       <div className="utilityContentCard profileContentCard">
       <div className="profileFormCard">
       <label className="field">
-        <span>이메일</span>
+        <span><span className="fieldLabelWithIcon"><User size={14} strokeWidth={2.4} aria-hidden="true" /> 이메일</span></span>
         <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} type="email" placeholder="이메일 입력" readOnly={lockContactFields} disabled={lockContactFields} />
       </label>
       {/* 상담원·변호사는 가입 시 고른 지부와 입력한 부서를 각각 보여줍니다.
@@ -3622,20 +4025,21 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
       </label>
       <div className="formGrid">
         <label className="field">
-          <span>현재 비밀번호</span>
+          <span><span className="fieldLabelWithIcon"><Lock size={14} strokeWidth={2.4} aria-hidden="true" /> 현재 비밀번호</span></span>
           <input value={form.currentPassword} onChange={(event) => setForm({ ...form, currentPassword: event.target.value })} type="password" placeholder="비밀번호를 바꿀 때만 입력" autoComplete="current-password" />
         </label>
       </div>
       <div className="formGrid">
         <label className="field">
-          <span>새 비밀번호</span>
+          <span><span className="fieldLabelWithIcon"><Lock size={14} strokeWidth={2.4} aria-hidden="true" /> 새 비밀번호</span></span>
           <input value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} type="password" placeholder="변경할 때만 입력" autoComplete="new-password" />
         </label>
         <label className="field">
-          <span>새 비밀번호 확인</span>
+          <span><span className="fieldLabelWithIcon"><Lock size={14} strokeWidth={2.4} aria-hidden="true" /> 새 비밀번호 확인</span></span>
           <input value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} type="password" placeholder="비밀번호 확인" />
         </label>
       </div>
+      <p className="helperText">{PASSWORD_RULE_TEXT}</p>
       {mismatch ? <p className="formError">비밀번호와 비밀번호 확인이 일치하지 않습니다.</p> : null}
       {message ? <p className={message.includes('저장') ? 'helperText success' : 'formError'}>{message}</p> : null}
       <button className="primaryButton" type="button" onClick={save} disabled={saving}>{saving ? '저장 중...' : '프로필 수정 저장'}</button>
@@ -3645,7 +4049,7 @@ function ProfilePanel({ role, currentUser, onUpdateProfile }) {
   );
 }
 
-function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, focusedConsultationId, onOpenAnalysis, onOpenDraft, analysisRuns, onStartAnalysis }) {
+function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, focusedConsultationId, focusedTemplateName, onOpenAnalysis, onOpenDraft, analysisRuns, onStartAnalysis }) {
   // '상담 등록'은 상담원 고유 업무입니다. 다른 역할에서 실수로 activeView가 넘어와도
   // 접수 화면이 열리지 않도록 역할을 한 번 더 확인합니다. (네비게이션 메뉴 구성과 이중 방어)
   if (view === '상담 등록') return role === 'counselor' ? (
@@ -3667,6 +4071,7 @@ function UtilityPanel({ view, role, consultations, onCreateConsultation, onReque
       onUpdateConsultation={onUpdateConsultation}
       onNotify={onNotify}
       focusedConsultationId={focusedConsultationId}
+      focusedTemplateName={focusedTemplateName}
     />
   );
   if (view === '알림') return <NotificationPanel role={role} currentUser={currentUser} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} />;
@@ -3819,6 +4224,7 @@ function ReliefEligibilityTab({ data }) {
   return (
     <div className="reliefReviewBox">
       <p className="reliefReviewHead">
+        <ShieldCheck size={14} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" />
         <span className={`statusChip ${evidenceStatusTone(data.evidenceStatus)}`}>증빙 {data.evidenceStatus || '미확인'}</span>
       </p>
       <dl className="reliefSignalList">
@@ -3840,6 +4246,7 @@ function ReliefWinnabilityTab({ data }) {
   return (
     <div className="reliefReviewBox">
       <p className="reliefReviewHead">
+        <TrendingUp size={14} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" />
         <span className="statusChip tone-info">신뢰도 {data.extractionConfidence || '불명확'}</span>
         {data.statuteOfLimitationsFlag ? (
           <span className={`statusChip ${data.statuteOfLimitationsFlag === '계산 불가' ? 'tone-warn' : 'tone-info'}`}>소멸시효 {data.statuteOfLimitationsFlag}</span>
@@ -3861,6 +4268,7 @@ function ReliefExecutabilityTab({ data }) {
   return (
     <div className="reliefReviewBox">
       <p className="reliefReviewHead">
+        <Gavel size={14} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" />
         <span className="statusChip tone-info">신뢰도 {data.extractionConfidence || '불명확'}</span>
         <span className="statusChip tone-info">{data.debtorAssetStatus || '판단 불가'}</span>
       </p>
@@ -3874,6 +4282,7 @@ function ReliefAppropriatenessTab({ data }) {
   return (
     <div className="reliefReviewBox">
       <p className="reliefReviewHead">
+        <Award size={14} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" />
         <span className="statusChip tone-info">신뢰도 {data.extractionConfidence || '불명확'}</span>
         {data.personalMotiveFlags.map((flag) => <span key={flag} className="statusChip tone-danger">{flag}</span>)}
       </p>
@@ -3898,26 +4307,30 @@ function ReliefReviewDetailTabs({ detail }) {
   if (!detail) return null;
 
   const tabs = [
-    { key: 'eligibility', label: '구조대상 여부', dot: false },
-    { key: 'winnability', label: '승소가능성', dot: detail.winnability?.statuteOfLimitationsFlag === '계산 불가' },
-    { key: 'executability', label: '집행가능성', dot: false },
-    { key: 'appropriateness', label: '구조타당성', dot: (detail.appropriateness?.personalMotiveFlags || []).length > 0 },
+    { key: 'eligibility', label: '구조대상 여부', dot: false, icon: ShieldCheck },
+    { key: 'winnability', label: '승소가능성', dot: detail.winnability?.statuteOfLimitationsFlag === '계산 불가', icon: TrendingUp },
+    { key: 'executability', label: '집행가능성', dot: false, icon: Gavel },
+    { key: 'appropriateness', label: '구조타당성', dot: (detail.appropriateness?.personalMotiveFlags || []).length > 0, icon: Award },
   ];
 
   return (
     <div>
       <div className="categoryTabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            className={activeTab === tab.key ? 'categoryTab active' : 'categoryTab'}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-            {tab.dot ? <span className="categoryTabDot" aria-hidden="true" /> : null}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const TabIcon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              className={activeTab === tab.key ? 'categoryTab active' : 'categoryTab'}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <TabIcon size={13} strokeWidth={2.2} aria-hidden="true" />
+              {tab.label}
+              {tab.dot ? <span className="categoryTabDot" aria-hidden="true" /> : null}
+            </button>
+          );
+        })}
       </div>
       {activeTab === 'eligibility' ? <ReliefEligibilityTab data={detail.eligibility} /> : null}
       {activeTab === 'winnability' ? <ReliefWinnabilityTab data={detail.winnability} /> : null}
@@ -4078,9 +4491,14 @@ function normalizeGeneratedDocument(response = {}) {
   };
 }
 
+// 예전엔 서버가 돌려준 원문 예외 메시지(예: "I/O error on POST request for
+// "http://localhost:8001/forms/draft": null")와 내부 서비스 이름('ai-api')을 그대로
+// 보여줘서, 상담원이 읽어도 무엇을 해야 할지 알 수 없었습니다(코치 피드백: 개발자 용어를
+// 유저 친화적으로). 원인을 알 수 있을 때만 짧게 덧붙이고, 항상 다음 행동을 안내합니다.
 function draftGenerationErrorMessage(error) {
-  const detail = error?.message ? ` (${error.message})` : '';
-  return `HWPX 생성 실패${detail} · ai-api/서식명 확인`;
+  const isConnectionIssue = /I\/O error|Connection refused|ECONNREFUSED|timeout/i.test(error?.message || '');
+  const reason = isConnectionIssue ? ' · 서식 생성 서버에 연결하지 못했습니다' : '';
+  return `HWPX 생성에 실패했습니다${reason}. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.`;
 }
 
 // consultationId를 넘기고 document가 core-api에 실제 저장된 것(source: 'core-api')이면 실제
@@ -4103,7 +4521,11 @@ function GeneratedFileBox({ document, consultationId }) {
   return (
     <div className="generatedFileBox">
       <div className="generatedFileHeader">
-        <strong>생성 파일</strong>
+        <strong><FileText size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 생성 파일</strong>
+        <span className={`statusChip ${downloadUrl ? 'tone-success' : document?.draftContent ? 'tone-warn' : 'tone-muted'}`}>
+          {downloadUrl ? <CheckCircle2 size={13} strokeWidth={2.4} aria-hidden="true" /> : <XCircle size={13} strokeWidth={2.4} aria-hidden="true" />}
+          {downloadUrl ? '서버 저장됨' : document?.draftContent ? '본문 기반 임시 파일' : '초안 없음'}
+        </span>
         {downloadUrl ? (
           <div className="generatedFileActions">
             <ServerDocumentDownloadButton
@@ -4116,7 +4538,7 @@ function GeneratedFileBox({ document, consultationId }) {
       </div>
       {downloadUrl ? (
         <>
-          <span>{fileName}을 서버에서 다운로드할 수 있습니다.</span>
+          <span><Download size={13} strokeWidth={2.2} aria-hidden="true" /> {fileName}을 서버에서 다운로드할 수 있습니다.</span>
           {filePath ? <code className="generatedFilePath">{filePath}</code> : null}
         </>
       ) : document?.draftContent ? (

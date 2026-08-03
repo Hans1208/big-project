@@ -11,6 +11,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ai-api/, ''),
       },
+      '/stt-api': {
+        target: process.env.VITE_STT_API_PROXY_TARGET || 'http://127.0.0.1:8002',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/stt-api/, ''),
+      },
       '/core-api': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,

@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Activity, Bell, BookOpen, ClipboardCheck, FileText, LayoutDashboard, PhoneCall, Search, UserRound } from 'lucide-react';
+import { Bell, ClipboardCheck, ClipboardList, FileText, LayoutDashboard, PhoneCall, Radio, Scale, Settings, UserRound } from 'lucide-react';
 import { formatCallDuration } from '../utils/date.js';
 
 function Brand({ onClick }) {
@@ -36,16 +36,12 @@ function Header({ onLogin, onRegister, onHome, hideLogin }) {
   );
 }
 
-// 아직 연결할 문서가 없는 항목은 링크(a href="#")로 두지 않습니다.
-// 눌러도 페이지 맨 위로만 튀어 "고장 난 링크"처럼 느껴지므로, 준비 중임을 밝힌 일반 텍스트로 보여줍니다.
-//
-// 개인정보 처리방침은 개인정보 보호법 제30조상 수립·공개 의무가 있어(미공개 시 과태료) 먼저 작성했습니다.
-// 라우터가 없는 앱이라 public/privacy.html 정적 문서로 두고 새 탭으로 엽니다 — 보던 화면을 잃지 않고,
-// SPA가 멈춰도 문서 자체는 계속 열립니다.
+// 법률 고지 문서는 라우터와 무관하게 열리도록 public의 정적 문서로 제공합니다.
+// 새 탭으로 열어, 업무 화면을 잃지 않고 각 문서를 확인할 수 있습니다.
 const footerPolicies = [
   { label: '개인정보 처리방침', href: '/privacy.html' },
-  { label: '이용 약관' },
-  { label: '저작권 정책' },
+  { label: '이용 약관', href: '/terms.html' },
+  { label: '저작권 정책', href: '/copyright.html' },
   { label: '오픈소스 라이선스' },
 ];
 
@@ -124,14 +120,26 @@ function DashboardHeader({ role, activeView, onViewChange, onLogout, currentUser
   // 아이콘이 조용히 바뀌어 버립니다. '기타'만 역할별로 뜻이 달라 한 번 갈라 줍니다.
   const navIconByView = {
     '상담 등록': FileText,
-    '법률, 판례': Search,
-    '서식 생성': BookOpen,
+    // 법령·판례 페이지 제목이 Scale(저울) 아이콘을 쓰므로 메뉴도 맞춥니다.
+    '법률, 판례': Scale,
+    // 서식 생성 화면(DraftWorkbench)의 페이지 제목·'서식 초안' 섹션 제목이 모두 FileText를
+    // 쓰므로 메뉴도 같은 아이콘으로 맞춥니다.
+    '서식 생성': FileText,
     알림: Bell,
     프로필: UserRound,
   };
   const navIcon = ({ view }) => {
-    if (view === '대시보드') return role === 'lawyer' ? ClipboardCheck : LayoutDashboard;
-    if (view === '기타') return role === 'counselor' ? Activity : ClipboardCheck;
+    // 대시보드 아이콘은 역할별 페이지 제목이 이미 쓰는 아이콘과 맞춥니다: 상담원은 '상담 현황'
+    // 페이지 제목의 ClipboardList, 변호사는 '검토' 페이지 제목의 ClipboardCheck을 그대로 씁니다.
+    if (view === '대시보드') {
+      if (role === 'lawyer') return ClipboardCheck;
+      if (role === 'counselor') return ClipboardList;
+      return LayoutDashboard;
+    }
+    // 상담원의 '기타' = 실시간 상담. 업무 흐름 단계(CounselorFlowStage)·페이지 제목이 이미 쓰는
+    // Radio 아이콘(통화 신호)으로 맞춥니다. 관리자의 '기타' = 운영 관리이며, 그 페이지 제목이
+    // 이미 Settings(톱니바퀴) 아이콘을 쓰므로 맞춥니다.
+    if (view === '기타') return role === 'counselor' ? Radio : Settings;
     return navIconByView[view] || UserRound;
   };
   return (

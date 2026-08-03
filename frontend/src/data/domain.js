@@ -66,7 +66,10 @@ export const caseCategories = [
 // 소분류(caseType) -> 대분류(caseCategory) 조회용 헬퍼입니다. (통계 집계, 배지 표시 등에 사용)
 // 아는 분류에 없으면 '기타'로 모아, 어떤 상담도 통계에서 사라지지 않게 합니다.
 export function getCaseCategory(caseType) {
-  const found = caseCategories.find((category) => category.subTypes.includes(caseType));
+  // AI 분석은 소분류(예: '가사소송일반') 대신 대분류 이름 자체('가사소송')를 caseType으로
+  // 돌려줄 때가 있습니다. subTypes 목록에만 있는지 확인하면 이런 값이 전부 '기타'로 잘못
+  // 집계되므로, 대분류 key와도 함께 비교합니다.
+  const found = caseCategories.find((category) => category.key === caseType || category.subTypes.includes(caseType));
   return found?.key || '기타';
 }
 
