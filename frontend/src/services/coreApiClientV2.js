@@ -169,6 +169,18 @@ export function loginCoreUser({ email, password }) {
   });
 }
 
+// 로그인한 본인의 비밀번호 변경. 대상 계정은 서버가 토큰에서 꺼내므로 여기서 보내지 않습니다
+// (이메일을 실어 보내면 남의 계정 비밀번호를 바꾸는 요청이 되어버립니다).
+//
+// 현재 비밀번호 불일치는 401, 지금과 같은 비밀번호는 409, 작성규칙 위반은 400으로 오고
+// requestCoreJson이 서버 메시지를 그대로 담은 에러를 던집니다.
+export function changeCorePassword({ currentPassword, newPassword }) {
+  return requestCoreJson('/api/auth/password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
 export function approveCoreUser(backendId, token) {
   return requestCoreJson(`/api/users/${backendId}/approve`, {
     method: 'POST',

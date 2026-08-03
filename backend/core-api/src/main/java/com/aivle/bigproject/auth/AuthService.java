@@ -1,6 +1,7 @@
 package com.aivle.bigproject.auth;
 
 import com.aivle.bigproject.auth.dto.AuthResponse;
+import com.aivle.bigproject.auth.dto.ChangePasswordRequest;
 import com.aivle.bigproject.auth.dto.LoginRequest;
 import com.aivle.bigproject.auth.dto.RegisterRequest;
 import com.aivle.bigproject.common.exception.BadRequestException;
@@ -92,6 +93,30 @@ public class AuthService {
         return toAuthResponse(user);
     }
 
+    // 로그인한 본인의 비밀번호를 바꾼다.
+    //
+    // 현재 비밀번호를 함께 받는 이유: 로그인한 화면을 잠깐 두고 자리를 비운 사이 남이
+    // 비밀번호를 바꿔 계정을 가져가는 것을 막기 위함이다(보호조치 기준 제5조).
+    //
+    // 같은 비밀번호로 바꾸는 것도 막는다. 화면에는 "변경되었습니다"가 뜨는데 실제로는
+    // 아무것도 안 바뀌면, 상담원은 바꾼 줄 알고 넘어간다 — 주기적 변경을 요구하는
+    // 운영 규칙이 그 자리에서 무의미해진다.
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UnauthorizedException("로그인이 필요합니다."));
+
+        if (request.currentPassword() == null || !matchesPassword(request.currentPassword(), user)) {
+            throw new UnauthorizedException("현재 비밀번호가 올바르지 않습니다.");
+        }
+        if (request.newPassword() != null && matchesPassword(request.newPassword(), user)) {
+            throw new ConflictException("지금 쓰고 있는 비밀번호와 같습니다. 다른 비밀번호를 입력해주세요.");
+        }
+        validatePasswordRule(request.newPassword(), email);
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+    }
+
     // ── 비밀번호 작성규칙 ──
     //
     // "개인정보의 기술적·관리적 보호조치 기준" 제4조 ⑧항:
@@ -139,10 +164,21 @@ public class AuthService {
     //   마스터 계정 비밀번호 test1234도 아래 validatePasswordRule 기준에 미달한다
     //   (가입 경로를 타지 않아 지금 로그인은 되지만, 테스트 계정 정리 시 함께 바꿔야 함).
     private boolean matchesPassword(String rawPassword, User user) {
+        // 저장된 값이 BCrypt 해시면 도메인과 무관하게 해시로 비교한다.
+        // 테스트 계정이 changePassword로 비밀번호를 바꾸면 그때부터는 해시가 저장되는데,
+        // 도메인만 보고 평문 비교로 가면 방금 바꾼 비밀번호로도 로그인이 안 되어 계정이 잠긴다.
+        if (isBcryptHash(user.getPasswordHash())) {
+            return passwordEncoder.matches(rawPassword, user.getPasswordHash());
+        }
         if (user.getEmail() != null && user.getEmail().endsWith("@test.test")) {
             return rawPassword.equals(user.getPasswordHash());
         }
         return passwordEncoder.matches(rawPassword, user.getPasswordHash());
+    }
+
+    private boolean isBcryptHash(String stored) {
+        return stored != null
+                && (stored.startsWith("$2a$") || stored.startsWith("$2b$") || stored.startsWith("$2y$"));
     }
 
     private AuthResponse toAuthResponse(User user) {

@@ -857,7 +857,11 @@ function App() {
   // 전용 core-api를 호출합니다. authToken은 users 배열에 저장하지 않는 별도 상태라, 화면에 내려줄 때만
   // currentUser에 합쳐줍니다 — users 배열(및 그걸 그대로 쓰는 updateProfile)에는 절대 섞이면 안 됩니다.
   const currentUserForDisplay = currentUser ? { ...currentUser, token: authToken } : null;
-  const updateProfile = ({ email, password, organization, phone }) => {
+  // 비밀번호는 여기서 다루지 않습니다 — ProfilePanel이 core-api(/api/auth/password)로 직접
+  // 보내고, 여기에는 그 결과(passwordChanged)만 감사 로그용으로 전달됩니다.
+  // 예전에는 password를 받고도 저장하지 않으면서 로그에는 '변경'으로 남겨, 어떤 값을 넣어도
+  // 바뀌지 않는데 화면에는 저장됐다고 뜨는 상태였습니다.
+  const updateProfile = ({ email, organization, phone, passwordChanged = false }) => {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, email, organization: organization ?? currentUser.organization, phone: phone ?? currentUser.phone };
     persistUsers(users.map((user) => user.email === currentUser.email ? updatedUser : user));
@@ -878,7 +882,7 @@ function App() {
         phoneChanged: (currentUser.phone || '') !== (phone || ''),
         phoneBefore: currentUser.phone || '',
         phoneAfter: phone || '',
-        passwordChanged: Boolean(password),
+        passwordChanged,
       },
     });
   };
