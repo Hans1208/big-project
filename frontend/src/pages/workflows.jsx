@@ -2183,6 +2183,14 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
             <span>AI 분석 결과</span>
             <p>상담 메모 · 첨부자료 기준</p>
           </div>
+          {/* AI 출력은 참고용이며 최종 확정은 담당자가 수행합니다. (사람이 검토·확정하는 원칙) */}
+              <div className="hitlBanner">
+                <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
+                <span>
+                  <strong>AI가 정리한 내용은 참고용이에요.</strong>
+                  <small>분류 · 긴급도 · 구조대상은 사람이 확정</small>
+                </span>
+              </div>
 
         {selectedCase ? (
           <div className="analysisProgressPanel">
@@ -2196,7 +2204,41 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
           </div>
         ) : null}
         {analyzed ? (
+          <>
+          <div className="resultInlineRow">
+                <h3>AI 응답 검증</h3>
+                <span className={`statusChip ${analysis.verification?.format ? 'tone-success' : 'tone-danger'}`}>형식 검증 {analysis.verification?.format ? '통과' : '오류'}</span>
+                <span className={`statusChip ${analysis.verification?.grounded ? 'tone-success' : 'tone-warn'}`}>근거 검증 {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
+                <span className={`statusChip ${analysis.verification?.hallucinationRisk ? 'tone-danger' : 'tone-success'}`}>환각 탐지 {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
+              </div>
+              <div className="resultInlineRow">
+                <h3>받은 자료</h3>
+                {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
+                    병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
+                {(analysis.modalities || []).map((item) => (
+                  <span key={item.key} className="modalityStat">
+                    <span className={`statusChip ${item.count > 0 ? 'tone-info' : 'tone-muted'}`}>{item.key}</span>
+                    <strong className="modalityValue">{item.count}건</strong>
+                  </span>
+                ))}
+              </div>
+              <div className="resultInlineRow">
+                <h3>자료 읽기 결과</h3>
+                {analysis.extractionDetail?.length ? analysis.extractionDetail.map((item, index) => (
+                  <span
+                    key={`${item.fileLink}-${index}`}
+                    className={`extractChip status-${item.status}`}
+                    title={[item.fileLink, item.note].filter(Boolean).join(' · ')}
+                  >
+                    <strong>{extractionStatusLabel(item.status)}</strong>
+                    <span>{item.fileLink || '(파일명 없음)'}</span>
+                    {item.note ? <em>{item.note}</em> : null}
+                  </span>
+                )) : <span className="resultInlineEmpty">첨부파일 없음 · 메모만 분석</span>}
+              </div>
+          
           <div className="analysisControlBar">
+            
             <div>
               <strong>AI 자동 확인</strong>
               <span>결과 확인 · 저장 · 검토 요청</span>
@@ -2221,6 +2263,7 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
               </button>
             </div>
           </div>
+          </>
         ) : null}
         {activeReviewAction ? (
           <section className={`reviewRequestBanner tone-${reviewActionTone(activeReviewAction.status)}`}>
@@ -2289,32 +2332,10 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         ) : (
           <div className="workflowColumns">
             <div>
-              {/* AI 출력은 참고용이며 최종 확정은 담당자가 수행합니다. (사람이 검토·확정하는 원칙) */}
-              <div className="hitlBanner">
-                <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
-                <span>
-                  <strong>AI가 정리한 내용은 참고용이에요.</strong>
-                  <small>분류 · 긴급도 · 구조대상은 사람이 확정</small>
-                </span>
-              </div>
+              
               <h3>인공지능 분석 요약</h3>
               <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
-              <h3>받은 자료</h3>
-              <div className="resultCard">
-                {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
-                    병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
-                {(analysis.modalities || []).map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
-              </div>
-              <h3>자료 읽기 결과</h3>
-              <div className="resultCard">
-                {analysis.extractionDetail?.length ? analysis.extractionDetail.map((item, index) => (
-                  <div key={`${item.fileLink}-${index}`} className="extractRow">
-                    <span className={`extractStatus status-${item.status}`}>{extractionStatusLabel(item.status)}</span>
-                    <span className="extractName">{item.fileLink || '(파일명 없음)'}</span>
-                    <span className="extractNote">{item.note}</span>
-                  </div>
-                )) : <p>첨부파일 없음 · 메모만 분석</p>}
-              </div>
+              
               <h3>개인정보는 자동으로 가려집니다</h3>
               <div className="resultCard">
                 <div className="segmented compactSegmented">
@@ -2325,12 +2346,6 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 <p className="sttPreviewText">{showMaskedStt ? analysis.sttPreview?.masked : analysis.sttPreview?.original}</p>
                 <p className="helperText">기본값: 마스킹본 · 원문: 오류 확인용</p>
               </div>
-              <h3>AI 응답 검증</h3>
-              <div className="resultCard">
-                <span className="miniField">형식 검증: {analysis.verification?.format ? '통과' : '오류'}</span>
-                <span className="miniField">근거 검증: {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
-                <span className="miniField">환각 탐지: {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
-              </div>
               <h3>무료 법률구조 대상 검토</h3>
               <div className={analysis.aiLinked?.eligibility ? 'resultCard aiLinkedCard' : 'resultCard'}>
                 {analysis.aiLinked?.eligibility ? (
@@ -2339,30 +2354,39 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     <span>대상 · 증빙 · 긴급도 · 체크리스트 갱신</span>
                   </div>
                 ) : null}
-                <label className="miniField">사건 유형<input value={analysis.caseType} onChange={(event) => setAnalysis({ ...analysis, caseType: event.target.value })} /></label>
-                <p className="reasonText">분류 근거: {analysis.caseTypeReason}</p>
-                <label className="miniField">긴급도 등급
-                  <select value={analysis.urgency} onChange={(event) => setAnalysis({ ...analysis, urgency: event.target.value, emergency: { ...analysis.emergency, level: event.target.value } })}><option>상</option><option>중</option><option>하</option></select>
-                </label>
-                <div className="urgencyGauge">
-                  {/* 트랙 전체를 하(초록)~중(주황)~상(빨강) 그라디언트로 항상 보여주고, 지금
-                      점수 이후 구간만 회색으로 덮어 '전체 스펙트럼 중 지금 어디쯤인지'가
-                      한눈에 들어오게 합니다. 등급과 점수를 한 줄로 같이 표시합니다. */}
-                  <div className="urgencyGaugeTrack">
-                    <div className="urgencyGaugeMask" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
-                    <div className="urgencyGaugeMarker" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                <div className="fieldPairRow">
+                  <div>
+                    <label className="miniField">사건 유형<input value={analysis.caseType} onChange={(event) => setAnalysis({ ...analysis, caseType: event.target.value })} /></label>
+                    <p className="reasonText">분류 근거: {analysis.caseTypeReason}</p>
                   </div>
-                  <span className="urgencyGaugeValue">긴급도 {analysis.emergency?.level || '미확인'} 등급 · 점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}%</span>
+                  <div>
+                    <label className="miniField">긴급도 등급
+                      <select value={analysis.urgency} onChange={(event) => setAnalysis({ ...analysis, urgency: event.target.value, emergency: { ...analysis.emergency, level: event.target.value } })}><option>상</option><option>중</option><option>하</option></select>
+                    </label>
+                    <div className="urgencyGauge">
+                      {/* 트랙 전체를 하(초록)~중(주황)~상(빨강) 그라디언트로 항상 보여주고, 지금
+                          점수 이후 구간만 회색으로 덮어 '전체 스펙트럼 중 지금 어디쯤인지'가
+                          한눈에 들어오게 합니다. 등급과 점수를 한 줄로 같이 표시합니다. */}
+                      <div className="urgencyGaugeTrack">
+                        <div className="urgencyGaugeMask" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                        <div className="urgencyGaugeMarker" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                      </div>
+                      <span className="urgencyGaugeValue">긴급도 {analysis.emergency?.level || '미확인'} 등급 · 점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}%</span>
+                    </div>
+                    <p className="reasonText">긴급도 근거: {analysis.emergency?.reason}</p>
+                  </div>
                 </div>
-                <p className="reasonText">긴급도 근거: {analysis.emergency?.reason}</p>
-                <label className="miniField">무료 법률구조 대상<select value={analysis.eligibility} onChange={(event) => setAnalysis({ ...analysis, eligibility: event.target.value })}><option>검토 필요</option><option>구조 가능</option><option>부적합</option><option>보류</option></select></label>
-                {analysis.eligibilityCheck ? (
-                  <div className={analysis.eligibilityCheck.isTargetCandidate && !analysis.eligibilityCheck.evidenceSubmitted ? 'eligibilitySummary missingEvidence' : 'eligibilitySummary'}>
-                    <span>대상 유형: {analysis.eligibilityCheck.applicantType}</span>
-                    <span>필요 증빙: {analysis.eligibilityCheck.requiredEvidence}</span>
-                    <span>증빙 제출: {analysis.eligibilityCheck.evidenceSubmitted ? '확인됨' : '미제출'}</span>
-                  </div>
-                ) : null}
+                <hr />
+                <div className="fieldPairRow">
+                  {analysis.eligibilityCheck ? (
+                    <div className={analysis.eligibilityCheck.isTargetCandidate && !analysis.eligibilityCheck.evidenceSubmitted ? 'eligibilitySummary missingEvidence' : 'eligibilitySummary'}>
+                      <span>대상 유형: {analysis.eligibilityCheck.applicantType}</span>
+                      <span>필요 증빙: {analysis.eligibilityCheck.requiredEvidence}</span>
+                      <span>증빙 제출: {analysis.eligibilityCheck.evidenceSubmitted ? '확인됨' : '미제출'}</span>
+                    </div>
+                  ) : <div />}
+                  <label className="miniField">무료 법률구조 대상<select value={analysis.eligibility} onChange={(event) => setAnalysis({ ...analysis, eligibility: event.target.value })}><option>검토 필요</option><option>구조 가능</option><option>부적합</option><option>보류</option></select></label>
+                </div>
               </div>
               
               
