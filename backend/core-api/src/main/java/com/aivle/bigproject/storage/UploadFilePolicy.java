@@ -19,10 +19,12 @@ import java.util.Set;
 //             S3 이벤트로 업로드 후 검사하는 방식이 필요하며, 그건 별도 작업이다.
 public final class UploadFilePolicy {
 
-    // 화면에서 실제로 받는 자료만 허용한다(workflows.jsx 파일선택 accept와 같은 범위).
-    //   녹취    mp3 wav m4a
-    //   문서    pdf hwp hwpx doc docx txt
-    //   증빙    jpg jpeg png
+    // 화면에서 실제로 받는 자료만 허용한다(workflows.jsx uploadCategoryAccept의 합집합).
+    //   녹취록    mp3 wav m4a
+    //   증빙자료  pdf hwp hwpx doc docx txt
+    //   신분증    jpg jpeg png
+    // 화면은 고른 자료 유형에 맞는 확장자만 받지만, 여기서는 유형을 알 수 없으므로
+    // (업로드 요청에 자료 유형이 실리지 않는다) 세 유형의 합집합을 허용한다.
     // 여기 없는 확장자는 서식 분석에도 STT에도 쓰이지 않으므로 받을 이유가 없다.
     private static final Map<String, Set<String>> ALLOWED = Map.ofEntries(
             Map.entry("mp3", Set.of("audio/mpeg", "audio/mp3")),
