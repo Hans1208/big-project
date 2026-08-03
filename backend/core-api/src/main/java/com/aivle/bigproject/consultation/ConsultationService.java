@@ -1,6 +1,7 @@
 package com.aivle.bigproject.consultation;
 
 import com.aivle.bigproject.analysis.AiAnalysisRepository;
+import com.aivle.bigproject.analysis.job.AnalysisJobRepository;
 import com.aivle.bigproject.attachment.Attachment;
 import com.aivle.bigproject.audit.AuditAction;
 import com.aivle.bigproject.audit.AuditLogService;
@@ -24,6 +25,7 @@ public class ConsultationService {
     private final UserService userService; // userId로 실제 User가 있는지 확인하기 위해 필요
     private final AiAnalysisRepository aiAnalysisRepository; // 삭제 시 딸린 분석 결과도 같이 지우기 위해 필요
     private final GeneratedDocumentRepository generatedDocumentRepository; // 삭제 시 딸린 생성 초안도 같이 지우기 위해 필요
+    private final AnalysisJobRepository analysisJobRepository; // 삭제 시 딸린 분석 작업 기록도 같이 지우기 위해 필요
     private final AuditLogService auditLogService; // SEC-01-01-01: 상담 조회를 감사 로그에 남기기 위해 필요
 
     public ConsultationService(ConsultationRepository consultationRepository,
@@ -31,12 +33,14 @@ public class ConsultationService {
                                 UserService userService,
                                 AiAnalysisRepository aiAnalysisRepository,
                                 GeneratedDocumentRepository generatedDocumentRepository,
+                                AnalysisJobRepository analysisJobRepository,
                                 AuditLogService auditLogService) {
         this.consultationRepository = consultationRepository;
         this.s3FileStorageService = s3FileStorageService;
         this.userService = userService;
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.generatedDocumentRepository = generatedDocumentRepository;
+        this.analysisJobRepository = analysisJobRepository;
         this.auditLogService = auditLogService;
     }
 
@@ -142,6 +146,7 @@ public class ConsultationService {
         // FK 제약조건 위반이 안 남
         aiAnalysisRepository.deleteByConsultationId(id);
         generatedDocumentRepository.deleteByConsultationId(id);
+        analysisJobRepository.deleteByConsultationId(id);
         consultationRepository.delete(consultation);
     }
 }
