@@ -11232,6 +11232,22 @@ a:focus-visible,
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 
+/* 대면상담 mic-stt 참고 배지: ai_judge/validation은 Rule Engine 판정과 무관한 참고용이라
+ * .resultCard/.reasonText 등 기존 표시 전용 클래스만 재사용하고, 배지 전용 여백만 추가합니다. */
+.sttReferenceCard {
+  display: grid;
+  gap: 8px;
+}
+
+.sttFlagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* ────────────────────────────────────────────────────────────────
  * 업무 화면 셸 (시안 정렬)
  *

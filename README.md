@@ -6,10 +6,11 @@
 
 ```
 backend/
-├── core-api/     Spring Boot (인증, 상담 CRUD, DB)
-└── ai-api/       FastAPI (AI 파이프라인 + HWPX 서식 처리)
-frontend/         React + Vite
-contracts/        팀 공용 JSON 계약서
+├── core-api/       Spring Boot (인증, 상담 CRUD, DB)
+├── ai-api/         FastAPI (AI 파이프라인 + HWPX 서식 처리)
+└── stt-mask-api/   FastAPI (대면상담 녹음 STT + PII 마스킹, GPU 별도 서버)
+frontend/           React + Vite
+contracts/          팀 공용 JSON 계약서
 ```
 
 ## 설치 방법
@@ -47,7 +48,39 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 또는 cmd에서 실행
 
-### 3. Spring Boot (core-api)
+### 3. STT+마스킹 API (stt-mask-api)
+
+상담원 화면의 "대면상담" 탭(녹음 → 텍스트 변환)이 쓰는 별도 서버. ai-api와 무관한 독립 FastAPI
+서비스로, `faster-whisper` + `openai/privacy-filter`(PII 마스킹)를 돌린다.
+
+로컬 개발 기본값은 CPU에서도 바로 도는 `base` 모델이라 **GPU 없이도 실행 가능**하다(품질은
+운영용 `large-v3`보다 낮음). GPU가 있는 로컬 환경이면 환경변수로 운영과 동일하게 맞출 수 있다:
+
+```
+cd backend/stt-mask-api
+
+py -3.12 -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+cd app
+uvicorn main:app --reload --port 8000
+```
+
+```
+# GPU가 있을 때 (선택)
+set WHISPER_MODEL_SIZE=large-v3
+set WHISPER_DEVICE=cuda
+set WHISPER_COMPUTE_TYPE=float16
+```
+
+운영은 `backend/stt-mask-api/modal/`의 Modal 배포본(GPU, `large-v3` 고정)을 쓴다. 그 주소를 쓰려면
+`VITE_STT_MASK_API_URL`을 배포 주소로 맞춘다.
+
+프론트는 `frontend/.env`(또는 `.env.local`)의 `VITE_STT_MASK_API_URL`로 이 서버 주소를 읽는다.
+기본값은 `http://127.0.0.1:8000`.
+
+### 4. Spring Boot (core-api)
 
 **사전 준비: 로컬 Postgres에 DB 생성**
 ```

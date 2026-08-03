@@ -101,10 +101,19 @@ class Backend:
     def web(self):
         import torch
         from fastapi import FastAPI, File, UploadFile
+        from fastapi.middleware.cors import CORSMiddleware
         from fastapi.responses import FileResponse, JSONResponse
         from pydub import AudioSegment
 
         web_app = FastAPI()
+
+        web_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["http://localhost:5173"],  # Vite 개발 서버 (상담원 화면 대면상담 녹음)
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
         @web_app.get("/")
         async def serve_frontend():
