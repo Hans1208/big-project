@@ -39,14 +39,12 @@ backend/ai-api/서식/
 변환결과.json
 *.txt
 
+backend/ai-api/rag/data/parsed_templates.json
+
 # 서버 실행 로그 (uvicorn, bootRun 등)
 *.log
 
 # 로컬 검증용 스크립트·목 데이터 (팀 공용 테스트가 아니라 각자 돌려보는 용도)
 backend/ai-api/test_*.py
 backend/ai-api/custom_mocks/
-
-# TTS로 만든 상담 목업 음성 (50MB). 대본과 생성 스크립트만 커밋하고 음성은 각자 만든다.
-# 한 번 커밋하면 히스토리에 영구히 남아 clone할 때마다 받게 된다.
-tts-mock/mock_audio/
 
