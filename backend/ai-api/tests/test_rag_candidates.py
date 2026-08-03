@@ -263,3 +263,17 @@ def test_search_rag_candidates_promotes_primary_inheritance_form():
         "\uc0c1\uc18d\ud55c\uc815\uc2b9\uc778 "
         "\uc2ec\ud310\uccad\uad6c\uc11c"
     )
+
+
+
+def test_search_rag_candidates_returns_empty_when_retriever_fails():
+    def failing_retrieve(**kwargs):
+        raise RuntimeError("vector store unavailable")
+
+    candidates = search_rag_candidates(
+        query_text="form recommendation query",
+        top_n=3,
+        retrieve=failing_retrieve,
+    )
+
+    assert candidates == []

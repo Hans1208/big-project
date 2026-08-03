@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 from collections.abc import Callable
 from typing import Any
 
 from rag.form_retriever import retrieve_forms
+
+logger = logging.getLogger(__name__)
 
 
 LEGAL_INTENT_TERMS: tuple[str, ...] = (
@@ -233,7 +237,14 @@ def search_rag_candidates(
             "classification_confidence"
         ] = classification_confidence
 
-    results = retrieve(**retrieve_kwargs)
+    try:
+        results = retrieve(**retrieve_kwargs)
+    except Exception:
+        logger.exception(
+            "Local form RAG retrieval failed; "
+            "using rule-based fallback."
+        )
+        return []
 
     candidates = convert_rag_results_to_candidates(
         results
