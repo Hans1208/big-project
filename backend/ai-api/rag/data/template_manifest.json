@@ -1,0 +1,2912 @@
+[
+  {
+    "template_id": "template_a3cb080df33a",
+    "template_name": "(부를 정하는 소)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "(부를 정하는 소).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/(부를 정하는 소).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9c15f7e25a9f",
+    "template_name": "(사실혼관계해소로 인한 위자료 등 청구의 소)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "(사실혼관계해소로 인한 위자료 등 청구의 소).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/(사실혼관계해소로 인한 위자료 등 청구의 소).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_239996fdbba8",
+    "template_name": "[아버지 결정 청구의 소(모가 모의 배우자, 전배우자를 상대로)]",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "[아버지 결정 청구의 소(모가 모의 배우자, 전배우자를 상대로)].hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/[아버지 결정 청구의 소(모가 모의 배우자, 전배우자를 상대로)].hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7859c3bfb535",
+    "template_name": "답변서(이혼)!",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "답변서(이혼)!.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/답변서(이혼)!.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0ffafbf07962",
+    "template_name": "반소장(부양료청구)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "반소장(부양료청구).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/반소장(부양료청구).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_fe8da61de22a",
+    "template_name": "위자료 등 청구의 소(사실혼 파기)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "위자료 등 청구의 소(사실혼 파기).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/위자료 등 청구의 소(사실혼 파기).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c7d01bce3a57",
+    "template_name": "유전자검사신청(수검명령신청)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "유전자검사신청(수검명령신청).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/유전자검사신청(수검명령신청).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e99f2590b77b",
+    "template_name": "이혼 및 양육자 지정, 양육비청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼 및 양육자 지정, 양육비청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼 및 양육자 지정, 양육비청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_30bffcd81742",
+    "template_name": "이혼 및 재산분할청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼 및 재산분할청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼 및 재산분할청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5073318dbc52",
+    "template_name": "이혼 및 친권행사자지정 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼 및 친권행사자지정 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼 및 친권행사자지정 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e8a6653bd5df",
+    "template_name": "이혼 및 친권행사자지정 청구의 소_2",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼 및 친권행사자지정 청구의 소_2.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼 및 친권행사자지정 청구의 소_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b0e8e268dd5e",
+    "template_name": "이혼 및 친권행사자지정 청구의 소_3",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼 및 친권행사자지정 청구의 소_3.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼 및 친권행사자지정 청구의 소_3.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_32a29ef23ef4",
+    "template_name": "이혼, 위자료 및 재산분할청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼, 위자료 및 재산분할청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼, 위자료 및 재산분할청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e979aa877aa9",
+    "template_name": "이혼, 위자료, 재산분할, 친권행사자, 양육권자지정 및 양육비 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼, 위자료, 재산분할, 친권행사자, 양육권자지정 및 양육비 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼, 위자료, 재산분할, 친권행사자, 양육권자지정 및 양육비 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_cfe83d2c55dc",
+    "template_name": "이혼, 위자료, 재산분할, 친권행사자지정, 양육비청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼, 위자료, 재산분할, 친권행사자지정, 양육비청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼, 위자료, 재산분할, 친권행사자지정, 양육비청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_58936459296b",
+    "template_name": "이혼, 위자료, 친권행사자, 양육비청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼, 위자료, 친권행사자, 양육비청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼, 위자료, 친권행사자, 양육비청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_82f4d91a40f3",
+    "template_name": "이혼무효확인 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼무효확인 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼무효확인 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_310daa4d956e",
+    "template_name": "이혼무효확인 청구의 소_2",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼무효확인 청구의 소_2.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼무효확인 청구의 소_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_fc4f8c34aec4",
+    "template_name": "이혼청구의 소(기타 중대한 사유)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼청구의 소(기타 중대한 사유).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼청구의 소(기타 중대한 사유).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b260d5e84951",
+    "template_name": "이혼청구의 소(배우자 등의 부당한 대우)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼청구의 소(배우자 등의 부당한 대우).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼청구의 소(배우자 등의 부당한 대우).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7236a3b5ce3e",
+    "template_name": "이혼청구의 소(생사 3년 이상 불분명)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼청구의 소(생사 3년 이상 불분명).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼청구의 소(생사 3년 이상 불분명).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c17f9c2437db",
+    "template_name": "이혼청구의 소(유기)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼청구의 소(유기).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼청구의 소(유기).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6ec092d0f30a",
+    "template_name": "이혼청구의 소(유기)_2",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼청구의 소(유기)_2.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼청구의 소(유기)_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_68be80858fdf",
+    "template_name": "이혼청구의 소(직계존속에 대한 부당한 대우)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "이혼청구의 소(직계존속에 대한 부당한 대우).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/이혼청구의 소(직계존속에 대한 부당한 대우).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_fb7d727f87fa",
+    "template_name": "인지무효확인 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "인지무효확인 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/인지무효확인 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9defa218cbe7",
+    "template_name": "인지청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "인지청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/인지청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5787ade5e5f3",
+    "template_name": "입양무효확인 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양무효확인 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양무효확인 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4735a7dea3c7",
+    "template_name": "입양무효확인의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양무효확인의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양무효확인의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_83710e379743",
+    "template_name": "입양취소청구의 소(미성년자가 양친이 된 경우)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양취소청구의 소(미성년자가 양친이 된 경우).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양취소청구의 소(미성년자가 양친이 된 경우).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f68384f9638b",
+    "template_name": "입양취소청구의 소(부부동반입양에 위반)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양취소청구의 소(부부동반입양에 위반).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양취소청구의 소(부부동반입양에 위반).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_261e0d82e8d5",
+    "template_name": "입양취소청구의 소(사기)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양취소청구의 소(사기).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양취소청구의 소(사기).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_63701ee0e63d",
+    "template_name": "입양취소청구의 소(악질 기타 중대한 사유)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양취소청구의 소(악질 기타 중대한 사유).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양취소청구의 소(악질 기타 중대한 사유).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_8fbf96a47ea7",
+    "template_name": "입양취소청구의 소(양자될 자의 직계혈족 부동의)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양취소청구의 소(양자될 자의 직계혈족 부동의).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양취소청구의 소(양자될 자의 직계혈족 부동의).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_805a69265d6f",
+    "template_name": "입양취소청구의 소(피성년후견인의 입양에 대한 성년후견인의 동의 부재)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "입양취소청구의 소(피성년후견인의 입양에 대한 성년후견인의 동의 부재).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/입양취소청구의 소(피성년후견인의 입양에 대한 성년후견인의 동의 부재).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_3eb4aee7a507",
+    "template_name": "준비서면",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "준비서면.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/준비서면.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c6df64631c2d",
+    "template_name": "친생부인의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생부인의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생부인의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1a9d13338912",
+    "template_name": "친생부인의 소_2",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생부인의 소_2.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생부인의 소_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0ed4a64cb351",
+    "template_name": "친생자관계부존재확인 청구의 소(문서위조)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생자관계부존재확인 청구의 소(문서위조).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생자관계부존재확인 청구의 소(문서위조).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_609516aa32c9",
+    "template_name": "친생자관계부존재확인 청구의 소(이중등록부 정정 목적)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생자관계부존재확인 청구의 소(이중등록부 정정 목적).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생자관계부존재확인 청구의 소(이중등록부 정정 목적).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_8b393af08dc7",
+    "template_name": "친생자관계부존재확인 청구의 소(허위의 출생신고)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생자관계부존재확인 청구의 소(허위의 출생신고).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생자관계부존재확인 청구의 소(허위의 출생신고).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0fbb6ed70297",
+    "template_name": "친생자관계부존재확인 청구의 소(혼인외의 자)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생자관계부존재확인 청구의 소(혼인외의 자).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생자관계부존재확인 청구의 소(혼인외의 자).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ed5472fd52cb",
+    "template_name": "친생자관계부존재확인 청구의 소(혼인외의 자)_2",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생자관계부존재확인 청구의 소(혼인외의 자)_2.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생자관계부존재확인 청구의 소(혼인외의 자)_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9bac3a17f7ac",
+    "template_name": "친생자관계부존재확인 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생자관계부존재확인 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생자관계부존재확인 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e25f3b3c888d",
+    "template_name": "친생자관계부존재확인 청구의 소_2",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친생자관계부존재확인 청구의 소_2.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친생자관계부존재확인 청구의 소_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_dca42380510b",
+    "template_name": "친양자 입양 취소 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친양자 입양 취소 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친양자 입양 취소 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_3b3d41fd9c8c",
+    "template_name": "친자 감정신청서",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "친자 감정신청서.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/친자 감정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_37c568913f5e",
+    "template_name": "파양무효확인 청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "파양무효확인 청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/파양무효확인 청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ae921dcbfc33",
+    "template_name": "파양청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "파양청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/파양청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_920b650c3a70",
+    "template_name": "파양취소청구의 소",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "파양취소청구의 소.hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/파양취소청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_46cc755b119e",
+    "template_name": "혼인무효확인 등 청구의 소(혼인 불합의)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "혼인무효확인 등 청구의 소(혼인 불합의).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/혼인무효확인 등 청구의 소(혼인 불합의).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_372fba7c7eb5",
+    "template_name": "혼인무효확인 청구의 소(당사자 간 직계인척)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "혼인무효확인 청구의 소(당사자 간 직계인척).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/혼인무효확인 청구의 소(당사자 간 직계인척).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b5a51bdeae61",
+    "template_name": "혼인무효확인 청구의 소(당사자 간 직계혈족)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "혼인무효확인 청구의 소(당사자 간 직계혈족).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/혼인무효확인 청구의 소(당사자 간 직계혈족).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b5d558b277b8",
+    "template_name": "혼인무효확인 청구의 소(혼인 불합의)",
+    "case_type": "가사소송",
+    "case_subtype": "가,나,다류 가사소송",
+    "file_name": "혼인무효확인 청구의 소(혼인 불합의).hwpx",
+    "file_path": "가사소송/가,나,다류 가사소송/혼인무효확인 청구의 소(혼인 불합의).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c6fb9c26b767",
+    "template_name": "가사소송 및 비송사건수수료표",
+    "case_type": "가사소송",
+    "case_subtype": "가사소송일반",
+    "file_name": "가사소송 및 비송사건수수료표.hwpx",
+    "file_path": "가사소송/가사소송일반/가사소송 및 비송사건수수료표.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_aedae0a641bd",
+    "template_name": "공시송달신청서",
+    "case_type": "가사소송",
+    "case_subtype": "가사소송일반",
+    "file_name": "공시송달신청서.hwpx",
+    "file_path": "가사소송/가사소송일반/공시송달신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f28a832d2be6",
+    "template_name": "불거주확인서",
+    "case_type": "가사소송",
+    "case_subtype": "가사소송일반",
+    "file_name": "불거주확인서.hwpx",
+    "file_path": "가사소송/가사소송일반/불거주확인서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_2c9016f9936e",
+    "template_name": "사전처분신청서",
+    "case_type": "가사소송",
+    "case_subtype": "가사소송일반",
+    "file_name": "사전처분신청서.hwpx",
+    "file_path": "가사소송/가사소송일반/사전처분신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_512985f37ca7",
+    "template_name": "송달료 예납기준표",
+    "case_type": "가사소송",
+    "case_subtype": "가사소송일반",
+    "file_name": "송달료 예납기준표.hwpx",
+    "file_path": "가사소송/가사소송일반/송달료 예납기준표.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a85c7d4de80c",
+    "template_name": "청구취지 추가 및 청구원인 보정신청서",
+    "case_type": "가사소송",
+    "case_subtype": "가사소송일반",
+    "file_name": "청구취지 추가 및 청구원인 보정신청서.hwpx",
+    "file_path": "가사소송/가사소송일반/청구취지 추가 및 청구원인 보정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_bc94d260d46a",
+    "template_name": "감치명령신청서",
+    "case_type": "가사소송",
+    "case_subtype": "과태료와 감치",
+    "file_name": "감치명령신청서.hwpx",
+    "file_path": "가사소송/과태료와 감치/감치명령신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b3f21b5da234",
+    "template_name": "이행명령 불이행에 따른 과태료부과신청",
+    "case_type": "가사소송",
+    "case_subtype": "과태료와 감치",
+    "file_name": "이행명령 불이행에 따른 과태료부과신청.hwpx",
+    "file_path": "가사소송/과태료와 감치/이행명령 불이행에 따른 과태료부과신청.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_743f6ea84ccd",
+    "template_name": "유아인도 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "기타",
+    "file_name": "유아인도 심판청구서.hwpx",
+    "file_path": "가사소송/기타/유아인도 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9ebda5c7a31c",
+    "template_name": "유아인도 조정신청서",
+    "case_type": "가사소송",
+    "case_subtype": "기타",
+    "file_name": "유아인도 조정신청서.hwpx",
+    "file_path": "가사소송/기타/유아인도 조정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_948b4cc04c22",
+    "template_name": "[상속재산목록 경정신청서(한정승인)]",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "[상속재산목록 경정신청서(한정승인)].hwpx",
+    "file_path": "가사소송/라,마류 가사비송/[상속재산목록 경정신청서(한정승인)].hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5dbb19cf6658",
+    "template_name": "부재선고 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "부재선고 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/부재선고 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c38d61097aec",
+    "template_name": "부재자 재산관리인 선임 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "부재자 재산관리인 선임 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/부재자 재산관리인 선임 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ed480b4a2853",
+    "template_name": "부재자 재산관리인 선임 심판청구서_2",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "부재자 재산관리인 선임 심판청구서_2.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/부재자 재산관리인 선임 심판청구서_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_24cb97f7327f",
+    "template_name": "상속승인기간 연장허가청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "상속승인기간 연장허가청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/상속승인기간 연장허가청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_d5be3b95aae9",
+    "template_name": "상속재산관리인 선임심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "상속재산관리인 선임심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/상속재산관리인 선임심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f48bba18bdb0",
+    "template_name": "상속재산의 분리 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "상속재산의 분리 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/상속재산의 분리 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_04eb1446aef3",
+    "template_name": "상속재산포기 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "상속재산포기 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/상속재산포기 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_070450b3ecec",
+    "template_name": "상속한정승인 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "상속한정승인 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/상속한정승인 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_79813509a864",
+    "template_name": "실종선고 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "실종선고 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/실종선고 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_23b12dac6188",
+    "template_name": "실종선고 취소 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "실종선고 취소 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/실종선고 취소 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b86c3703051b",
+    "template_name": "유언집행자 선임청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "유언집행자 선임청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/유언집행자 선임청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_2ef30fcacc78",
+    "template_name": "자의 성과 본의 변경허가 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "자의 성과 본의 변경허가 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/자의 성과 본의 변경허가 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_2a0690e157f3",
+    "template_name": "자의 종전의 성과 본의 계속사용허가 심판청구",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "자의 종전의 성과 본의 계속사용허가 심판청구.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/자의 종전의 성과 본의 계속사용허가 심판청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f45443bf74dc",
+    "template_name": "재산명시신청서(가사소송법)",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "재산명시신청서(가사소송법).hwpx",
+    "file_path": "가사소송/라,마류 가사비송/재산명시신청서(가사소송법).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ab6dcedd54a8",
+    "template_name": "재산조회신청서(가사)",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "재산조회신청서(가사).hwpx",
+    "file_path": "가사소송/라,마류 가사비송/재산조회신청서(가사).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_54214c0558f5",
+    "template_name": "특별대리인 선임 심판청구서(상속재산 협의분할의 경우)",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "특별대리인 선임 심판청구서(상속재산 협의분할의 경우).hwpx",
+    "file_path": "가사소송/라,마류 가사비송/특별대리인 선임 심판청구서(상속재산 협의분할의 경우).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_946ecea5a830",
+    "template_name": "특별대리인 선임 심판청구서(예금통장 명의변경의 경우)",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "특별대리인 선임 심판청구서(예금통장 명의변경의 경우).hwpx",
+    "file_path": "가사소송/라,마류 가사비송/특별대리인 선임 심판청구서(예금통장 명의변경의 경우).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1e562c047ac5",
+    "template_name": "특별대리인 선임 심판청구서",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "특별대리인 선임 심판청구서.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/특별대리인 선임 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b0b9237175b2",
+    "template_name": "특별대리인 선임 심판청구서_2",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "특별대리인 선임 심판청구서_2.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/특별대리인 선임 심판청구서_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_d08d1410cf38",
+    "template_name": "특별대리인 선임 심판청구서_3",
+    "case_type": "가사소송",
+    "case_subtype": "라,마류 가사비송",
+    "file_name": "특별대리인 선임 심판청구서_3.hwpx",
+    "file_path": "가사소송/라,마류 가사비송/특별대리인 선임 심판청구서_3.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_3bb99111ef00",
+    "template_name": "소득세원천징수의무자에 대한 진술최고신청서",
+    "case_type": "가사소송",
+    "case_subtype": "양육비직접지급명령",
+    "file_name": "소득세원천징수의무자에 대한 진술최고신청서.hwpx",
+    "file_path": "가사소송/양육비직접지급명령/소득세원천징수의무자에 대한 진술최고신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a6c55cea8825",
+    "template_name": "양육비 직접지급명령 신청서",
+    "case_type": "가사소송",
+    "case_subtype": "양육비직접지급명령",
+    "file_name": "양육비 직접지급명령 신청서.hwpx",
+    "file_path": "가사소송/양육비직접지급명령/양육비 직접지급명령 신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_35b8434ba2b8",
+    "template_name": "양육비 직접지급명령 취소신청서",
+    "case_type": "가사소송",
+    "case_subtype": "양육비직접지급명령",
+    "file_name": "양육비 직접지급명령 취소신청서.hwpx",
+    "file_path": "가사소송/양육비직접지급명령/양육비 직접지급명령 취소신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c0b4b5791b28",
+    "template_name": "일시금지급명령 신청서",
+    "case_type": "가사소송",
+    "case_subtype": "양육비직접지급명령",
+    "file_name": "일시금지급명령 신청서.hwpx",
+    "file_path": "가사소송/양육비직접지급명령/일시금지급명령 신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_645a01b4fcf5",
+    "template_name": "이행명령신청서(면접교섭)",
+    "case_type": "가사소송",
+    "case_subtype": "이행명령",
+    "file_name": "이행명령신청서(면접교섭).hwpx",
+    "file_path": "가사소송/이행명령/이행명령신청서(면접교섭).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6adc9c6f7cf7",
+    "template_name": "이행명령신청서",
+    "case_type": "가사소송",
+    "case_subtype": "이행명령",
+    "file_name": "이행명령신청서.hwpx",
+    "file_path": "가사소송/이행명령/이행명령신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_328b65d74545",
+    "template_name": "이행명령신청서_2",
+    "case_type": "가사소송",
+    "case_subtype": "이행명령",
+    "file_name": "이행명령신청서_2.hwpx",
+    "file_path": "가사소송/이행명령/이행명령신청서_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5b5db1a43ff3",
+    "template_name": "[등록부정정허가신청서(성 표기 정정)]",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "[등록부정정허가신청서(성 표기 정정)].hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/[등록부정정허가신청서(성 표기 정정)].hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_fad338290e20",
+    "template_name": "등록부정정신청서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정신청서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정신청서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a2abbf6ff51a",
+    "template_name": "등록부정정허가신청서(말소회복-사망착오)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정허가신청서(말소회복-사망착오).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정허가신청서(말소회복-사망착오).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_556363be4b71",
+    "template_name": "등록부정정허가신청서(성별정정)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정허가신청서(성별정정).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정허가신청서(성별정정).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_da7169273375",
+    "template_name": "등록부정정허가신청서(성전환자)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정허가신청서(성전환자).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정허가신청서(성전환자).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7b5816080227",
+    "template_name": "등록부정정허가신청서(위장결혼)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정허가신청서(위장결혼).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정허가신청서(위장결혼).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e49cd70cef45",
+    "template_name": "등록부정정허가신청서(이중등록부 정정)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정허가신청서(이중등록부 정정).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정허가신청서(이중등록부 정정).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5be6bda9084d",
+    "template_name": "등록부정정허가신청서(출생일 정정)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정허가신청서(출생일 정정).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정허가신청서(출생일 정정).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_364e4ebdcc07",
+    "template_name": "등록부정정허가신청서(출생일)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "file_name": "등록부정정허가신청서(출생일).hwpx",
+    "file_path": "가족관계등록/가족관계등록부정정/등록부정정허가신청서(출생일).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_18132230cd56",
+    "template_name": "가족관계등록 창설허가신청서(군사분계선 이북지역 재적자의 경우)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록창설",
+    "file_name": "가족관계등록 창설허가신청서(군사분계선 이북지역 재적자의 경우).hwpx",
+    "file_path": "가족관계등록/가족관계등록창설/가족관계등록 창설허가신청서(군사분계선 이북지역 재적자의 경우).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_76d6696234a0",
+    "template_name": "가족관계등록 창설허가신청서(일반무적자로서 부모도 무적인 채 사망한 경우)",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록창설",
+    "file_name": "가족관계등록 창설허가신청서(일반무적자로서 부모도 무적인 채 사망한 경우).hwpx",
+    "file_path": "가족관계등록/가족관계등록창설/가족관계등록 창설허가신청서(일반무적자로서 부모도 무적인 채 사망한 경우).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_3a707563a51f",
+    "template_name": "가족관계등록 창설허가신청서",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록창설",
+    "file_name": "가족관계등록 창설허가신청서.hwpx",
+    "file_path": "가족관계등록/가족관계등록창설/가족관계등록 창설허가신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9c67cfde91f5",
+    "template_name": "국적상실 신고서",
+    "case_type": "가족관계등록",
+    "case_subtype": "국적의 취득과 상실",
+    "file_name": "국적상실 신고서.hwpx",
+    "file_path": "가족관계등록/국적의 취득과 상실/국적상실 신고서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_709cdd66c182",
+    "template_name": "국적취득 신고서",
+    "case_type": "가족관계등록",
+    "case_subtype": "국적의 취득과 상실",
+    "file_name": "국적취득 신고서.hwpx",
+    "file_path": "가족관계등록/국적의 취득과 상실/국적취득 신고서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_95e593f384c8",
+    "template_name": "국적회복 신고서(관공서 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "국적의 취득과 상실",
+    "file_name": "국적회복 신고서(관공서 제출용).hwpx",
+    "file_path": "가족관계등록/국적의 취득과 상실/국적회복 신고서(관공서 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7655d51c0a13",
+    "template_name": "귀화신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "국적의 취득과 상실",
+    "file_name": "귀화신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/국적의 취득과 상실/귀화신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_642bb292458c",
+    "template_name": "귀화허가 신청서",
+    "case_type": "가족관계등록",
+    "case_subtype": "국적의 취득과 상실",
+    "file_name": "귀화허가 신청서.hwpx",
+    "file_path": "가족관계등록/국적의 취득과 상실/귀화허가 신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_8cd382fa1711",
+    "template_name": "개명허가신청서",
+    "case_type": "가족관계등록",
+    "case_subtype": "성본창설과 개명",
+    "file_name": "개명허가신청서.hwpx",
+    "file_path": "가족관계등록/성본창설과 개명/개명허가신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9a8e0a5cf73d",
+    "template_name": "개명허가신청서_2",
+    "case_type": "가족관계등록",
+    "case_subtype": "성본창설과 개명",
+    "file_name": "개명허가신청서_2.hwpx",
+    "file_path": "가족관계등록/성본창설과 개명/개명허가신청서_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_bc3a30681ddc",
+    "template_name": "개명허가신청서_3",
+    "case_type": "가족관계등록",
+    "case_subtype": "성본창설과 개명",
+    "file_name": "개명허가신청서_3.hwpx",
+    "file_path": "가족관계등록/성본창설과 개명/개명허가신청서_3.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1da3d3c88eea",
+    "template_name": "개명허가신청서_4",
+    "case_type": "가족관계등록",
+    "case_subtype": "성본창설과 개명",
+    "file_name": "개명허가신청서_4.hwpx",
+    "file_path": "가족관계등록/성본창설과 개명/개명허가신청서_4.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c4df5a5888a9",
+    "template_name": "성 및 본의 창설허가신청서",
+    "case_type": "가족관계등록",
+    "case_subtype": "성본창설과 개명",
+    "file_name": "성 및 본의 창설허가신청서.hwpx",
+    "file_path": "가족관계등록/성본창설과 개명/성 및 본의 창설허가신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f6ee83571129",
+    "template_name": "(실종, 부재)선고신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "(실종, 부재)선고신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/(실종, 부재)선고신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_517ee93c6c30",
+    "template_name": "(실종, 부재)선고취소신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "(실종, 부재)선고취소신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/(실종, 부재)선고취소신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_07850e418de6",
+    "template_name": "가족관계등록부 존재신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "가족관계등록부 존재신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/가족관계등록부 존재신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6f339b85e9f2",
+    "template_name": "가족관계등록창설신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "가족관계등록창설신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/가족관계등록창설신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ba7da58eb10d",
+    "template_name": "개명신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "개명신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/개명신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_27313cf60728",
+    "template_name": "국적취득자의 성,본 창설신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "국적취득자의 성,본 창설신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/국적취득자의 성,본 창설신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_439e2448de52",
+    "template_name": "등록기준지변경신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "등록기준지변경신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/등록기준지변경신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1a84f7c38e29",
+    "template_name": "미성년후견,후견감독개시신고서(시구읍면사무소_제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "미성년후견,후견감독개시신고서(시구읍면사무소_제출용).hwpx",
+    "file_path": "가족관계등록/신고/미성년후견,후견감독개시신고서(시구읍면사무소_제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7674d34a910c",
+    "template_name": "미성년후견인, 후견감독인 경질신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "미성년후견인, 후견감독인 경질신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/미성년후견인, 후견감독인 경질신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_2c9adced1388",
+    "template_name": "사망신고서(시구읍면동사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "사망신고서(시구읍면동사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/사망신고서(시구읍면동사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0aecd2adc5e6",
+    "template_name": "사산신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "사산신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/사산신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_3a5c6c34e434",
+    "template_name": "성, 본 계속사용신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "성, 본 계속사용신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/성, 본 계속사용신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f173512555cd",
+    "template_name": "성,본 변경신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "성,본 변경신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/성,본 변경신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_23905207a74b",
+    "template_name": "이혼(친권자 지정)신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "이혼(친권자 지정)신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/이혼(친권자 지정)신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f3410a419323",
+    "template_name": "인지(친권자지정)신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "인지(친권자지정)신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/인지(친권자지정)신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f56251feadd7",
+    "template_name": "인지신고시 자녀의 성과 본 계속사용 협의서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "인지신고시 자녀의 성과 본 계속사용 협의서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/인지신고시 자녀의 성과 본 계속사용 협의서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_551bfdb9e270",
+    "template_name": "입양신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "입양신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/입양신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_bf5dcbbb20e1",
+    "template_name": "입양취소신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "입양취소신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/입양취소신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1281677ad0d9",
+    "template_name": "추후보완신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "추후보완신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/추후보완신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a14db5c7da78",
+    "template_name": "출생신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "출생신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/출생신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a3280ca944f1",
+    "template_name": "친권상실, 법률행위대리권, 재산관리권(상실, 사퇴)신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "친권상실, 법률행위대리권, 재산관리권(상실, 사퇴)신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/친권상실, 법률행위대리권, 재산관리권(상실, 사퇴)신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_3d6fb61af7dd",
+    "template_name": "친권상실회복, 법률행위대리권, 재산관리권(상실, 사퇴)회복신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "친권상실회복, 법률행위대리권, 재산관리권(상실, 사퇴)회복신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/친권상실회복, 법률행위대리권, 재산관리권(상실, 사퇴)회복신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1afa85c49d75",
+    "template_name": "친권자(지정, 변경)신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "친권자(지정, 변경)신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/친권자(지정, 변경)신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0233eec3d3bf",
+    "template_name": "친양자 입양 신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "친양자 입양 신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/친양자 입양 신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0a8f6d213d80",
+    "template_name": "친양자 입양취소 신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "친양자 입양취소 신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/친양자 입양취소 신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_121da862b3ce",
+    "template_name": "친양자 파양신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "친양자 파양신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/친양자 파양신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4131a17fe575",
+    "template_name": "파양신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "파양신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/파양신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_930152fa021d",
+    "template_name": "혼인신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "혼인신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/혼인신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c2bbfbd739fc",
+    "template_name": "혼인신고시 자녀의 성과 본에 대한 협의서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "혼인신고시 자녀의 성과 본에 대한 협의서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/혼인신고시 자녀의 성과 본에 대한 협의서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e18627fb485b",
+    "template_name": "혼인취소신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "혼인취소신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/혼인취소신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f45772a7ee75",
+    "template_name": "후견개시신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "후견개시신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/후견개시신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_119b9d4b91d4",
+    "template_name": "후견인경질신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "후견인경질신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/후견인경질신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_27e46322aa2b",
+    "template_name": "후견종료신고서(시구읍면사무소 제출용)",
+    "case_type": "가족관계등록",
+    "case_subtype": "신고",
+    "file_name": "후견종료신고서(시구읍면사무소 제출용).hwpx",
+    "file_path": "가족관계등록/신고/후견종료신고서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1e94b0deb54f",
+    "template_name": "소유권이전등기(대습상속)",
+    "case_type": "상속",
+    "case_subtype": "상속분",
+    "file_name": "소유권이전등기(대습상속).hwpx",
+    "file_path": "상속/상속분/소유권이전등기(대습상속).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ddc2fb2004eb",
+    "template_name": "소유권이전등기(등기전 매도인의 사망)",
+    "case_type": "상속",
+    "case_subtype": "상속분",
+    "file_name": "소유권이전등기(등기전 매도인의 사망).hwpx",
+    "file_path": "상속/상속분/소유권이전등기(등기전 매도인의 사망).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_88f25c7fcecd",
+    "template_name": "소유권이전등기(등기전 매수인의 사망)",
+    "case_type": "상속",
+    "case_subtype": "상속분",
+    "file_name": "소유권이전등기(등기전 매수인의 사망).hwpx",
+    "file_path": "상속/상속분/소유권이전등기(등기전 매수인의 사망).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4e0bf6d5be8a",
+    "template_name": "소유권이전등기신청서(상속)",
+    "case_type": "상속",
+    "case_subtype": "상속분",
+    "file_name": "소유권이전등기신청서(상속).hwpx",
+    "file_path": "상속/상속분/소유권이전등기신청서(상속).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b00c68ccf6ce",
+    "template_name": "상속인수색의 공고청구서",
+    "case_type": "상속",
+    "case_subtype": "상속일반",
+    "file_name": "상속인수색의 공고청구서.hwpx",
+    "file_path": "상속/상속일반/상속인수색의 공고청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_26598df44f84",
+    "template_name": "상속재산분할협의서",
+    "case_type": "상속",
+    "case_subtype": "상속재산분할",
+    "file_name": "상속재산분할협의서.hwpx",
+    "file_path": "상속/상속재산분할/상속재산분할협의서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5f94ef967799",
+    "template_name": "상속재산분할협의서_2",
+    "case_type": "상속",
+    "case_subtype": "상속재산분할",
+    "file_name": "상속재산분할협의서_2.hwpx",
+    "file_path": "상속/상속재산분할/상속재산분할협의서_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_08a1a7f34185",
+    "template_name": "소유권보존등기(상속)",
+    "case_type": "상속",
+    "case_subtype": "상속재산분할",
+    "file_name": "소유권보존등기(상속).hwpx",
+    "file_path": "상속/상속재산분할/소유권보존등기(상속).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_93a05fcb4bf7",
+    "template_name": "소유권보존등기(협의분할에 의한 상속)",
+    "case_type": "상속",
+    "case_subtype": "상속재산분할",
+    "file_name": "소유권보존등기(협의분할에 의한 상속).hwpx",
+    "file_path": "상속/상속재산분할/소유권보존등기(협의분할에 의한 상속).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c575936d6c9c",
+    "template_name": "소유권이전등기신청서(협의분할에 의한 상속)",
+    "case_type": "상속",
+    "case_subtype": "상속재산분할",
+    "file_name": "소유권이전등기신청서(협의분할에 의한 상속).hwpx",
+    "file_path": "상속/상속재산분할/소유권이전등기신청서(협의분할에 의한 상속).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e822eb1e491a",
+    "template_name": "유류분반환청구의 소",
+    "case_type": "상속",
+    "case_subtype": "유류분",
+    "file_name": "유류분반환청구의 소.hwpx",
+    "file_path": "상속/유류분/유류분반환청구의 소.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_79f5a6300ac9",
+    "template_name": "구수증서에 의한 유언증서",
+    "case_type": "상속",
+    "case_subtype": "유언",
+    "file_name": "구수증서에 의한 유언증서.hwpx",
+    "file_path": "상속/유언/구수증서에 의한 유언증서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5ef0e57e446f",
+    "template_name": "소유권이전등기청구의 소(다세대주택, 특정유증을 원인으로)",
+    "case_type": "상속",
+    "case_subtype": "유언",
+    "file_name": "소유권이전등기청구의 소(다세대주택, 특정유증을 원인으로).hwpx",
+    "file_path": "상속/유언/소유권이전등기청구의 소(다세대주택, 특정유증을 원인으로).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e0187ddd6b84",
+    "template_name": "유언증서 검인신청서",
+    "case_type": "상속",
+    "case_subtype": "유언",
+    "file_name": "유언증서 검인신청서.hwpx",
+    "file_path": "상속/유언/유언증서 검인신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e45de868ac64",
+    "template_name": "자필증서에 의한 유언증서",
+    "case_type": "상속",
+    "case_subtype": "유언",
+    "file_name": "자필증서에 의한 유언증서.hwpx",
+    "file_path": "상속/유언/자필증서에 의한 유언증서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a6acdae639fa",
+    "template_name": "면접교섭권 배제 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "면접교섭권",
+    "file_name": "면접교섭권 배제 심판청구서.hwpx",
+    "file_path": "친족/면접교섭권/면접교섭권 배제 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b495978e38e3",
+    "template_name": "면접교섭허가 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "면접교섭권",
+    "file_name": "면접교섭허가 심판청구서.hwpx",
+    "file_path": "친족/면접교섭권/면접교섭허가 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_61cef7943d6f",
+    "template_name": "부양료청구 조정신청서",
+    "case_type": "친족",
+    "case_subtype": "부양",
+    "file_name": "부양료청구 조정신청서.hwpx",
+    "file_path": "친족/부양/부양료청구 조정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c5ee733f61e4",
+    "template_name": "조정신청서(약혼예물 반환)",
+    "case_type": "친족",
+    "case_subtype": "약혼",
+    "file_name": "조정신청서(약혼예물 반환).hwpx",
+    "file_path": "친족/약혼/조정신청서(약혼예물 반환).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_288bcd45d79f",
+    "template_name": "담보제공명령신청(양육비)",
+    "case_type": "친족",
+    "case_subtype": "양육비",
+    "file_name": "담보제공명령신청(양육비).hwpx",
+    "file_path": "친족/양육비/담보제공명령신청(양육비).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c27f630551ec",
+    "template_name": "양육비 등 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "양육비",
+    "file_name": "양육비 등 심판청구서.hwpx",
+    "file_path": "친족/양육비/양육비 등 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_85b1cb94ea4f",
+    "template_name": "양육비 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "양육비",
+    "file_name": "양육비 심판청구서.hwpx",
+    "file_path": "친족/양육비/양육비 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a005ee62d3cc",
+    "template_name": "양육비심판청구(과거양육비)",
+    "case_type": "친족",
+    "case_subtype": "양육비",
+    "file_name": "양육비심판청구(과거양육비).hwpx",
+    "file_path": "친족/양육비/양육비심판청구(과거양육비).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_40150b06655e",
+    "template_name": "양육자 지정 및 양육비 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "양육비",
+    "file_name": "양육자 지정 및 양육비 심판청구서.hwpx",
+    "file_path": "친족/양육비/양육자 지정 및 양육비 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c8b2b53b64c3",
+    "template_name": "자의 양육과 친권자결정에 관한 협의서(법원제출용)",
+    "case_type": "친족",
+    "case_subtype": "양육비",
+    "file_name": "자의 양육과 친권자결정에 관한 협의서(법원제출용).hwpx",
+    "file_path": "친족/양육비/자의 양육과 친권자결정에 관한 협의서(법원제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_181527e5c77e",
+    "template_name": "이혼 및 위자료 조정신청서",
+    "case_type": "친족",
+    "case_subtype": "이혼 및 위자료",
+    "file_name": "이혼 및 위자료 조정신청서.hwpx",
+    "file_path": "친족/이혼 및 위자료/이혼 및 위자료 조정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1103822196ca",
+    "template_name": "답변서(가옥인도청구)",
+    "case_type": "친족",
+    "case_subtype": "이혼 및 재산분할청구권",
+    "file_name": "답변서(가옥인도청구).hwpx",
+    "file_path": "친족/이혼 및 재산분할청구권/답변서(가옥인도청구).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_18f56b787a3f",
+    "template_name": "재산분할 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "이혼 및 재산분할청구권",
+    "file_name": "재산분할 심판청구서.hwpx",
+    "file_path": "친족/이혼 및 재산분할청구권/재산분할 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e6090f5ec7b8",
+    "template_name": "미성년자 입양 동의서",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "미성년자 입양 동의서.hwpx",
+    "file_path": "친족/입양, 파양, 친양자/미성년자 입양 동의서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_cda2f352f832",
+    "template_name": "미성년자 입양 승낙서(13세미만)",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "미성년자 입양 승낙서(13세미만).hwpx",
+    "file_path": "친족/입양, 파양, 친양자/미성년자 입양 승낙서(13세미만).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_333c8186f26e",
+    "template_name": "미성년자 입양 승낙서(13세이상)",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "미성년자 입양 승낙서(13세이상).hwpx",
+    "file_path": "친족/입양, 파양, 친양자/미성년자 입양 승낙서(13세이상).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ffb113fa6708",
+    "template_name": "미성년자 입양 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "미성년자 입양 허가 청구.hwpx",
+    "file_path": "친족/입양, 파양, 친양자/미성년자 입양 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6a7e1dfb15a9",
+    "template_name": "부모의 동의를 갈음하는 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "부모의 동의를 갈음하는 허가 청구.hwpx",
+    "file_path": "친족/입양, 파양, 친양자/부모의 동의를 갈음하는 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_30f63030088e",
+    "template_name": "입양 허가 신청(국내에서의 국외입양)",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "입양 허가 신청(국내에서의 국외입양).hwpx",
+    "file_path": "친족/입양, 파양, 친양자/입양 허가 신청(국내에서의 국외입양).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0298f3e4df84",
+    "template_name": "입양 허가 신청(국내입양)",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "입양 허가 신청(국내입양).hwpx",
+    "file_path": "친족/입양, 파양, 친양자/입양 허가 신청(국내입양).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_647bf0d93de2",
+    "template_name": "친양자 입양 동의서",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "친양자 입양 동의서.hwpx",
+    "file_path": "친족/입양, 파양, 친양자/친양자 입양 동의서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0fb68f7b1a3b",
+    "template_name": "친양자 입양 심판청구서(친모의 배우자 단독신청)",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "친양자 입양 심판청구서(친모의 배우자 단독신청).hwpx",
+    "file_path": "친족/입양, 파양, 친양자/친양자 입양 심판청구서(친모의 배우자 단독신청).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1791c45c6d30",
+    "template_name": "친양자 입양청구서(공동입양)",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "친양자 입양청구서(공동입양).hwpx",
+    "file_path": "친족/입양, 파양, 친양자/친양자 입양청구서(공동입양).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f73a324c010c",
+    "template_name": "파양 조정신청서",
+    "case_type": "친족",
+    "case_subtype": "입양, 파양, 친양자",
+    "file_name": "파양 조정신청서.hwpx",
+    "file_path": "친족/입양, 파양, 친양자/파양 조정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c3cf5b682ae2",
+    "template_name": "이혼 조정신청서",
+    "case_type": "친족",
+    "case_subtype": "재판상이혼 등",
+    "file_name": "이혼 조정신청서.hwpx",
+    "file_path": "친족/재판상이혼 등/이혼 조정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_db67a18957c9",
+    "template_name": "친권 일부제한 심판 청구서",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권 일부제한 심판 청구서.hwpx",
+    "file_path": "친족/친권/친권 일부제한 심판 청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_42a2722a49eb",
+    "template_name": "친권 일시정지 기간연장 심판 청구",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권 일시정지 기간연장 심판 청구.hwpx",
+    "file_path": "친족/친권/친권 일시정지 기간연장 심판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1d1375635997",
+    "template_name": "친권 일시정지 심판 청구",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권 일시정지 심판 청구.hwpx",
+    "file_path": "친족/친권/친권 일시정지 심판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_68cff8807975",
+    "template_name": "친권 회복 심판 청구",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권 회복 심판 청구.hwpx",
+    "file_path": "친족/친권/친권 회복 심판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4159b7f3a600",
+    "template_name": "친권상실 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권상실 심판청구서.hwpx",
+    "file_path": "친족/친권/친권상실 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_d57e603a86b8",
+    "template_name": "친권자의 동의에 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권자의 동의에 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/친권/친권자의 동의에 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a0f360a86dcb",
+    "template_name": "친권자의 법률행위 대리권 및 재산관리권 상실선고 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권자의 법률행위 대리권 및 재산관리권 상실선고 심판청구서.hwpx",
+    "file_path": "친족/친권/친권자의 법률행위 대리권 및 재산관리권 상실선고 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_407e20141ed3",
+    "template_name": "친권자지정 청구서",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권자지정 청구서.hwpx",
+    "file_path": "친족/친권/친권자지정 청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_d1e9b2679996",
+    "template_name": "친권행사자 변경 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권행사자 변경 심판청구서.hwpx",
+    "file_path": "친족/친권/친권행사자 변경 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b831bd493aad",
+    "template_name": "친권행사자 지정 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권행사자 지정 심판청구서.hwpx",
+    "file_path": "친족/친권/친권행사자 지정 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_36d3f986cf9a",
+    "template_name": "친권행사정지 사전처분신청서",
+    "case_type": "친족",
+    "case_subtype": "친권",
+    "file_name": "친권행사정지 사전처분신청서.hwpx",
+    "file_path": "친족/친권/친권행사정지 사전처분신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c3f2efecc315",
+    "template_name": "이혼 숙려기간 면제(단축) 사유서(법원제출용)",
+    "case_type": "친족",
+    "case_subtype": "협의이혼",
+    "file_name": "이혼 숙려기간 면제(단축) 사유서(법원제출용).hwpx",
+    "file_path": "친족/협의이혼/이혼 숙려기간 면제(단축) 사유서(법원제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a72b30e39ea8",
+    "template_name": "협의이혼의사 철회서(시구읍면사무소 제출용)",
+    "case_type": "친족",
+    "case_subtype": "협의이혼",
+    "file_name": "협의이혼의사 철회서(시구읍면사무소 제출용).hwpx",
+    "file_path": "친족/협의이혼/협의이혼의사 철회서(시구읍면사무소 제출용).hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e81f4009aa0e",
+    "template_name": "협의이혼의사철회서",
+    "case_type": "친족",
+    "case_subtype": "협의이혼",
+    "file_name": "협의이혼의사철회서.hwpx",
+    "file_path": "친족/협의이혼/협의이혼의사철회서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_51a3bb576dc6",
+    "template_name": "협의이혼의사확인신청서",
+    "case_type": "친족",
+    "case_subtype": "협의이혼",
+    "file_name": "협의이혼의사확인신청서.hwpx",
+    "file_path": "친족/협의이혼/협의이혼의사확인신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a08d62262444",
+    "template_name": "부부동거 조정신청서",
+    "case_type": "친족",
+    "case_subtype": "혼인의 성립, 무효, 취소",
+    "file_name": "부부동거 조정신청서.hwpx",
+    "file_path": "친족/혼인의 성립, 무효, 취소/부부동거 조정신청서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_783b6b6b690b",
+    "template_name": "혼인동의서",
+    "case_type": "친족",
+    "case_subtype": "혼인의 성립, 무효, 취소",
+    "file_name": "혼인동의서.hwpx",
+    "file_path": "친족/혼인의 성립, 무효, 취소/혼인동의서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0703ced153ee",
+    "template_name": "미성년후견 종료 및 친권자지정 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견 종료 및 친권자지정 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견 종료 및 친권자지정 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6d692f451be0",
+    "template_name": "미성년후견 종료시 관리계산기간 연장 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7d12e90e1713",
+    "template_name": "미성년후견(감독)인  보수의 수여 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견(감독)인  보수의 수여 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견(감독)인  보수의 수여 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_35f1389f6be3",
+    "template_name": "미성년후견감독인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견감독인 변경 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견감독인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_dd8c977148fe",
+    "template_name": "미성년후견감독인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_327db47cf5e4",
+    "template_name": "미성년후견감독인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견감독인 선임 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견감독인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1b330f0abf30",
+    "template_name": "미성년후견감독인의 동의를 갈음하는 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견감독인의 동의를 갈음하는 허가 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견감독인의 동의를 갈음하는 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5f9e0c199004",
+    "template_name": "미성년후견인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견인 변경 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_2c01de241406",
+    "template_name": "미성년후견인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_639da59e4e6c",
+    "template_name": "미성년후견인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견인 선임 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_26b3453d9614",
+    "template_name": "미성년후견인 선임 청구_2",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견인 선임 청구_2.hwpx",
+    "file_path": "친족/후견인/미성년후견인 선임 청구_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_8cac9055d954",
+    "template_name": "미성년후견인 선임 청구_3",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견인 선임 청구_3.hwpx",
+    "file_path": "친족/후견인/미성년후견인 선임 청구_3.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_bc560f01308f",
+    "template_name": "미성년후견인의 재산목록 작성기간 연장 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견인의 재산목록 작성기간 연장 허가 청구.hwpx",
+    "file_path": "친족/후견인/미성년후견인의 재산목록 작성기간 연장 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9d08271cd5ae",
+    "template_name": "미성년후견인임무대행자지정청구서",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "미성년후견인임무대행자지정청구서.hwpx",
+    "file_path": "친족/후견인/미성년후견인임무대행자지정청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_85cdcf796771",
+    "template_name": "성년후견 종료시 관리계산기간 연장 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_path": "친족/후견인/성년후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c37ffed0663e",
+    "template_name": "성년후견감독인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견감독인 변경 청구.hwpx",
+    "file_path": "친족/후견인/성년후견감독인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_abdad85be11d",
+    "template_name": "성년후견감독인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/성년후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b7b0c8429a7d",
+    "template_name": "성년후견감독인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견감독인 선임 청구.hwpx",
+    "file_path": "친족/후견인/성년후견감독인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7bfadcb8a9ec",
+    "template_name": "성년후견감독인의 의사표시를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/성년후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_46ab81f76c73",
+    "template_name": "성년후견개시 심판청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견개시 심판청구.hwpx",
+    "file_path": "친족/후견인/성년후견개시 심판청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_34a0660a1020",
+    "template_name": "성년후견개시 심판청구_2",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견개시 심판청구_2.hwpx",
+    "file_path": "친족/후견인/성년후견개시 심판청구_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4b2fc01b7c2c",
+    "template_name": "성년후견인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인 변경 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b1ef755fe05f",
+    "template_name": "성년후견인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4a5e09a4e9a7",
+    "template_name": "성년후견인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인 선임 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_588297d36e1f",
+    "template_name": "성년후견인의 법정대리권의 범위 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인의 법정대리권의 범위 변경 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인의 법정대리권의 범위 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_d3731bbbcc00",
+    "template_name": "성년후견인의 의사표시를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4265294bc184",
+    "template_name": "성년후견인의 임무수행에 관하여 필요한 처분명령 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e47df81436bb",
+    "template_name": "성년후견인의 재산목록 작성기간 연장 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인의 재산목록 작성기간 연장 허가 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인의 재산목록 작성기간 연장 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ef51fb6aa0e3",
+    "template_name": "성년후견인이 피성년후견인의 신상에 관하여 결정할 수 있는 권한의 범위 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견인이 피성년후견인의 신상에 관하여 결정할 수 있는 권한의 범위 변경 청구.hwpx",
+    "file_path": "친족/후견인/성년후견인이 피성년후견인의 신상에 관하여 결정할 수 있는 권한의 범위 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_19868c5bda60",
+    "template_name": "성년후견종료 심판청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "성년후견종료 심판청구.hwpx",
+    "file_path": "친족/후견인/성년후견종료 심판청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_f7ba7e923257",
+    "template_name": "임무대행자 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임무대행자 선임 청구.hwpx",
+    "file_path": "친족/후견인/임무대행자 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6f2865b01555",
+    "template_name": "임무대행자의 권한초과행위 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임무대행자의 권한초과행위 허가 청구.hwpx",
+    "file_path": "친족/후견인/임무대행자의 권한초과행위 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_8de958cae9f4",
+    "template_name": "임무대행자의 임무수행에 관하여 필요한 처분명령 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임무대행자의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_path": "친족/후견인/임무대행자의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4ca8afa7674d",
+    "template_name": "임시후견인 선임 사전처분",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임시후견인 선임 사전처분.hwpx",
+    "file_path": "친족/후견인/임시후견인 선임 사전처분.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0c2ca7eb024f",
+    "template_name": "임의후견감독인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임의후견감독인 변경 청구.hwpx",
+    "file_path": "친족/후견인/임의후견감독인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_dbacb10da0f2",
+    "template_name": "임의후견감독인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임의후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/임의후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_292d114acbce",
+    "template_name": "임의후견감독인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임의후견감독인 선임 청구.hwpx",
+    "file_path": "친족/후견인/임의후견감독인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_196e0a8e660b",
+    "template_name": "임의후견감독인에 대한 보수의 수여 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임의후견감독인에 대한 보수의 수여 청구.hwpx",
+    "file_path": "친족/후견인/임의후견감독인에 대한 보수의 수여 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_209d3c258a66",
+    "template_name": "임의후견감독인의 의사표시를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임의후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/임의후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9ac09536a52b",
+    "template_name": "임의후견인 해임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "임의후견인 해임 청구.hwpx",
+    "file_path": "친족/후견인/임의후견인 해임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_22b943c9a96f",
+    "template_name": "취소할수없는 피성년후견인의 법률행위범위 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "취소할수없는 피성년후견인의 법률행위범위 변경 청구.hwpx",
+    "file_path": "친족/후견인/취소할수없는 피성년후견인의 법률행위범위 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e49314426ea2",
+    "template_name": "특정후견 심판청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견 심판청구.hwpx",
+    "file_path": "친족/후견인/특정후견 심판청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_0dc55707c67b",
+    "template_name": "특정후견 종료시 관리계산기간 연장 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_path": "친족/후견인/특정후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a6096cb09d0b",
+    "template_name": "특정후견(감독)인에 대한 보수의 수여 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견(감독)인에 대한 보수의 수여 청구.hwpx",
+    "file_path": "친족/후견인/특정후견(감독)인에 대한 보수의 수여 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4d91c6852e0b",
+    "template_name": "특정후견감독인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견감독인 변경 청구.hwpx",
+    "file_path": "친족/후견인/특정후견감독인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c1b75c3d3bab",
+    "template_name": "특정후견감독인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/특정후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6e642bf0ff24",
+    "template_name": "특정후견감독인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견감독인 선임 청구.hwpx",
+    "file_path": "친족/후견인/특정후견감독인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ccaaa70cd0a2",
+    "template_name": "특정후견감독인의 의사표시를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/특정후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7c89eefdddc4",
+    "template_name": "특정후견인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견인 변경 청구.hwpx",
+    "file_path": "친족/후견인/특정후견인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a94e5f32be41",
+    "template_name": "특정후견인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/특정후견인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5b817431c40e",
+    "template_name": "특정후견인의 의사표시를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/특정후견인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ccb576e1763d",
+    "template_name": "특정후견인의 임무수행에 관하여 필요한 처분명령 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "특정후견인의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_path": "친족/후견인/특정후견인의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_378e77ca44e7",
+    "template_name": "피미성년후견인에 대한 의료행위의 동의에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피미성년후견인에 대한 의료행위의 동의에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피미성년후견인에 대한 의료행위의 동의에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_299f909368ad",
+    "template_name": "피미성년후견인의 재산상황조사 및 임무수행에 관하여 필요한 처분명령 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피미성년후견인의 재산상황조사 및 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_path": "친족/후견인/피미성년후견인의 재산상황조사 및 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_51e81e2ff680",
+    "template_name": "피미성년후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피미성년후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피미성년후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_bdf41b386644",
+    "template_name": "피성년후견인 격리에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피성년후견인 격리에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피성년후견인 격리에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_468d4c092cae",
+    "template_name": "피성년후견인에 대한 의료행위의 동의에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피성년후견인에 대한 의료행위의 동의에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피성년후견인에 대한 의료행위의 동의에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9b465127cb6f",
+    "template_name": "피성년후견인의 재산상황조사 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피성년후견인의 재산상황조사 청구.hwpx",
+    "file_path": "친족/후견인/피성년후견인의 재산상황조사 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_c9f31d2ee80e",
+    "template_name": "피성년후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피성년후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피성년후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_fd3fac553c7f",
+    "template_name": "피성년후견인이 양자가 되는 것에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피성년후견인이 양자가 되는 것에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피성년후견인이 양자가 되는 것에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e9ae69b600c3",
+    "template_name": "피성년후견인이 입양을 하는 것에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피성년후견인이 입양을 하는 것에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피성년후견인이 입양을 하는 것에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_77a405124e50",
+    "template_name": "피특정후견인의 재산상황조사 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피특정후견인의 재산상황조사 청구.hwpx",
+    "file_path": "친족/후견인/피특정후견인의 재산상황조사 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_12f7c54c6ee8",
+    "template_name": "피한정후견인 격리에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피한정후견인 격리에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피한정후견인 격리에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_2bc9ed031a11",
+    "template_name": "피한정후견인에 대한 의료행위의 동의에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피한정후견인에 대한 의료행위의 동의에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피한정후견인에 대한 의료행위의 동의에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b4c0211808c6",
+    "template_name": "피한정후견인의 재산상황조사 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피한정후견인의 재산상황조사 청구.hwpx",
+    "file_path": "친족/후견인/피한정후견인의 재산상황조사 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_13f036df115e",
+    "template_name": "피한정후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "피한정후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/피한정후견인이 거주하는 건물 또는 대지에 대한 매도 등에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b37bf9a24a4b",
+    "template_name": "한정후견 종료시 관리계산기간 연장 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_path": "친족/후견인/한정후견 종료시 관리계산기간 연장 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_1ad3d1e7f074",
+    "template_name": "한정후견(감독)인에 대한 보수의 수여 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견(감독)인에 대한 보수의 수여 청구.hwpx",
+    "file_path": "친족/후견인/한정후견(감독)인에 대한 보수의 수여 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_606331e4e91e",
+    "template_name": "한정후견감독인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견감독인 변경 청구.hwpx",
+    "file_path": "친족/후견인/한정후견감독인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_99d7e6638fe5",
+    "template_name": "한정후견감독인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/한정후견감독인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_ae67cb2367ff",
+    "template_name": "한정후견감독인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견감독인 선임 청구.hwpx",
+    "file_path": "친족/후견인/한정후견감독인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_a1ec5c8ec5ab",
+    "template_name": "한정후견감독인의 동의를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견감독인의 동의를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/한정후견감독인의 동의를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_beb91f671f48",
+    "template_name": "한정후견감독인의 의사표시를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/한정후견감독인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_89d1ca542aa4",
+    "template_name": "한정후견개시 심판청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견개시 심판청구.hwpx",
+    "file_path": "친족/후견인/한정후견개시 심판청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_4962f93177f4",
+    "template_name": "한정후견개시 심판청구_2",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견개시 심판청구_2.hwpx",
+    "file_path": "친족/후견인/한정후견개시 심판청구_2.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_b05d4d4907b3",
+    "template_name": "한정후견인 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인 변경 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9f606affe9ab",
+    "template_name": "한정후견인 사임에 대한 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인 사임에 대한 허가 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인 사임에 대한 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_d593ea69f166",
+    "template_name": "한정후견인 선임 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인 선임 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인 선임 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_fa47b4da1333",
+    "template_name": "한정후견인의 대리권의 범위 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인의 대리권의 범위 변경 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인의 대리권의 범위 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_462c9402e731",
+    "template_name": "한정후견인의 동의를 갈음하는 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인의 동의를 갈음하는 허가 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인의 동의를 갈음하는 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_e48ebd89583b",
+    "template_name": "한정후견인의 동의를 받아야 하는 행위의 범위 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인의 동의를 받아야 하는 행위의 범위 변경 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인의 동의를 받아야 하는 행위의 범위 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_22f6495983a5",
+    "template_name": "한정후견인의 의사표시를 갈음하는 재판 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인의 의사표시를 갈음하는 재판 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_6b9588a9fdc3",
+    "template_name": "한정후견인의 임무수행에 관하여 필요한 처분명령 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인의 임무수행에 관하여 필요한 처분명령 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_9cfe491dcf95",
+    "template_name": "한정후견인이 피한정후견인의 신상에 관하여 결정할 수 있는 권한의 범위 변경 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견인이 피한정후견인의 신상에 관하여 결정할 수 있는 권한의 범위 변경 청구.hwpx",
+    "file_path": "친족/후견인/한정후견인이 피한정후견인의 신상에 관하여 결정할 수 있는 권한의 범위 변경 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5f4817157021",
+    "template_name": "한정후견종료 심판청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "한정후견종료 심판청구.hwpx",
+    "file_path": "친족/후견인/한정후견종료 심판청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_870bb7f0f8ec",
+    "template_name": "후견계약 종료 허가 청구",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "후견계약 종료 허가 청구.hwpx",
+    "file_path": "친족/후견인/후견계약 종료 허가 청구.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_5f29c95979b5",
+    "template_name": "후견인 경질 심판청구서",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "후견인 경질 심판청구서.hwpx",
+    "file_path": "친족/후견인/후견인 경질 심판청구서.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  },
+  {
+    "template_id": "template_7cd4ace58908",
+    "template_name": "후견인 직무집행정지 및 직무대행자 선임 사전처분",
+    "case_type": "친족",
+    "case_subtype": "후견인",
+    "file_name": "후견인 직무집행정지 및 직무대행자 선임 사전처분.hwpx",
+    "file_path": "친족/후견인/후견인 직무집행정지 및 직무대행자 선임 사전처분.hwpx",
+    "file_extension": ".hwpx",
+    "parsing_status": "pending"
+  }
+]

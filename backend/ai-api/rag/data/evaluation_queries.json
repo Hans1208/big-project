@@ -1,0 +1,74 @@
+[
+  {
+    "id": "eval_001",
+    "query": "배우자와 이혼하면서 정신적 피해에 대한 위자료도 청구하고 싶습니다.",
+    "case_type": "친족",
+    "case_subtype": "이혼 및 위자료",
+    "expected_document_ids": [
+      "mock_family_001"
+    ]
+  },
+  {
+    "id": "eval_002",
+    "query": "이혼한 상대방이 몇 달째 아이의 양육비를 보내지 않고 있습니다.",
+    "case_type": "친족",
+    "case_subtype": "양육비",
+    "expected_document_ids": [
+      "mock_family_002"
+    ]
+  },
+  {
+    "id": "eval_003",
+    "query": "부모님이 남긴 재산을 형제들과 어떻게 나눌지 합의가 되지 않습니다.",
+    "case_type": "상속",
+    "case_subtype": "상속재산분할",
+    "expected_document_ids": [
+      "mock_inheritance_001"
+    ]
+  },
+  {
+    "id": "eval_004",
+    "query": "다른 가족에게만 재산이 증여되어 제가 받아야 할 최소 상속분을 받지 못했습니다.",
+    "case_type": "상속",
+    "case_subtype": "유류분",
+    "expected_document_ids": [
+      "mock_inheritance_002"
+    ]
+  },
+  {
+    "id": "eval_005",
+    "query": "양육비를 계속 받지 못해서 상대방의 급여에서 바로 지급받고 싶습니다.",
+    "case_type": "가사소송",
+    "case_subtype": "양육비직접지급명령",
+    "expected_document_ids": [
+      "mock_family_litigation_001"
+    ]
+  },
+  {
+    "id": "eval_006",
+    "query": "법원에서 정해진 의무를 상대방이 지키지 않아 이행하게 하고 싶습니다.",
+    "case_type": "가사소송",
+    "case_subtype": "이행명령",
+    "expected_document_ids": [
+      "mock_family_litigation_002"
+    ]
+  },
+  {
+    "id": "eval_007",
+    "query": "현재 이름 때문에 불편함이 있어 이름을 변경하고 싶습니다.",
+    "case_type": "가족관계등록",
+    "case_subtype": "성본창설과 개명",
+    "expected_document_ids": [
+      "mock_registration_001"
+    ]
+  },
+  {
+    "id": "eval_008",
+    "query": "가족관계등록부에 기재된 생년월일이 실제와 달라서 고치고 싶습니다.",
+    "case_type": "가족관계등록",
+    "case_subtype": "가족관계등록부정정",
+    "expected_document_ids": [
+      "mock_registration_002"
+    ]
+  }
+]
