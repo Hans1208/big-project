@@ -693,12 +693,44 @@ function buildAutoUploadTitle() {
 // 드롭존 하나로 통일합니다. 버튼 세 개를 늘어놓던 이전 방식보다 화면이 훨씬 단순해집니다.
 const uploadCategoryOptions = ['녹취록', '신분증', '증빙자료'];
 
+// 자료 유형별로 받을 파일 종류를 제한합니다.
+//
+// 유형은 뒤 단계에서 파일을 어떻게 처리할지를 정합니다 — 녹취록은 STT로 텍스트를 뽑고,
+// 신분증·증빙자료는 OCR/문서 추출로 갑니다. 녹취록 자리에 사진이 들어가면 STT가 처리할 수
+// 없는 파일을 붙들게 되고, 상담원은 분석 결과에 녹취 내용이 왜 없는지 한참 뒤에야 알게 됩니다.
+// 고르는 순간 막아서 그런 상황 자체를 없앱니다.
+const uploadCategoryAccept = {
+  '녹취록': '.mp3,.wav,.m4a',
+  '신분증': '.jpg,.jpeg,.png',
+  '증빙자료': '.pdf,.hwp,.hwpx,.doc,.docx,.txt',
+};
+
+function fileMatchesCategory(file, category) {
+  const allowed = uploadCategoryAccept[category];
+  if (!allowed) return true;
+  const dot = file.name.lastIndexOf('.');
+  const ext = dot === -1 ? '' : file.name.slice(dot).toLowerCase();
+  return allowed.split(',').includes(ext);
+}
+
 function FileDropzone({ category, onCategoryChange, onAddFiles }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const inputId = React.useId();
+  const showToast = useToast();
   const handleFiles = (fileList) => {
     if (!fileList || !fileList.length) return;
-    onAddFiles(category, fileList);
+    // accept 속성은 파일 선택창만 걸러줍니다. 드래그앤드롭으로 들어온 파일은 그대로 통과하므로
+    // 여기서 한 번 더 확인합니다.
+    const files = Array.from(fileList);
+    const accepted = files.filter((file) => fileMatchesCategory(file, category));
+    const rejected = files.filter((file) => !fileMatchesCategory(file, category));
+    if (rejected.length) {
+      showToast(
+        `${category}에는 ${uploadCategoryAccept[category]} 파일만 올릴 수 있습니다 (제외: ${rejected.map((file) => file.name).join(', ')})`,
+        'warn',
+      );
+    }
+    if (accepted.length) onAddFiles(category, accepted);
   };
   return (
     <div
@@ -713,7 +745,7 @@ function FileDropzone({ category, onCategoryChange, onAddFiles }) {
     >
       <div className="fileDropzoneCopy">
         <strong>자료 유형을 고른 뒤 파일을 추가하세요.</strong>
-        <span>녹취, 이미지, 문서를 추가할 수 있습니다.</span>
+        <span>{category ? `${category}: ${uploadCategoryAccept[category] || '모든 형식'}` : '녹취, 이미지, 문서를 추가할 수 있습니다.'}</span>
       </div>
       <div className="fileDropzoneControls">
         <div className="fileCategoryChoices" role="group" aria-label="자료 유형 선택">
@@ -735,7 +767,7 @@ function FileDropzone({ category, onCategoryChange, onAddFiles }) {
             id={inputId}
             type="file"
             multiple
-            accept=".mp3,.wav,.m4a,.txt,.pdf,.jpg,.jpeg,.png,.hwpx,.doc,.docx"
+            accept={uploadCategoryAccept[category] || ''}
             onChange={(event) => {
               handleFiles(event.target.files);
               event.target.value = '';
