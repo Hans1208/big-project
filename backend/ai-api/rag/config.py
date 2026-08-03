@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 # backend/ai-api/rag/config.py
@@ -15,6 +15,7 @@ EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-small"
 # ChromaDB 컬렉션
 COLLECTION_NAME = "legal_documents"
 LEGAL_FORMS_COLLECTION_NAME = "legal_forms"
+LEGAL_STATUTES_COLLECTION_NAME = "legal_statutes"
 
 # 데이터 파일
 CLASSIFICATION_PATH = DATA_DIR / "case_classification.json"

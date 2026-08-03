@@ -4,6 +4,9 @@ from app.ai.analysis import service as analysis_service
 from app.ai.consult.graph import run_consult_analysis
 from app.ai.consult.schemas import ConsultAnalyzeResponse, RawInput
 from app.ai.stt import extract as stt_extract
+from app.ai.statutes.service import (
+    find_related_statutes,
+)
 
 router = APIRouter(prefix="/consult", tags=["consult"])
 
@@ -37,6 +40,13 @@ async def analyze_consult(payload: RawInput) -> dict:
     )
     analysis = analysis_service.analyze(consult_text)
 
+    # 3) statutes ? ???? ?? ?? ??? ?? ????? ??
+    related_statutes = find_related_statutes(
+        analysis=analysis,
+        fallback_text=consult_text,
+        top_n=5,
+    )
+
     # 3) consult — 위 결과와 텍스트를 받아 판정. 이 그래프는 S3/파일을 모른다.
     result = await run_consult_analysis({
         "content": content,
@@ -47,4 +57,8 @@ async def analyze_consult(payload: RawInput) -> dict:
         },
     })
 
-    return {**result, **analysis.to_dict()}
+    return {
+        **result,
+        **analysis.to_dict(),
+        "related_statutes": related_statutes,
+    }

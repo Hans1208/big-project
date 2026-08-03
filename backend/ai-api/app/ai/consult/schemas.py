@@ -297,6 +297,9 @@ class ConsultAnalyzeResponse(BaseModel):
     consult_case_subtype: Optional[str] = None
     consult_extracted: Optional[dict] = None
     consult_timeline: Optional[list] = None
+    related_statutes: List[dict] = Field(
+        default_factory=list
+    )
     case_analysis: CaseAnalysisPayload
     relief_review_checklist: ReliefReviewChecklist
     missing_items: List[MissingItemWithDocuments]

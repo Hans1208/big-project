@@ -163,3 +163,26 @@ python test_eval.py    # eval_testset.json 32케이스 → Top-1/Top-3 Accuracy,
 
 ## 환경 변수
 `.env.example`을 복사해 `.env` 생성 후 값 입력 (ai-api용 — core-api는 `.env`를 안 읽음, 위 3번 참고)
+## 현행법령 RAG
+
+국가법령정보 공동활용 API로 현행 법령을 수집하고, 조문 단위로 임베딩하여
+상담 분석 결과에 관련 법령을 연결한다. 상담 요청 시 외부 법령 API를 직접
+호출하지 않고 로컬 Chroma 인덱스를 검색하며, 검색 장애 시 빈 결과로
+계속 진행한다.
+
+인덱스 생성:
+
+```powershell
+cd backend/ai-api
+.\venv\Scripts\python.exe -m rag.build_statute_index
+```
+
+검색 품질 평가:
+
+```powershell
+.\venv\Scripts\python.exe -m rag.evaluate_statute_retrieval
+```
+
+환경변수, 갱신 절차, 테스트 및 장애 대응은
+[`backend/ai-api/docs/statute-rag.md`](backend/ai-api/docs/statute-rag.md)를
+참고한다.
