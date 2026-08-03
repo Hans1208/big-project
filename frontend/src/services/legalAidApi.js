@@ -3,12 +3,6 @@ import { attachmentTypes, legalTemplateSeed } from '../data/domain.js';
 // 백엔드 연동 전 프론트엔드 화면을 완성하기 위한 임시 서비스 계층입니다.
 // 실제 API가 준비되면 아래 apiEndpoints 주소를 기준으로 fetch/axios 호출로 교체하면 됩니다.
 
-// 실제 백엔드 응답 대기 시간을 흉내내는 임시 헬퍼입니다. (로딩 오버레이 동작 확인용)
-// 각 함수가 실제 fetch 호출로 교체되면 이 지연도 자연스럽게 사라집니다.
-export function simulateBackendLatency(durationMs = 2400) {
-  return new Promise((resolve) => setTimeout(resolve, durationMs));
-}
-
 // 파일 업로드 UI에서 선택한 파일을 S3 업로드 전 단계의 메타데이터로 변환합니다.
 export function createAttachmentMetadata(file, categoryLabel) {
   const matchedType = attachmentTypes.find((item) => item.label === categoryLabel);

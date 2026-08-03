@@ -9,11 +9,34 @@ import { CORE_API_BASE_URL, coreAuthHeader } from './coreApiClientV2.js';
 
 const DEFAULT_AUDIO_WS_PATH = '/ws/audio/operator';
 
-function audioWebSocketUrl() {
+function audioWebSocketUrl({ callId, ticket }) {
   const configured = import.meta.env.VITE_AUDIO_WS_URL;
-  if (configured) return configured;
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}${DEFAULT_AUDIO_WS_PATH}`;
+  const endpoint = configured || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${DEFAULT_AUDIO_WS_PATH}`;
+  const separator = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${separator}callId=${encodeURIComponent(callId)}&ticket=${encodeURIComponent(ticket)}`;
+}
+
+// 외부 전화/SIP 서버가 먼저 등록한 통화 중 상담원이 연결할 수 있는 목록입니다.
+// 이미 다른 상담원이 연결한 CONNECTED 상태는 선택지에서 제외합니다.
+export async function fetchAvailableAudioCalls() {
+  let response;
+  try {
+    response = await fetch(`${CORE_API_BASE_URL}/api/audio/calls`, {
+      headers: coreAuthHeader(),
+    });
+  } catch {
+    throw new Error('진행 중인 통화 목록을 불러올 수 없습니다. Core API 서버 상태를 확인해주세요.');
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('통화 목록을 조회할 권한이 없습니다. 다시 로그인해주세요.');
+  }
+  if (!response.ok) {
+    throw new Error(`통화 목록을 불러오지 못했습니다.(HTTP ${response.status})`);
+  }
+  const calls = await response.json();
+  return Array.isArray(calls)
+    ? calls.filter((call) => call?.callId && call.status === 'WAITING')
+    : [];
 }
 
 // 소켓에 붙기 전에 1회용 티켓을 받아옵니다.
@@ -122,10 +145,28 @@ function decodeMuLawBytes(bytes) {
   return samples;
 }
 
+// 서버가 오디오를 받는 것과 별개로 실시간 자막(STT 중간/최종 결과) 텍스트 프레임을 같은
+// 소켓으로 돌려보내 줄 때 화면에 뿌리기 위한 자리입니다. 백엔드가 아직 이 프레임을 보내지
+// 않아 지금은 항상 빈 채로 남지만(코치 피드백: "실시간 통화 기술" 중 프론트가 먼저 준비해둘
+// 수 있는 부분), 백엔드가 붙는 순간 바로 동작하도록 파싱·콜백 구조만 미리 만들어 둡니다.
+// 기대하는 프레임 모양: { type: 'transcript', text: string, isFinal?: boolean }
+function parseTranscriptFrame(raw) {
+  if (typeof raw !== 'string') return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!parsed || parsed.type !== 'transcript' || typeof parsed.text !== 'string') return null;
+  return { text: parsed.text, isFinal: Boolean(parsed.isFinal) };
+}
+
 export class RealtimeAudioStream {
-  constructor({ onStatus, onError } = {}) {
+  constructor({ onStatus, onError, onTranscript } = {}) {
     this.onStatus = onStatus || (() => {});
     this.onError = onError || (() => {});
+    this.onTranscript = onTranscript || (() => {});
     this.socket = null;
     this.mediaStream = null;
     this.audioContext = null;
@@ -135,9 +176,12 @@ export class RealtimeAudioStream {
     this.playbackCursor = 0;
   }
 
-  async start() {
+  async start({ callId } = {}) {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('이 브라우저에서는 마이크 입력을 사용할 수 없습니다.');
+    }
+    if (!callId) {
+      throw new Error('연결할 통화를 선택해주세요.');
     }
     this.onStatus('connecting');
     this.mediaStream = await navigator.mediaDevices.getUserMedia({
