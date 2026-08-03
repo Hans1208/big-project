@@ -1,6 +1,7 @@
 package com.aivle.bigproject.consultation;
 
 import com.aivle.bigproject.analysis.AiAnalysisRepository;
+import com.aivle.bigproject.analysis.job.AnalysisJobRepository;
 import com.aivle.bigproject.attachment.Attachment;
 import com.aivle.bigproject.audit.AuditAction;
 import com.aivle.bigproject.audit.AuditLogService;
@@ -10,8 +11,13 @@ import com.aivle.bigproject.consultation.dto.ConsultationResponse;
 import com.aivle.bigproject.storage.S3FileStorageService;
 import com.aivle.bigproject.document.GeneratedDocumentRepository;
 import com.aivle.bigproject.user.User;
+import com.aivle.bigproject.user.UserRepository;
+import com.aivle.bigproject.user.UserRole;
 import com.aivle.bigproject.user.UserService;
 import java.util.List;
+import java.util.Optional;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,20 +30,26 @@ public class ConsultationService {
     private final UserService userService; // userId로 실제 User가 있는지 확인하기 위해 필요
     private final AiAnalysisRepository aiAnalysisRepository; // 삭제 시 딸린 분석 결과도 같이 지우기 위해 필요
     private final GeneratedDocumentRepository generatedDocumentRepository; // 삭제 시 딸린 생성 초안도 같이 지우기 위해 필요
+    private final AnalysisJobRepository analysisJobRepository; // 삭제 시 딸린 분석 작업 기록도 같이 지우기 위해 필요
     private final AuditLogService auditLogService; // SEC-01-01-01: 상담 조회를 감사 로그에 남기기 위해 필요
+    private final UserRepository userRepository; // 목록 조회 시 로그인한 사용자를 email로 찾기 위해 필요
 
     public ConsultationService(ConsultationRepository consultationRepository,
                                 S3FileStorageService s3FileStorageService,
                                 UserService userService,
                                 AiAnalysisRepository aiAnalysisRepository,
                                 GeneratedDocumentRepository generatedDocumentRepository,
-                                AuditLogService auditLogService) {
+                                AnalysisJobRepository analysisJobRepository,
+                                AuditLogService auditLogService,
+                                UserRepository userRepository) {
         this.consultationRepository = consultationRepository;
         this.s3FileStorageService = s3FileStorageService;
         this.userService = userService;
         this.aiAnalysisRepository = aiAnalysisRepository;
         this.generatedDocumentRepository = generatedDocumentRepository;
+        this.analysisJobRepository = analysisJobRepository;
         this.auditLogService = auditLogService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -68,10 +80,35 @@ public class ConsultationService {
         return ConsultationResponse.from(saved);
     }
 
+    // 상담원은 자기가 담당한 상담만 본다.
+    //
+    // 예전에는 누가 로그인했든 전체 목록을 그대로 돌려줘서, 상담원 계정마다 다른 상담을
+    // 봐야 하는데 모두가 같은 목록을 보고 있었다. 남의 상담 내용(이름·연락처·사건 내용)까지
+    // 다 보이던 상태다.
+    //
+    // 변호사·관리자는 전체를 본다 — 변호사는 자기가 담당하지 않은 상담을 검토해야 하고,
+    // 관리자는 운영 현황을 봐야 한다.
+    //
+    // 이 엔드포인트는 SecurityConfig에서 이미 인증을 요구하므로(토큰 없이 호출하면 403)
+    // 아래 orElseGet은 실제로는 변호사·관리자만 탄다. 인증이 없는 경우까지 열어둔 것은
+    // 나중에 접근 정책이 바뀌어 익명 호출이 들어와도 NPE로 터지지 않게 하기 위한 기본값이다.
     public List<ConsultationResponse> findAll() {
-        return consultationRepository.findAll().stream()
+        List<Consultation> consultations = currentUser()
+                .filter(user -> user.getRole() == UserRole.CONSULTANT)
+                .map(user -> consultationRepository.findByUserId(user.getId()))
+                .orElseGet(consultationRepository::findAll);
+        return consultations.stream()
                 .map(ConsultationResponse::from)
                 .toList();
+    }
+
+    // 로그인한 사용자. 인증이 없거나(익명 요청) 계정을 찾을 수 없으면 비어 있다.
+    private Optional<User> currentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return Optional.empty();
+        }
+        return userRepository.findByEmail(authentication.getName());
     }
 
     // 컨트롤러가 쓰는 조회용 — 엔티티 대신 바로 응답 DTO를 반환
@@ -142,6 +179,7 @@ public class ConsultationService {
         // FK 제약조건 위반이 안 남
         aiAnalysisRepository.deleteByConsultationId(id);
         generatedDocumentRepository.deleteByConsultationId(id);
+        analysisJobRepository.deleteByConsultationId(id);
         consultationRepository.delete(consultation);
     }
 }

@@ -6,10 +6,6 @@ function documentKey(document) {
   return document.local_key || document.document_id || document.documentId;
 }
 
-function sameDocument(left, right) {
-  return documentKey(left) === documentKey(right);
-}
-
 function readQueue() {
   return readStorage(storageKeys.documentReviewQueue, []);
 }
@@ -21,30 +17,6 @@ function writeQueue(documents) {
 
 export function readSubmittedLocalDocumentReviews() {
   return readQueue().filter((document) => REVIEWABLE_STATUSES.has(document.status));
-}
-
-export function saveLocalDocumentReviewRequest({ consultation, document }) {
-  const submitted = {
-    local_key: document.local_key || document.document_id || `local-doc-${Date.now()}`,
-    document_id: document.document_id || document.documentId || document.local_key || `local-doc-${Date.now()}`,
-    consultation_id: document.consultation_id || document.consultationId || consultation?.id || '',
-    caseNo: consultation?.caseNo || '',
-    title: consultation?.title || '',
-    counselor: consultation?.counselor || null,
-    form_name: document.form_name || document.formName || '선택 서식',
-    requested_form_name: document.requested_form_name || document.requestedFormName || '',
-    draft_file_path: document.draft_file_path || document.draftFilePath || '',
-    download_file_name: document.download_file_name || document.downloadFileName || '',
-    draft_content: document.draft_content || document.draftContent || '',
-    status: 'SUBMITTED_FOR_REVIEW',
-    source: document.source || 'ai-api-local',
-    submitted_at: new Date().toISOString(),
-    review_note: '',
-    requested_materials: [],
-  };
-  const nextQueue = [submitted, ...readQueue().filter((item) => !sameDocument(item, submitted))];
-  writeQueue(nextQueue);
-  return submitted;
 }
 
 export function updateLocalDocumentReview(documentKeyValue, changes) {

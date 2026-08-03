@@ -1,15 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, ClipboardCheck, Search, Trash2 } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, ClipboardCheck, Search, Trash2,
+  CheckCircle2, XCircle, FileEdit, FilePlus2, PauseCircle,
+  ListChecks, ShieldCheck, FileText, MessageSquareText, Clock,
+  EyeOff, Scale, CheckSquare, Square, AlertTriangle, Info,
+  ClipboardList, FolderOpen, Sparkles, LayoutDashboard,
+} from 'lucide-react';
 import { statusAll, today } from '../constants.jsx';
-import { EmptyRows, InlineEmptyNotice, StatusButton, SummaryCards, ConsultationTable, HitlConfirmModal, WorkPageHeader, workflowStatusTone, HorizontalScrollBox, ScrollableDataTable, FIRST_SEVEN_COLUMN_MIN_WIDTHS } from '../components/common.jsx';
+import { EmptyRows, InlineEmptyNotice, StatusButton, SummaryCards, ConsultationTable, HitlConfirmModal, WorkPageHeader, workflowStatusTone, HorizontalScrollBox, ScrollableDataTable, FIRST_SEVEN_COLUMN_MIN_WIDTHS, CollapsibleSection, friendlyErrorMessage } from '../components/common.jsx';
 import { useConfirm, useToast } from '../components/feedback.jsx';
-import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList } from './workflows.jsx';
+import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList, resolveConfirmedCaseType } from './workflows.jsx';
 import { appendAuditLog, getAuditLogs } from '../services/storage.js';
 import { checkAiApiHealth, checkFormRevisions, acknowledgeFormRevisions } from '../services/aiApiClient.js';
-import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, fetchCoreUsers, mapCoreUserToLocal, requestCoreAnalysisRevision, verifyCoreAuditLogChain, timelineEmptyMessage } from '../services/coreApiClientV2.js';
+import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, fetchCoreUsers, mapCoreUserToLocal, requestCoreAnalysisRevision, verifyCoreAuditLogChain } from '../services/coreApiClientV2.js';
 import { readSubmittedLocalDocumentReviews, updateLocalDocumentReview, removeLocalDocumentReview, dismissDocumentReview, isDocumentReviewDismissed, saveLawyerDraftEdit, readLawyerDraftEdit } from '../services/documentReviewStore.js';
 import { hydrateDraftDocument } from '../services/draftDocumentStore.js';
-import { caseCategories, getCaseCategory } from '../data/domain.js';
+import { caseCategories, getCaseCategory, isKnownCaseType } from '../data/domain.js';
 import { useAsyncAction } from '../components/loading.jsx';
 import { statusChipClass } from '../utils/statusTone.js';
 
@@ -17,6 +23,11 @@ import { statusChipClass } from '../utils/statusTone.js';
 // 본문 줄까지만 스크롤 없이 바로 보이고, 더 있으면 마우스로 내려야 볼 수 있게 표 전체에서
 // 이 기준 하나로 통일합니다(회원 목록·감사 로그처럼 표마다 3/4/5로 제각각이던 것을 맞춥니다).
 const VISIBLE_ROW_COUNT = 6;
+
+// 긴급도(상→중→하) 순 정렬 기준입니다. 법률구조 검토 요청 표와 서류 검토 대기 목록이 같은
+// 기준을 공유해야, 어느 화면을 열어도 변호사가 "지금 뭐부터 봐야 하는지"를 같은 규칙으로
+// 알 수 있습니다.
+const URGENCY_RANK = { 상: 0, 중: 1, 하: 2 };
 
 const adminCardUnitsByFilter = {
   consultations: '건',
@@ -30,13 +41,15 @@ function withAdminCardUnit(card) {
   return { ...card, value: `${card.value}${unit}` };
 }
 
-function CounselorDashboard({ consultations, setConsultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onDeleteConsultation, onOpenConsultationForm, onOpenAnalysis, onOpenDraft, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedConsultationId }) {
+function CounselorDashboard({ consultations, setConsultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onDeleteConsultation, onOpenConsultationForm, onOpenAnalysis, onOpenDraft, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedConsultationId, focusedTemplateName, analysisRuns, onStartAnalysis }) {
   const [filter, setFilter] = useState(statusAll);
   const [selectedDate, setSelectedDate] = useState(today);
   const filtered = filter === statusAll ? consultations : consultations.filter((item) => item.status === filter);
   const dateRows = filtered.filter((item) => item.date === selectedDate);
+  // '총 상담'을 변호사 대시보드의 같은 자리 카드('전체 검토 요청')와 같은 말('전체')로
+  // 맞춰, 두 대시보드가 같은 표 구조를 쓰는데 용어만 다르게 느껴지지 않게 합니다.
   const cards = [
-    { title: '총 상담', value: `${consultations.length}건`, filter: statusAll },
+    { title: '전체 상담', value: `${consultations.length}건`, filter: statusAll },
     { title: '진행 중인 상담', value: `${consultations.filter((item) => item.status === '진행 중').length}건`, filter: '진행 중' },
     { title: '완료된 상담', value: `${consultations.filter((item) => item.status === '완료').length}건`, filter: '완료' },
     { title: '보류 상담', value: `${consultations.filter((item) => item.status === '보류').length}건`, filter: '보류' },
@@ -48,16 +61,22 @@ function CounselorDashboard({ consultations, setConsultations, onCreateConsultat
     // 넘어가는 다음 단계 링크(onGoToUpload)에도 그대로 재사용합니다. onOpenDraft는 분석이 끝난
     // 직후 추천 서식 패널에서 '이 서식으로 초안 만들기'를 눌렀을 때 서식 생성 화면으로 사건을
     // 그대로 이어서 넘기는 데 씁니다.
-    return <UtilityPanel view={activeView} role="counselor" consultations={consultations} onCreateConsultation={onCreateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} onUpdateConsultation={(id, updates) => setConsultations((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item))} currentUser={currentUser} onUpdateProfile={onUpdateProfile} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} focusedConsultationId={focusedConsultationId} onOpenConsultationForm={onOpenConsultationForm} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} />;
+    return <UtilityPanel view={activeView} role="counselor" consultations={consultations} onCreateConsultation={onCreateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} onUpdateConsultation={(id, updates) => setConsultations((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item))} currentUser={currentUser} onUpdateProfile={onUpdateProfile} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} onOpenConsultationForm={onOpenConsultationForm} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} analysisRuns={analysisRuns} onStartAnalysis={onStartAnalysis} />;
   }
   return (
     <>
       <div className="dashboardIntroWrap">
         <div className="dashboardIntroRow">
           <div className="dashboardIntro">
-            <h1>상담 현황</h1>
+            <h1><ClipboardList size={22} strokeWidth={2.2} className="dashboardIntroIcon" aria-hidden="true" /> 상담 현황</h1>
             <p>전체 {consultations.length}건 · 보완 요청 {reworkRows.length}건</p>
           </div>
+          {/* '새 상담을 어디서 시작하지'를 찾을 때 가장 먼저 보는 자리는 페이지 제목 줄입니다.
+              예전엔 이 버튼이 '보완 요청 상담'(문제 있는 기존 건을 다시 처리하는) 패널 안에
+              끼어 있어, 정작 새 상담을 시작하려는 사람은 그 패널을 열어봐야만 찾을 수 있었습니다
+              (.dashboardIntroRow는 이 자리에 오른쪽 끝 버튼을 두도록 이미 justify-content:
+              space-between으로 설계돼 있었습니다). 가장 자주 쓰는 동작을 제목 줄로 옮깁니다. */}
+          <button className="addConsultationButton" type="button" onClick={onOpenConsultationForm}>+ 새 상담 접수</button>
         </div>
       </div>
       <main className="dashboard dashboard-counselor">
@@ -66,7 +85,7 @@ function CounselorDashboard({ consultations, setConsultations, onCreateConsultat
           <ConsultationTable title={filter === statusAll ? '최근 상담 목록' : `${filter} 상담 목록`} rows={filtered} onDelete={onDeleteConsultation} onOpenAnalysis={onOpenAnalysis} searchable />
         </section>
         <section className="dashboardRight">
-          <CounselorReworkPanel rows={reworkRows} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} onOpenConsultationForm={onOpenConsultationForm} />
+          <CounselorReworkPanel rows={reworkRows} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} />
           <ConsultationTable title="일정별 상담 목록" rows={dateRows} onOpenAnalysis={onOpenAnalysis} tall selectedDate={selectedDate} onDateChange={setSelectedDate} />
         </section>
       </main>
@@ -74,7 +93,7 @@ function CounselorDashboard({ consultations, setConsultations, onCreateConsultat
   );
 }
 
-function CounselorReworkPanel({ rows, onOpenAnalysis, onOpenDraft, onOpenConsultationForm }) {
+function CounselorReworkPanel({ rows, onOpenAnalysis, onOpenDraft }) {
   const openRework = (row) => {
     if (row.reviewAction?.workbench === '서식 생성') {
       onOpenDraft?.(row.id);
@@ -87,10 +106,7 @@ function CounselorReworkPanel({ rows, onOpenAnalysis, onOpenDraft, onOpenConsult
     <section className="panel reworkPanel">
       <div className="panelTitleRow">
         <h2>보완 요청 상담</h2>
-        <div className="reworkPanelActions">
-          <span className="panelCountBadge">{rows.length}건</span>
-          <button className="addConsultationButton" type="button" onClick={onOpenConsultationForm}>상담 자료 올리기</button>
-        </div>
+        <span className="panelCountBadge">{rows.length}건</span>
       </div>
       {rows.length ? (
         <div className="reworkList">
@@ -171,7 +187,20 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
   const [filter, setFilter] = useState(statusAll);
   const [logs, setLogs] = useState([]);
   const [activeReview, setActiveReview] = useState(null);
-  const filtered = filter === statusAll ? reviews : reviews.filter((item) => item.status === filter);
+  // review.analysis(긴급도·구조대상 등)는 검토 요청 시점의 스냅샷이라, 그 뒤 상담원이 분석을
+  // 다시 저장하면 검토 목록·상세 화면엔 옛 값이 남아 다른 화면(법령·판례 등, 실시간 consultations
+  // 기준)과 값이 어긋났습니다. 최신 상담 분석이 있으면 그걸 우선해 목록·상세 모두 같은 값을 보게 합니다.
+  const reviewsWithLiveAnalysis = reviews.map((review) => {
+    const live = consultations.find((item) => item.id === review.id);
+    if (!live?.analysis) return review;
+    return {
+      ...review,
+      urgency: live.analysis.urgency || review.urgency,
+      eligibility: live.analysis.eligibility || review.eligibility,
+      analysis: { ...review.analysis, ...live.analysis },
+    };
+  });
+  const filtered = filter === statusAll ? reviewsWithLiveAnalysis : reviewsWithLiveAnalysis.filter((item) => item.status === filter);
 
   // 변호사가 볼 수 있는 사건 후보 전체(coreId 있는 것만). '변호사 검토 요청'(분석 검토, reviews)을
   // 거친 사건뿐 아니라, 상담원이 분석 검토는 안 거치고 서식 초안만 먼저 제출한 사건도 여기 포함해야
@@ -194,7 +223,10 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
     { title: '전체 검토 요청', value: `${reviews.length}건`, filter: statusAll },
     { title: '법률구조 검토 대기', value: `${waitingCount}건`, filter: '검토 대기' },
     { title: '법률구조 검토 중', value: `${countByStatus('검토 중')}건`, filter: '검토 중' },
-    { title: '법률구조 검토 완료', value: `${countByStatus('승인')}건`, filter: '승인' },
+    // 카드 이름과 실제 표에 찍히는 상태값('승인')이 서로 다른 말이면, 이 카드를 눌러 걸러본
+    // 사람이 표에서는 '완료'가 아니라 '승인'이라고 적힌 걸 보고 헷갈립니다(코치 피드백).
+    // 표에 그대로 나오는 값과 같은 말로 맞춥니다.
+    { title: '법률구조 검토 승인', value: `${countByStatus('승인')}건`, filter: '승인' },
   ];
   // HITL 최종 결정: 결정(status)과 사유(reason)를 함께 기록하고 감사 로그로 남깁니다.
   // 예전엔 이 결정이 로컬 상태(reviews)에만 반영되고 core-api의 실제 검토 상태
@@ -288,7 +320,7 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
       <div className="dashboardIntroWrap lawyerIntroWrap">
         <div className="dashboardIntroRow">
           <div className="dashboardIntro">
-            <h1>검토</h1>
+            <h1><ClipboardCheck size={22} strokeWidth={2.2} className="dashboardIntroIcon" aria-hidden="true" /> 검토</h1>
             <p>전체 검토 요청 {reviews.length}건 · 검토 대기 {waitingCount}건</p>
           </div>
         </div>
@@ -326,6 +358,7 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
   const confirm = useConfirm();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState('');
   const [previewingKey, setPreviewingKey] = useState(null);
   const [reviewingKey, setReviewingKey] = useState(null);
   const [noteText, setNoteText] = useState('');
@@ -455,7 +488,7 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
       setReviewingKey(null);
       reload();
     } catch (error) {
-      showToast(`검토 처리에 실패했습니다: ${error.message || '서버 오류'}`, 'warn');
+      showToast(`검토 처리에 실패했습니다: ${friendlyErrorMessage(error, '잠시 후 다시 시도해 주세요.')}`, 'warn');
     } finally {
       setPending(false);
     }
@@ -466,13 +499,35 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
   // .documentReviewList(flex:1, overflow-y:auto)로 칸이 고정되고 넘치면 스크롤되도록
   // 되어 있어서, 다른 표처럼 별도 tableScroll을 씌우지 않아도 같은 동작을 합니다.
 
+  // 이름·사건번호·서식명 기준으로 로컬 검색합니다(ReviewTable과 같은 검색 범위).
+  const normalizedQuery = query.trim().toLowerCase();
+  const matchedDocuments = normalizedQuery
+    ? documents.filter((doc) => [doc.caseNo, doc.title, doc.requested_form_name, doc.form_name].some((value) => (value || '').toLowerCase().includes(normalizedQuery)))
+    : documents;
+  // ReviewTable(법률구조 검토 요청 목록)과 같은 기준: 긴급도(상→중→하) 먼저, 같은 긴급도
+  // 안에서는 오래 기다린 순. 이 패널도 같은 긴급도·경과일 칼럼을 보여주면서 정렬만 안 돼
+  // 있었는데, 변호사가 화면을 열자마자 뭐부터 볼지 알 수 있어야 하는 건 서류 검토도 마찬가지입니다.
+  const displayDocuments = [...matchedDocuments].sort((left, right) => {
+    const rankDiff = (URGENCY_RANK[left.urgency] ?? 3) - (URGENCY_RANK[right.urgency] ?? 3);
+    if (rankDiff !== 0) return rankDiff;
+    const leftDays = daysWaitingFrom(left.created_at || left.submitted_at || '') ?? 0;
+    const rightDays = daysWaitingFrom(right.created_at || right.submitted_at || '') ?? 0;
+    return rightDays - leftDays;
+  });
+  const noSearchResult = Boolean(normalizedQuery) && !displayDocuments.length;
+
   return (
     <section className="panel documentReviewQueuePanel">
       <div className="panelTitleRow">
-        <h2>서류 검토 대기</h2>
+        <h2><FileText size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 서류 검토 대기</h2>
+        <div className="tableSearchBox">
+          <Search size={14} strokeWidth={2.2} />
+          <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="상담번호·제목·서식명 검색" aria-label="서류 검토 대기 검색" />
+        </div>
         {loading ? <span className="helperText">불러오는 중…</span> : null}
       </div>
-      {documents.length ? (
+      {noSearchResult ? <InlineEmptyNotice>검색 결과 없음</InlineEmptyNotice> : null}
+      {displayDocuments.length ? (
         <div className="documentReviewList">
           <table className="dataTable reviewRequestTable documentReviewTable">
             <colgroup>
@@ -485,7 +540,7 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
             </colgroup>
             <thead><tr><th>상담 번호</th><th>서식 정보</th><th>긴급도</th><th>요청 경과</th><th>검토</th><th>삭제</th></tr></thead>
             <tbody>
-              {documents.map((doc) => {
+              {displayDocuments.map((doc) => {
                 const key = reviewDocumentKey(doc);
                 const isExpanded = previewingKey === key;
                 const isReviewing = reviewingKey === key;
@@ -617,8 +672,12 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
                                 </div>
                               </div>
                             ) : (
+                              // '검토 완료'는 실제로 승인 처리를 확정하는 버튼(618-622줄)의 라벨입니다.
+                              // 편집을 시작하는 이 버튼에 같은 문구를 쓰면 눌러도 아무것도 끝나지 않아
+                              // 헷갈린다는 피드백을 받아, 지금 하는 일(내용 확인하고 편집 시작)에
+                              // 맞는 문구로 구분합니다.
                               <div className="inlineControls documentReviewActions">
-                                <button className="reviewApproveButton" type="button" onClick={() => startReview(doc)}>검토 완료</button>
+                                <button className="reviewApproveButton" type="button" onClick={() => startReview(doc)}>검토하기</button>
                               </div>
                             )}
                           </div>
@@ -632,7 +691,7 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
           </table>
         </div>
       ) : (
-        !loading ? <InlineEmptyNotice>검토 대기 중인 서류가 없습니다.</InlineEmptyNotice> : null
+        !loading && !noSearchResult ? <InlineEmptyNotice>검토 대기 중인 서류가 없습니다.</InlineEmptyNotice> : null
       )}
     </section>
   );
@@ -640,6 +699,21 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
 
 // 검토 상태도 상담 상태와 같은 색 기준(statusTone)을 그대로 씁니다. (색상 일관성)
 const reviewStatusTone = statusChipClass;
+
+// 검토 상태 칩에 톤과 함께 작은 아이콘도 붙여, HITL 결정 카드·필 로우와 같은 "아이콘+라벨"
+// 언어를 검토 표/로그에도 그대로 이어갑니다. 실제 색·판정 기준은 statusChipClass(단일 기준)를
+// 그대로 따르고, 여기서는 그 톤 이름에 아이콘만 매핑합니다.
+const REVIEW_STATUS_TONE_ICONS = {
+  success: CheckCircle2,
+  danger: XCircle,
+  warn: PauseCircle,
+  info: Clock,
+  muted: Info,
+};
+function reviewStatusIcon(status) {
+  const tone = reviewStatusTone(status).replace('statusChip tone-', '');
+  return REVIEW_STATUS_TONE_ICONS[tone] || Info;
+}
 
 // 요청일로부터 며칠이 지났는지 계산합니다. 법률구조 검토 요청 표와 서식 초안 검토 카드가 함께 쓰는
 // 공용 헬퍼입니다 — 오래 밀린 건일수록 눈에 띄어야 변호사가 그 순서대로 처리할 수 있습니다.
@@ -689,9 +763,8 @@ function ReviewTable({ title = '법률구조 검토 요청 목록', rows, onOpen
     : rows;
   // 긴급도(상→중→하) 순으로 먼저 훑고, 같은 긴급도 안에서는 오래 기다린 요청부터 보이도록 정렬합니다.
   // 변호사가 화면을 열자마자 '지금 뭐부터 봐야 하는지' 바로 알 수 있게 하기 위함입니다.
-  const urgencyRank = { 상: 0, 중: 1, 하: 2 };
   const displayRows = [...matchedRows].sort((left, right) => {
-    const rankDiff = (urgencyRank[left.urgency] ?? 3) - (urgencyRank[right.urgency] ?? 3);
+    const rankDiff = (URGENCY_RANK[left.urgency] ?? 3) - (URGENCY_RANK[right.urgency] ?? 3);
     if (rankDiff !== 0) return rankDiff;
     return (daysWaitingFrom(right.requestedAt) ?? 0) - (daysWaitingFrom(left.requestedAt) ?? 0);
   });
@@ -714,7 +787,7 @@ function ReviewTable({ title = '법률구조 검토 요청 목록', rows, onOpen
   return (
     <section className="panel reviewRequestPanel">
       <div className="panelTitleRow">
-        <h2>{title}</h2>
+        <h2><ClipboardCheck size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> {title}</h2>
         <div className="tableSearchBox">
           <Search size={14} strokeWidth={2.2} />
           <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름·사건번호·제목 검색" aria-label="상담번호·유형·제목·상담원으로 검토 요청 검색" />
@@ -762,7 +835,12 @@ function ReviewTable({ title = '법률구조 검토 요청 목록', rows, onOpen
                 </td>
                 <td>
                   <div className="cellBody">
-                    <span className={reviewStatusTone(row.status)}>{row.status}</span>
+                    {(() => {
+                      const StatusIcon = reviewStatusIcon(row.status);
+                      return (
+                        <span className={reviewStatusTone(row.status)}><StatusIcon size={12} strokeWidth={2.4} aria-hidden="true" />{row.status}</span>
+                      );
+                    })()}
                   </div>
                 </td>
                 {/* HITL: 결정을 바로 누르지 않고 검토 모달을 열어 AI 결과 확인 후 사유와 함께 확정합니다. */}
@@ -794,11 +872,14 @@ function ReviewTable({ title = '법률구조 검토 요청 목록', rows, onOpen
 // needsReason은 카드 자체에 작은 "사유 필수" 배지로 보여주므로, 힌트 문장에서는
 // 중복으로 적지 않습니다.
 const hitlDecisions = [
-  { key: '승인', label: '승인', hint: '법률구조 대상으로 확정하고 다음 단계로 진행', tone: 'success', needsReason: false },
-  { key: '수정 요청', label: '수정 요청', hint: '상담원에게 서식·내용 수정을 요청', tone: 'warn', needsReason: true },
-  { key: '추가자료 요청', label: '추가자료 요청', hint: '판단에 필요한 자료 보완을 요청', tone: 'warn', needsReason: true },
-  { key: '반려', label: '반려', hint: '구조 대상 부적합으로 거절', tone: 'danger', needsReason: true },
-  { key: '보류', label: '보류', hint: '추가 검토가 필요해 결정을 보류', tone: 'warn', needsReason: true },
+  { key: '승인', label: '승인', hint: '법률구조 대상으로 확정하고 다음 단계로 진행', tone: 'success', needsReason: false, icon: CheckCircle2 },
+  { key: '수정 요청', label: '수정 요청', hint: '상담원에게 서식·내용 수정을 요청', tone: 'warn', needsReason: true, icon: FileEdit },
+  { key: '추가자료 요청', label: '추가자료 요청', hint: '판단에 필요한 자료 보완을 요청', tone: 'warn', needsReason: true, icon: FilePlus2 },
+  // 순서는 부드러운 결정(주의)에서 강한 결정(위험)으로 이어지도록 둡니다. 예전엔 danger
+  // 톤인 '반려'가 warn 톤 '보류'보다 앞에 있어 성공→주의→주의→위험→주의로 중간에 색
+  // 강도가 꺾여 보였습니다. 보류를 반려 앞으로 옮겨 성공→주의→주의→주의→위험으로 자연스럽게 이어지게 합니다.
+  { key: '보류', label: '보류', hint: '추가 검토가 필요해 결정을 보류', tone: 'warn', needsReason: true, icon: PauseCircle },
+  { key: '반려', label: '반려', hint: '구조 대상 부적합으로 거절', tone: 'danger', needsReason: true, icon: XCircle },
 ];
 
 function formatAnalysisList(items, emptyText) {
@@ -815,20 +896,24 @@ function evidenceDisplayLocation(item = {}) {
 
 function LawyerReviewBrief({ review, analysis, attachments }) {
   const submittedEvidenceCount = attachments.filter((item) => evidenceDisplayLocation(item) !== '저장 위치 없음').length;
+  const urgencyValue = analysis.urgency || review.urgency || '';
   return (
     <div className="lawyerReviewBrief">
       <article>
-        <strong>AI 상담 요약</strong>
+        <strong><Sparkles size={14} strokeWidth={2.4} className="sectionIcon" aria-hidden="true" /> AI 상담 요약</strong>
         {/* 변호사 피드백: "AI 상담요약은 좀 더 간략하게 한눈에". 여기는 검토를 시작하기 전
             훑어보는 자리라 핵심 두 줄만 먼저 보여주고, 전체 내용은 아래 '상담원 분석 내용'에서
             펼쳐 볼 수 있습니다. */}
         <SummaryBulletList text={analysis.summary || review.memo || review.title} emptyText="상담 요약 없음" maxItems={2} />
       </article>
       <article>
-        <strong>법률구조 검토 신호</strong>
+        <strong><ShieldCheck size={14} strokeWidth={2.4} className="sectionIcon" aria-hidden="true" /> 법률구조 검토 신호</strong>
         <dl>
           <div><dt>구조대상</dt><dd>{analysis.eligibility || review.eligibility || '검토 필요'}</dd></div>
-          <div><dt>긴급도</dt><dd>{analysis.urgency || review.urgency || '미확인'}</dd></div>
+          <div>
+            <dt>긴급도</dt>
+            <dd>{urgencyValue ? <span className={`statusChip tone-${urgencyTone(urgencyValue)}`}>{urgencyValue}</span> : '미확인'}</dd>
+          </div>
           <div><dt>증빙자료</dt><dd>{submittedEvidenceCount}건 확인</dd></div>
         </dl>
       </article>
@@ -846,7 +931,7 @@ function fileExtractionLabel(status) {
 function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   const [decision, setDecision] = useState('');
   const [reason, setReason] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState(review.counselor?.email || '');
+  const [recipientEmail] = useState(review.counselor?.email || '');
   const [checks, setChecks] = useState({ eligibility: false, evidence: false, hallucination: false });
   const [showFinalHitlConfirm, setShowFinalHitlConfirm] = useState(false);
   const selectedDecision = hitlDecisions.find((item) => item.key === decision);
@@ -861,6 +946,7 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   const sttOriginal = analysis.sttPreview?.original || '원문 텍스트 없음';
   const sttMasked = analysis.sttPreview?.masked || '개인정보 가림 텍스트 없음';
   const allChecked = checks.eligibility && checks.evidence && checks.hallucination;
+  const checkedCount = Object.values(checks).filter(Boolean).length;
   const trimmedReason = reason.trim();
   const reasonRequired = selectedDecision?.needsReason && !trimmedReason;
   const canSubmit = decision && allChecked && !reasonRequired;
@@ -869,67 +955,92 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   // 직접 다듬을 수 있는 편집 칸을 둡니다.
   const [lawyerComment, setLawyerComment] = useState('');
   const [editedSummary, setEditedSummary] = useState(analysis.summary || '');
+  // 섹션 헤더를 누르면 오른쪽 '검토 항목' 빠른 이동 목록에서 지금 보고 있는 항목이 무엇인지
+  // 바로 알 수 있도록 강조합니다.
+  const [activeQuickNavId, setActiveQuickNavId] = useState('hitlSectionAnalysis');
+  // 실제로 펼쳐서 내용을 확인한 항목을 기록합니다. defaultOpen인 두 항목은 펼친 채로
+  // 시작하므로 처음부터 '확인함'으로 봅니다. 나머지는 상담원이 헤더를 눌러 펼쳐야 표시됩니다.
+  const [viewedSectionIds, setViewedSectionIds] = useState(() => new Set());
+  const markSectionViewed = (id) => setViewedSectionIds((current) => (current.has(id) ? current : new Set(current).add(id)));
   const summaryEdited = editedSummary.trim() !== (analysis.summary || '').trim();
-  const completeDecision = () => {
+  // 확정은 core-api 호출이 끝나야 화면이 넘어갑니다(decideReview가 await 후 setActiveReview(null)).
+  // 그동안 아무 표시가 없으면 안 눌린 줄 알고 '검토 확정'을 다시 누르게 되고, 그 사이 첫 요청은
+  // 이미 처리되고 있어 승인이 두 번 나갈 수 있습니다. 진행 중임을 버튼에 드러내고 잠급니다.
+  const [submitting, setSubmitting] = useState(false);
+  const completeDecision = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     setShowFinalHitlConfirm(false);
-    onDecide(review.id, decision, trimmedReason, recipientEmail, {
-      lawyerComment: lawyerComment.trim(),
-      editedSummary: summaryEdited ? editedSummary.trim() : '',
-    });
+    try {
+      await onDecide(review.id, decision, trimmedReason, recipientEmail, {
+        lawyerComment: lawyerComment.trim(),
+        editedSummary: summaryEdited ? editedSummary.trim() : '',
+      });
+    } finally {
+      // 성공하면 이 화면 자체가 사라지지만(setActiveReview(null)), 실패해 남아 있을 때는
+      // 다시 시도할 수 있어야 하므로 잠금을 푼다.
+      setSubmitting(false);
+    }
   };
 
   return (
     <main className="workspacePage hitlReviewPage">
-      <div className="workflowIntro hitlWorkflowIntro">
-        <h1>확정 전 확인</h1>
-        <p>핵심 요약 확인 · 근거 검토 · 결과 확정</p>
-      </div>
+      {/* 제목과 검토 내용을 별개의 흰 카드 두 장으로 나누면 모서리끼리 어긋나 겹쳐 보인다는
+          피드백을 받아, 하나의 카드(.hitlReviewPanel) 안에 제목 · 툴바 · 검토 내용을 모두
+          담습니다 — 카드는 이 화면 전체에 하나만 있습니다. */}
       <section className="hitlReviewPanel">
+        <div className="workflowIntro hitlWorkflowIntro roleAccent-lawyer">
+          <span className="roleIdentityBadge roleIdentityBadge-lawyer"><Scale size={12} strokeWidth={2.4} aria-hidden="true" /> 변호사 검토</span>
+          <h1>법률구조 최종 검토 <span className="statusChip tone-info">검토 진행중</span></h1>
+          <p>{review.caseNo} · {review.type} · {review.title}</p>
+        </div>
         <div className="hitlReviewToolbar reviewToolbarSticky">
           <span>핵심 내용과 근거를 확인한 뒤 결과를 확정하세요.</span>
           <button className="hitlReviewCloseButton" type="button" onClick={onClose}>닫기</button>
         </div>
 
-        <div className="hitlCaseMeta">
-          <span><strong>{review.caseNo}</strong></span>
-          <span>{review.type}</span>
-          <span>{review.title}</span>
-        </div>
+        {/* 코치 피드백: "배치를 바꿔달라" — 예전엔 사건 정보부터 결정 버튼까지 위에서
+            아래로 한 줄로 쭉 이어져, 결정을 내리려면 맨 위 근거를 다시 스크롤해 올라가야
+            했습니다. 왼쪽에 근거(사건 정보·요약·자료)를, 오른쪽에 결정(최종 확인 체크·
+            승인/반려 선택·확정 버튼)을 좌우로 나눠 스크롤하지 않고 같이 볼 수 있게 합니다. */}
+        <div className="hitlReviewGrid">
+        <div className="hitlReviewMain">
+        {/* 사건 번호·유형·제목은 바로 위 페이지 제목 줄({review.caseNo} · {review.type} ·
+            {review.title})과 오른쪽 '사건 요약' 카드에도 나와 있어, 여기 세 번째로 또
+            보여주면 같은 정보가 반복돼 산만합니다(코치 피드백). 이 자리는 지웁니다. */}
         <div className="reviewRecipientBox">
-          <div>
-            <strong>담당 상담원</strong>
-            <span>
-              {review.counselor?.name || '미지정'}
-              {review.counselor?.organization ? ` · ${review.counselor.organization}` : ''}
-            </span>
+          <div className="reviewRecipientSummary">
+            <span className="reviewRecipientIcon" aria-hidden="true"><MessageSquareText size={18} strokeWidth={2.4} /></span>
+            <div className="reviewRecipientCopy">
+              <strong>검토 결과 전달</strong>
+              <span>검토를 확정하면 담당 상담원에게 자동으로 전달됩니다.</span>
+            </div>
+            <div className="reviewRecipientAssignee">
+              <span>담당 상담원</span>
+              <strong>{review.counselor?.name || '미지정'}</strong>
+              {(review.counselor?.organization || review.counselor?.email) && (
+                <small>{[review.counselor?.organization, review.counselor?.email].filter(Boolean).join(' · ')}</small>
+              )}
+            </div>
           </div>
-          <label>
-            검토 결과 수신
-            {/* 현재는 이 상담을 등록한 담당 상담원 1명에게만 결과가 전달됩니다.
-                고를 수 있는 다른 수신자가 없으므로 선택형 컨트롤 대신 고정값임을 그대로 보여줍니다.
-                (여러 명에게 보낼 수 있게 되면 이 자리를 다시 select로 바꾸면 됩니다) */}
-            <select value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} disabled>
-              <option value={review.counselor?.email || ''}>
-                {review.counselor?.email ? `${review.counselor.name || '담당 상담원'} (${review.counselor.email})` : '담당 상담원 미지정'}
-              </option>
-            </select>
-            <small className="helperText">전달 대상: 담당 상담원</small>
-          </label>
         </div>
 
         {/* AI 분석은 참고용임을 명확히 (HITL 원칙) */}
         <div className="hitlBanner">
-          <strong>AI 분석은 참고용</strong>
-          <span>최종 판단과 결과 확정은 변호사가 직접 진행합니다.</span>
+          <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
+          <span>
+            <strong>AI 분석은 참고용</strong>
+            <small>최종 판단과 결과 확정은 변호사가 직접 진행합니다.</small>
+          </span>
         </div>
 
-        <div className="hitlSection">
-          <h3>한눈에 보기</h3>
+        {/* 코치 피드백 반영: 한눈에 보기(pinned) → 아코디언 그룹 → 제출 확인(pinned)을
+            맨 마지막에 두는 순서로 정리합니다. */}
+        <CollapsibleSection className="hitlSection" id="hitlSectionOverview" icon={Sparkles} title="한눈에 보기" pinned onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionOverview'); if (nextOpen) markSectionViewed('hitlSectionOverview'); }}>
           <LawyerReviewBrief review={review} analysis={analysis} attachments={attachmentItems} />
-        </div>
+        </CollapsibleSection>
 
-        <div className="hitlSection">
-          <h3>상담 분석 확인</h3>
+        <CollapsibleSection className="hitlSection" id="hitlSectionAnalysis" icon={ClipboardList} title="상담 분석 확인" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionAnalysis'); if (nextOpen) markSectionViewed('hitlSectionAnalysis'); }}>
           <div className="resultCard lawyerAnalysisCard">
             <div className="lawyerAnalysisHeader">
               <strong>검토 요청에 포함된 상담 분석</strong>
@@ -945,13 +1056,20 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               />
               <small className="helperText">확정 시 상담원에게 전달</small>
             </label>
+            {/* 긴급도·구조대상은 '한눈에 보기'(법률구조 검토 신호)와 오른쪽 사건 요약 카드에
+                이미 나와 있어, 여기서는 그 둘에 없는 사건 유형·소분류만 보여줍니다. */}
             <div className="hitlAnalysisGrid">
               <span>사건 유형: {analysis.caseType || review.type}</span>
               <span>사건 소분류: {analysis.caseSubtype || '미입력'}</span>
-              <span>긴급도: {analysis.urgency || review.urgency || '중'}</span>
-              <span>구조대상: {analysis.eligibility || review.eligibility || '검토 필요'}</span>
             </div>
-            {analysis.counselorReviewNote ? <pre className="counselorReviewNote">{analysis.counselorReviewNote}</pre> : null}
+            {/* 예전엔 줄바꿈만 있는 <pre> 원문을 그대로 보여줘서 변호사가 한눈에 훑기 어려웠습니다
+                (코치 피드백: 줄글이 아닌 개요 형식으로). 다른 요약 카드와 같은 방식으로 개조식
+                불릿 목록으로 보여줍니다. */}
+            {analysis.counselorReviewNote ? (
+              <div className="counselorReviewNote">
+                <SummaryBulletList text={analysis.counselorReviewNote} />
+              </div>
+            ) : null}
             {analysis.caseTypeReason ? <p className="reasonText">분류 근거: {analysis.caseTypeReason}</p> : null}
             {analysis.emergency?.reason ? <p className="reasonText">긴급도 근거: {analysis.emergency.reason}</p> : null}
             {/* 상담원 화면에서 AI가 제시한 사건유형 후보(비율·근거)입니다. 상담원이 위 사건 유형으로
@@ -974,30 +1092,38 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
             {/* 승소·집행 가능성, 구조 타당성 신호 — 상담원 화면과 같은 컴포넌트로 그려서 표시가 어긋나지 않게 합니다. */}
             {analysis.reliefReview ? <ReliefReviewSummary review={analysis.reliefReview} /> : null}
           </div>
-        </div>
+        </CollapsibleSection>
 
-        <div className="hitlSection">
-          <h3>누락 자료와 확인 항목</h3>
+        <CollapsibleSection className="hitlSection" id="hitlSectionMissing" icon={AlertTriangle} title="누락 자료와 확인 항목" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionMissing'); if (nextOpen) markSectionViewed('hitlSectionMissing'); }}>
           <div className="resultCard hitlEvidenceGrid">
             <div>
               <strong>누락 자료</strong>
-              {analysis.missingInfo?.length ? analysis.missingInfo.map((item) => (
-                <span key={item}>
-                  {item}
-                  {analysis.evidenceStatus?.[item] ? ` · ${analysis.evidenceStatus[item] === 'submitted' ? '제출 확인' : '미제출'}` : ''}
-                </span>
-              )) : <span>아직 받지 못한 자료가 없습니다.</span>}
+              {analysis.missingInfo?.length ? analysis.missingInfo.map((item) => {
+                const submitted = analysis.evidenceStatus?.[item] === 'submitted';
+                return (
+                  <span key={item} className={`hitlPillRow ${submitted ? 'is-submitted' : 'is-missing'}`}>
+                    {submitted ? <CheckCircle2 size={13} strokeWidth={2.4} aria-hidden="true" /> : <XCircle size={13} strokeWidth={2.4} aria-hidden="true" />}
+                    {item}
+                    <em className="hitlPillState">{analysis.evidenceStatus?.[item] ? (submitted ? '제출 확인' : '미제출') : '확인 대기'}</em>
+                  </span>
+                );
+              }) : <span>아직 받지 못한 자료가 없습니다.</span>}
             </div>
             <div>
               <strong>상담원 확인 항목</strong>
-              {analysis.checklist?.length ? analysis.checklist.map((item) => <span key={item.label}>{item.checked ? '확인' : '미확인'} · {item.label}</span>) : <span>확인할 항목이 없습니다.</span>}
+              {analysis.checklist?.length ? analysis.checklist.map((item) => (
+                <span key={item.label} className={`hitlPillRow ${item.checked ? 'is-submitted' : 'is-missing'}`}>
+                  {item.checked ? <CheckSquare size={13} strokeWidth={2.4} aria-hidden="true" /> : <Square size={13} strokeWidth={2.4} aria-hidden="true" />}
+                  {item.label}
+                  <em className="hitlPillState">{item.checked ? '확인' : '미확인'}</em>
+                </span>
+              )) : <span>확인할 항목이 없습니다.</span>}
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
 
-        <div className="hitlSection">
+        <CollapsibleSection className="hitlSection" id="hitlSectionPrivacy" icon={EyeOff} title="개인정보가 가려진 상담 내용" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionPrivacy'); if (nextOpen) markSectionViewed('hitlSectionPrivacy'); }}>
           {/* 'STT'·'마스킹'은 개발팀 용어라 변호사에게는 '통화 내용 텍스트'·'개인정보 가림'으로 풀어 씁니다. */}
-          <h3>개인정보가 가려진 상담 내용</h3>
           <div className="resultCard lawyerSttGrid">
             <div>
               <strong>개인정보 가림</strong>
@@ -1009,10 +1135,9 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               <span>원문에는 민감정보가 포함될 수 있으므로 검증 목적으로만 확인합니다.</span>
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
 
-        <div className="hitlSection">
-          <h3>검토 근거</h3>
+        <CollapsibleSection className="hitlSection" id="hitlSectionEvidence" icon={Scale} title="검토 근거" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionEvidence'); if (nextOpen) markSectionViewed('hitlSectionEvidence'); }}>
           <div className="resultCard lawyerEvidenceBundle">
             <div>
               <strong>상담원 채택 항목</strong>
@@ -1048,10 +1173,9 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               <span>환각 위험: {analysis.verification?.hallucinationRisk ? '확인 필요' : '낮음'}</span>
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
 
-        <div className="hitlSection">
-          <h3>사실관계 타임라인</h3>
+        <CollapsibleSection className="hitlSection" id="hitlTimelineSection" icon={Clock} title="사실관계 타임라인" onToggle={(nextOpen) => { setActiveQuickNavId('hitlTimelineSection'); if (nextOpen) markSectionViewed('hitlTimelineSection'); }}>
           <div className="resultCard lawyerTimeline">
             {/* ai-api가 만드는 timeline_json 항목은 {날짜, 내용} 키를 씁니다
                 (backend/ai-api/app/schemas/analysis.py의 TimelineItem).
@@ -1070,61 +1194,148 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               );
             }) : <p className="emptyTimelineNotice">확인된 타임라인 자료가 없습니다.</p>}
           </div>
-        </div>
+        </CollapsibleSection>
 
-        <div className="hitlSection">
-          <h3>최종 확인</h3>
-          <div className="resultCard checklistBox">
-            <label><input type="checkbox" checked={checks.eligibility} onChange={() => setChecks((c) => ({ ...c, eligibility: !c.eligibility }))} />법률구조 대상 요건을 확인했습니다.</label>
-            <label><input type="checkbox" checked={checks.evidence} onChange={() => setChecks((c) => ({ ...c, evidence: !c.evidence }))} />제출된 자료·증빙을 확인했습니다.</label>
-            <label><input type="checkbox" checked={checks.hallucination} onChange={() => setChecks((c) => ({ ...c, hallucination: !c.hallucination }))} />AI가 제시한 법령·판례 근거의 실재 여부를 확인했습니다.</label>
-          </div>
-        </div>
-
-        <div className="hitlSection">
-          <h3>결과 선택</h3>
-          <div className="hitlDecisionGrid">
-            {hitlDecisions.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={`hitlDecisionCard tone-${item.tone}${decision === item.key ? ' selected' : ''}`}
-                onClick={() => setDecision(item.key)}
-              >
-                <span className="hitlDecisionCardHead">
-                  <strong>{item.label}</strong>
-                  {item.needsReason ? <em className="hitlReasonRequiredBadge">사유 필수</em> : null}
-                </span>
-                <small>{item.hint}</small>
-              </button>
+        {/* 최종 결정 전 반드시 체크해야 하는 섹션이라 항상 펼쳐둡니다(pinned). 아코디언
+            그룹 다음, 맨 마지막에 둬서 검토를 다 훑은 뒤 확인하는 흐름에 맞춥니다. */}
+        <CollapsibleSection className="hitlSection" id="hitlSectionFinalCheck" icon={ShieldCheck} title="제출 확인" pinned onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionFinalCheck'); if (nextOpen) markSectionViewed('hitlSectionFinalCheck'); }}>
+          <div className="resultCard checklistBox hitlFinalChecklist">
+            {[
+              { key: 'eligibility', text: '법률구조 대상 요건을 확인했습니다.' },
+              { key: 'evidence', text: '제출된 자료·증빙을 확인했습니다.' },
+              { key: 'hallucination', text: 'AI가 제시한 법령·판례 근거의 실재 여부를 확인했습니다.' },
+            ].map((row) => (
+              <label key={row.key} className={`hitlFinalCheckItem${checks[row.key] ? ' is-checked' : ''}`}>
+                <input type="checkbox" checked={checks[row.key]} onChange={() => setChecks((c) => ({ ...c, [row.key]: !c[row.key] }))} />
+                {checks[row.key] ? <CheckSquare size={16} strokeWidth={2.4} aria-hidden="true" /> : <Square size={16} strokeWidth={2.4} aria-hidden="true" />}
+                <span>{row.text}</span>
+                <em className={`statusChip ${checks[row.key] ? 'tone-success' : 'tone-muted'}`}>{checks[row.key] ? '확인됨' : '미확인'}</em>
+              </label>
             ))}
           </div>
+        </CollapsibleSection>
+
         </div>
 
-        {selectedDecision?.needsReason ? (
-          <div className="noteBox warn">
-            <label className="field">
-              <span>사유 <strong className="requiredMark">필수</strong></span>
-              <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="사유를 입력하세요." />
-            </label>
+        {/* 코치 피드백: "결과 선택을 오른쪽 말고 아래쪽에 배치". 좁은 오른쪽 레일에 결정 카드
+            5개를 세로로 쌓아두니 답답해 보인다는 의견을 받아, 결정 UI는 페이지 하단에
+            전체 폭으로 옮겨 카드를 가로로 넉넉하게 펼칩니다. 대신 오른쪽 레일은 긴 검토
+            흐름을 스크롤하는 동안에도 사건 핵심 정보와 지금 어디를 보고 있는지를 계속
+            보여주는 '요약 + 빠른 이동' 자리로 씁니다. */}
+        <div className="hitlReviewSide">
+          <div className="hitlSection hitlCaseSummaryCard">
+            <h3><FolderOpen size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 사건 요약</h3>
+            <dl className="hitlCaseSummaryList">
+              <div><dt>사건 번호</dt><dd>{review.caseNo}</dd></div>
+              <div><dt>사건 유형</dt><dd>{analysis.caseType || review.type}</dd></div>
+              <div>
+                <dt>긴급도</dt>
+                <dd>
+                  {(() => {
+                    const level = analysis.urgency || review.urgency || '';
+                    const tone = { 상: 'danger', 중: 'warn', 하: 'success' }[level] || 'muted';
+                    return level ? <span className={`statusChip tone-${tone}`}>{level}</span> : '미확인';
+                  })()}
+                </dd>
+              </div>
+              <div><dt>구조대상</dt><dd>{analysis.eligibility || review.eligibility || '검토 필요'}</dd></div>
+              <div><dt>담당 상담원</dt><dd>{review.counselor?.name || '미지정'}</dd></div>
+            </dl>
           </div>
-        ) : null}
 
-        {/* 반려·수정요청 등 일부 결정에만 열리는 '사유'와 달리, 코멘트는 승인을 포함한 모든 결정에서
-            남길 수 있습니다. 상담원에게 참고용으로 함께 전달됩니다. */}
-        <label className="field">
-          <span>코멘트 (선택)</span>
-          <textarea value={lawyerComment} onChange={(event) => setLawyerComment(event.target.value)} placeholder="결정과 별개로 상담원에게 남길 코멘트가 있으면 적어주세요." />
-        </label>
-
-        {reasonRequired ? <p className="formError">{decision} 결정에는 사유 입력이 필요합니다.</p> : null}
-        {decision && !allChecked ? <p className="formError">법률 판단 항목을 모두 확인해야 결정을 확정할 수 있습니다.</p> : null}
-
-        <div className="inlineControls statusConfirmActions">
-          <button className="smallButton light" type="button" onClick={onClose}>취소</button>
-          <button className="primaryButton hitlSubmitButton" type="button" disabled={!canSubmit} onClick={() => setShowFinalHitlConfirm(true)}>검토 확정</button>
+          <nav className="hitlSection hitlQuickNav" aria-label="검토 항목 빠른 이동">
+            <h3><ListChecks size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 검토 항목</h3>
+            <div className="hitlQuickNavList">
+              {[
+                { id: 'hitlSectionAnalysis', label: '상담 분석 확인', icon: ClipboardList },
+                { id: 'hitlSectionMissing', label: '누락 자료와 확인 항목', icon: AlertTriangle },
+                { id: 'hitlSectionPrivacy', label: '개인정보가 가려진 상담 내용', icon: EyeOff },
+                { id: 'hitlSectionEvidence', label: '검토 근거', icon: Scale },
+                { id: 'hitlTimelineSection', label: '사실관계 타임라인', icon: Clock },
+              ].map((item) => {
+                const NavIcon = item.icon;
+                // 우측 목록에는 접어서 확인하는 중간 검토 항목만 남깁니다. 실제로 열어본
+                // 항목은 체크 배지로 표시해 검토 진행 상태를 바로 알 수 있게 합니다.
+                const isActive = item.id === activeQuickNavId;
+                const isViewed = viewedSectionIds.has(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`hitlQuickNavItem${isActive ? ' is-active' : ''}${isViewed ? ' is-viewed' : ''}`}
+                    onClick={() => { setActiveQuickNavId(item.id); markSectionViewed(item.id); document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+                  >
+                    <NavIcon size={14} strokeWidth={2.2} aria-hidden="true" />
+                    <span>{item.label}</span>
+                    {isViewed ? (
+                      <em className="hitlQuickNavBadge is-complete">
+                        <CheckCircle2 size={12} strokeWidth={2.4} aria-hidden="true" />
+                      </em>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
         </div>
-        <p className="helperText">결정자 {reviewer} · 감사 로그/알림 반영</p>
+        </div>
+
+        <div className="hitlSection hitlDecisionSection">
+          <h3><ListChecks size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 결과 선택</h3>
+          <div className="hitlDecisionGrid hitlDecisionGridBottom">
+            {hitlDecisions.map((item) => {
+              const DecisionIcon = item.icon;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`hitlDecisionCard tone-${item.tone}${decision === item.key ? ' selected' : ''}`}
+                  onClick={() => setDecision(item.key)}
+                >
+                  <span className="hitlDecisionCardHead">
+                    <DecisionIcon size={17} strokeWidth={2.2} className="hitlDecisionCardIcon" aria-hidden="true" />
+                    <strong>{item.label}</strong>
+                  </span>
+                  <span className="hitlDecisionCardMeta">
+                    <small>{item.hint}</small>
+                    {item.needsReason ? <em className="hitlReasonRequiredBadge">사유 필수</em> : null}
+                    {decision === item.key ? <em className="hitlDecisionSelectedBadge">선택됨</em> : null}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedDecision?.needsReason ? (
+            <div className="noteBox warn">
+              <label className="field">
+                <span>사유 <strong className="requiredMark">필수</strong></span>
+                <textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="사유를 입력하세요." />
+              </label>
+            </div>
+          ) : null}
+
+          {/* 반려·수정요청 등 일부 결정에만 열리는 '사유'와 달리, 코멘트는 승인을 포함한 모든 결정에서
+              남길 수 있습니다. 상담원에게 참고용으로 함께 전달됩니다. */}
+          <label className="field hitlCommentField">
+            <span>코멘트 (선택)</span>
+            <textarea value={lawyerComment} onChange={(event) => setLawyerComment(event.target.value)} placeholder="결정과 별개로 상담원에게 남길 코멘트가 있으면 적어주세요." />
+          </label>
+
+          {reasonRequired ? <p className="formError">{decision} 결정에는 사유 입력이 필요합니다.</p> : null}
+          {decision && !allChecked ? <p className="formError">법률 판단 항목을 모두 확인해야 결정을 확정할 수 있습니다.</p> : null}
+
+          <div className="inlineControls statusConfirmActions">
+            <p className="hitlDecisionActionHint">
+              {decision ? <><strong>{decision}</strong> 결과를 확정합니다. 확정 후에는 변경할 수 없습니다.</> : '결과를 선택한 뒤 검토 결과를 확정하세요.'}
+              <small>결정자 {reviewer}</small>
+            </p>
+            <div className="hitlDecisionActionButtons">
+              <button className="smallButton light" type="button" onClick={onClose}>취소</button>
+              <button className="primaryButton hitlSubmitButton" type="button" disabled={!canSubmit} onClick={() => setShowFinalHitlConfirm(true)}>검토 결과 확정</button>
+            </div>
+          </div>
+        </div>
         {showFinalHitlConfirm ? (
           <HitlConfirmModal
             title="검토 결과 확정 전 최종 확인"
@@ -1159,22 +1370,25 @@ function ReviewLog({ logs, onDelete }) {
   const scrollable = logs.length > visibleRowCount;
   return (
     <section className="panel recentDecisionLogPanel">
-      <div className="panelTitleRow"><h2>최근 검토 결정 로그</h2></div>
+      <div className="panelTitleRow"><h2><ListChecks size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 최근 검토 결정 로그</h2></div>
       <div className={scrollable ? 'tableScroll' : ''}>
         <table className="dataTable">
           <thead><tr><th>검토 번호</th><th>사건 번호</th><th>상담 제목</th><th>처리일</th><th>결정</th><th>사유</th>{onDelete ? <th>삭제</th> : null}</tr></thead>
           <tbody>
-            {logs.map((row) => (
+            {logs.map((row) => {
+              const StatusIcon = reviewStatusIcon(row.status);
+              return (
               <tr key={`${row.id}-${row.status}-${row.loggedAt}`}>
                 <td>R-{row.id}</td>
                 <td>{row.caseNo}</td>
                 <td>{row.title}</td>
                 <td>{row.loggedAt}</td>
-                <td><span className={reviewStatusTone(row.status)}>{row.status}</span></td>
+                <td><span className={reviewStatusTone(row.status)}><StatusIcon size={12} strokeWidth={2.4} aria-hidden="true" />{row.status}</span></td>
                 <td>{row.reason || '-'}</td>
                 {onDelete ? <td><button className="tableAction danger" type="button" onClick={() => handleDelete(row)}><Trash2 size={12} strokeWidth={2.4} />삭제</button></td> : null}
               </tr>
-            ))}
+              );
+            })}
             {scrollable ? null : <EmptyRows count={Math.max(0, visibleRowCount - logs.length)} columns={columnCount} isEmpty={logs.length === 0} emptyLabel="검토 결정 이력 없음" />}
           </tbody>
         </table>
@@ -1259,7 +1473,7 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
     <>
       <div className="dashboardIntroWrap">
         <div className="dashboardIntro">
-          <h1>운영 현황</h1>
+          <h1><LayoutDashboard size={22} strokeWidth={2.2} className="dashboardIntroIcon" aria-hidden="true" /> 운영 현황</h1>
           <p>가입 승인 대기 {pendingApprovals}건 · 상담/분석 운영 상태</p>
         </div>
       </div>
@@ -1277,15 +1491,15 @@ function AdminDashboard({ users, onUpdateUserStatus, consultations, reviews, act
         <div className="adminSplit">
           <ConsultationStatsPanel consultations={consultations} />
           <div className="adminSplitStack">
-            <BarChartMock consultations={consultations} />
-            <DonutChartMock reviews={reviews} />
+            <BarChartMock consultations={consultations} serverStats={adminStats} />
+            <DonutChartMock reviews={reviews} serverStats={adminStats} />
           </div>
         </div>
       ) : null}
       {activeAdminView === 'analysis' ? (
         <div className="adminSplit">
           <AnalysisStatsPanel reviews={reviews} />
-          <DonutChartMock reviews={reviews} />
+          <DonutChartMock reviews={reviews} serverStats={adminStats} />
         </div>
       ) : null}
       {activeAdminView === 'activeUsers' ? <ActiveUsersPanel users={userRows} /> : null}
@@ -1388,21 +1602,6 @@ function formatWeekRangeLabel(weekStart) {
   return `${weekStart.getFullYear()}년 ${fmt(weekStart)} ~ ${fmt(weekEnd)}`;
 }
 
-// 이 화면의 막대그래프들(요일별 상담 건수, 사건 유형별 상담 건수)이 공용으로 쓰는 눈금 계산입니다.
-// 실제 최댓값을 그대로 100%로 잡으면 건수가 적을 때는 막대가 꽉 차 보이고, 건수가 아주 많아지면
-// 반대로 눈금 갱신이 안 따라가는 문제가 생깁니다. 그래서 최댓값의 3배 정도를 목표로 잡고
-// 1/2/5/10 단위의 "보기 좋은 눈금"으로 올림해서, 하루 2건이든 법률구조공단 실제 규모(하루 수십~백여 건)든
-// 막대가 항상 절제된(대략 20~35%대) 비율로 표현되도록 합니다.
-function computeNiceScaleMax(rawMax) {
-  if (rawMax <= 0) return 10;
-  const headroomMultiplier = 3;
-  const targetMax = rawMax * headroomMultiplier;
-  const magnitude = 10 ** Math.floor(Math.log10(targetMax));
-  const normalized = targetMax / magnitude;
-  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-  return niceNormalized * magnitude;
-}
-
 function ConsultationStatsPanel({ consultations }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -1423,7 +1622,6 @@ function ConsultationStatsPanel({ consultations }) {
       count: consultations.filter((item) => item.date === iso).length,
     };
   }), [weekStart, consultations]);
-  const scaleMax = computeNiceScaleMax(Math.max(0, ...days.map((item) => item.count)));
 
   // 주를 이동하면 선택된 날짜가 화면에 보이는 주 밖으로 벗어나므로, 같은 요일로 자동 재선택합니다.
   useEffect(() => {
@@ -1467,10 +1665,11 @@ function ConsultationStatsPanel({ consultations }) {
             onClick={() => setSelectedDate(item.iso)}
           >
             <span>{item.label} <em>{item.dayOfMonth}</em></span>
-            <div className="weekdayBarTrack">
-              {item.closed ? <em className="closedLabel">휴무</em> : <i style={{ height: `${item.count ? Math.max(14, (item.count / scaleMax) * 100) : 0}%` }} />}
-            </div>
-            <strong>{item.closed ? '상담 없음' : `${item.count}건`}</strong>
+            {/* '휴무'(주말)라도 실제로 접수된 상담이 있으면 건수를 그대로 보여줍니다.
+                예전엔 주말이면 무조건 '상담 없음'으로 표시해, 바로 아래 상세 표에는 그날 접수된
+                상담이 있는데도 요약 칸만 "없다"고 말하는 모순이 실사용 중 확인됐습니다.
+                (막대 그래프 대신 숫자만 크게 보여줘 한눈에 비교하기 쉽게 합니다) */}
+            <strong>{item.closed && !item.count ? '상담 없음' : `${item.count}건`}</strong>
           </button>
         ))}
       </div>
@@ -1480,7 +1679,7 @@ function ConsultationStatsPanel({ consultations }) {
           <thead>
             <tr>
               <th colSpan={7} className="adminTableCaption">
-                {selectedDay.closed ? `${selectedDay.label}요일 (휴무) 상담 내역` : `${selectedDay.year}.${selectedDay.monthNum}.${selectedDay.dayOfMonth} (${selectedDay.label}) 상담 내역 · ${dayRows.length}건`}
+                {selectedDay.closed ? `${selectedDay.label}요일 (휴무) 상담 내역 · ${dayRows.length}건` : `${selectedDay.year}.${selectedDay.monthNum}.${selectedDay.dayOfMonth} (${selectedDay.label}) 상담 내역 · ${dayRows.length}건`}
               </th>
             </tr>
             <tr>
@@ -1494,7 +1693,10 @@ function ConsultationStatsPanel({ consultations }) {
             </tr>
           </thead>
           <tbody>
-            {dayRows.map((row) => <tr key={row.id}><td>{row.caseNo}</td><td>{row.name}</td><td>{row.counselor?.name || '미지정'}</td><td>{row.lawyer?.name || row.reviewAction?.reviewer?.name || '미지정'}</td><td>{row.type}</td><td>{row.date}</td><td><span className={workflowStatusTone(row.workflowStatus)}>{row.workflowStatus || '분석 전'}</span></td></tr>)}
+            {/* row.type(상담 등록 때 고른 유형)만 보면, AI 분석·상담원이 확정한 소분류가
+                있어도 등록 당시 미분류였던 상담은 이 칸이 계속 빈 채로 보였습니다. 실시간
+                상담·확정 전 확인 화면과 같은 기준(resolveConfirmedCaseType)으로 맞춥니다. */}
+            {dayRows.map((row) => <tr key={row.id}><td>{row.caseNo}</td><td>{row.name || '이름 미입력'}</td><td>{row.counselor?.name || '미지정'}</td><td>{row.lawyer?.name || row.reviewAction?.reviewer?.name || '미지정'}</td><td>{resolveConfirmedCaseType(row) || '미분류'}</td><td>{row.date}</td><td><span className={workflowStatusTone(row.workflowStatus)}>{row.workflowStatus || '분석 전'}</span></td></tr>)}
             {dayRows.length > VISIBLE_ROW_COUNT ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - dayRows.length)} columns={7} isEmpty={dayRows.length === 0} emptyLabel="선택일 상담 없음" />}
           </tbody>
           </ScrollableDataTable>
@@ -1769,16 +1971,55 @@ function AdminOpsPanel({ currentUser }) {
   );
 }
 
-function BarChartMock({ consultations }) {
+function BarChartMock({ consultations, serverStats }) {
   // 소분류(29개)가 아니라 대분류(친족/상속/가사소송/가족관계등록) 4개 기준으로 집계해 한눈에 보이게 합니다.
-  const countByCategory = (key) => consultations.filter((item) => (item.category || getCaseCategory(item.type)) === key).length;
+  // item.category/item.type은 '새 상담 만들기'에서 직접 고른 값만 채워지고, 통화 중 빠르게 만든
+  // 상담이나 자료 업로드로 들어온 상담은 비어 있습니다 — 그런 상담은 AI 분석이 정리한
+  // caseSubtype/caseType으로 대분류를 판단해야 실제로는 분류된 상담이 전부 '기타'로 잡히지 않습니다.
+  const resolveKnownCaseType = (item) => {
+    if (isKnownCaseType(item.analysis?.caseSubtype)) return item.analysis.caseSubtype;
+    if (isKnownCaseType(item.analysis?.caseType)) return item.analysis.caseType;
+    return item.type;
+  };
+  const serverCategoryStats = serverStats?.case_type_stats && typeof serverStats.case_type_stats === 'object'
+    ? serverStats.case_type_stats
+    : null;
+  // core-api는 대분류(친족/상속/가사소송/가족관계등록)가 아니라 소분류(예: '약혼') 단위로
+  // 집계해서 돌려줍니다. 소분류 키를 대분류 키로 그대로 조회하면 항상 0건으로 보여, 여기서
+  // 로컬 집계와 같은 방식(getCaseCategory)으로 대분류로 다시 묶습니다.
+  const serverCategoryTotals = serverCategoryStats
+    ? Object.entries(serverCategoryStats).reduce((totals, [subType, count]) => {
+        const category = getCaseCategory(subType);
+        totals[category] = (totals[category] || 0) + Number(count || 0);
+        return totals;
+      }, {})
+    : null;
+  const countByCategory = (key) => {
+    if (serverCategoryTotals) return Number(serverCategoryTotals[key] || 0);
+    return consultations.filter((item) => (item.category || getCaseCategory(resolveKnownCaseType(item))) === key).length;
+  };
   // 아는 4개 분류에 속하지 않는 상담(AI가 다른 체계의 유형을 돌려준 경우 등)은 '기타'로 모입니다.
   // 이 줄이 없으면 그런 상담이 통계에서 통째로 사라져, 합계가 실제 건수와 맞지 않게 됩니다.
   const knownKeys = caseCategories.map((category) => category.key);
   const categoryKeys = countByCategory('기타') ? [...knownKeys, '기타'] : knownKeys;
-  const rawMax = Math.max(0, ...categoryKeys.map(countByCategory));
-  const scaleMax = computeNiceScaleMax(rawMax);
-  return <section className="chartPanel"><h2>사건 유형별 상담 통계</h2><div className="barChart">{categoryKeys.map((key) => { const count = countByCategory(key); const isZero = count === 0; return <div className="barRow" key={key}><span>{key}</span><i className={isZero ? 'zero' : ''} style={{ width: isZero ? 0 : `${Math.max(8, (count / scaleMax) * 100)}%` }}>{count}</i></div>; })}</div></section>;
+  // 막대 위에 숫자를 얹어 보여주던 이전 방식은 막대와 숫자가 겹쳐 보여 불편하다는 피드백에 따라,
+  // 막대 그래프 대신 분류명과 건수를 나란히 둔 목록으로 단순화합니다.
+  return (
+    <section className="chartPanel">
+      <h2>사건 유형별 상담 통계</h2>
+      <div className="statList">
+        {categoryKeys.map((key) => {
+          const count = countByCategory(key);
+          return (
+            <div className={count === 0 ? 'statListRow zero' : 'statListRow'} key={key}>
+              <span>{key}</span>
+              <strong>{count}건</strong>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 // 도넛의 각 구간(stroke-dasharray/offset)을 계산하는 저수준 기하 로직입니다.
@@ -1813,11 +2054,18 @@ function DonutChart({ total, segments }) {
   );
 }
 
-function DonutChartMock({ reviews }) {
-  const total = reviews.length;
-  const approved = reviews.filter((item) => item.status === '승인').length;
-  const rejected = reviews.filter((item) => item.status === '반려').length;
-  const pending = Math.max(0, total - approved - rejected);
+function DonutChartMock({ reviews, serverStats }) {
+  const serverBreakdown = serverStats?.analysis_status_breakdown && typeof serverStats.analysis_status_breakdown === 'object'
+    ? serverStats.analysis_status_breakdown
+    : null;
+  const total = serverBreakdown
+    ? Object.values(serverBreakdown).reduce((sum, value) => sum + Number(value || 0), 0)
+    : reviews.length;
+  const approved = serverBreakdown ? Number(serverBreakdown.approved || 0) : reviews.filter((item) => item.status === '승인').length;
+  const rejected = serverBreakdown ? Number(serverBreakdown.rejected || 0) : reviews.filter((item) => item.status === '반려').length;
+  const pending = serverBreakdown
+    ? Number(serverBreakdown.pending || 0)
+    : Math.max(0, total - approved - rejected);
   // 승인/반려/대기 색상은 나머지 화면의 처리 단계 톤(tone-success/danger/warn)과 그대로 맞춰 일관성을 유지합니다.
   const segments = [
     { key: 'approved', label: '승인', value: approved, toneClass: 'tone-success' },

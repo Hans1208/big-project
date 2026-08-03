@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // 화면 전환과 전역 상태를 관리하는 프론트엔드 최상위 컴포넌트입니다.
 import { Header, Footer, DashboardHeader } from './components/layout.jsx';
 import { initialConsultations, initialReviews, today } from './constants.jsx';
 import { LoginPage, RegisterPage, PasswordFindPage } from './pages/auth.jsx';
 import { CounselorDashboard, LawyerDashboard, AdminDashboard } from './pages/dashboards.jsx';
-import { hydrateAnalysisForDisplay } from './pages/workflows.jsx';
+import { hydrateAnalysisForDisplay, runConsultationAnalysis } from './pages/workflows.jsx';
 import { appendAuditLog, readStorage, readTextStorage, storageKeys, writeStorage, writeTextStorage } from './services/storage.js';
 import { LoadingProvider } from './components/loading.jsx';
 import { FeedbackProvider, useToast } from './components/feedback.jsx';
@@ -92,6 +92,9 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
   const defaultView = role === 'counselor' ? '기타' : '대시보드';
   const [activeView, setActiveView] = useState(defaultView);
   const [focusedConsultationId, setFocusedConsultationId] = useState(null);
+  // 추천 서식 카드에서 특정 서식의 '저장하고 초안 만들기'를 눌렀을 때, 서식 생성 화면이
+  // 어떤 서식을 열어야 하는지 함께 전달합니다(코치 피드백: 추천 3개가 모두 같은 동작이었음).
+  const [focusedTemplateName, setFocusedTemplateName] = useState(null);
   const [focusedReviewCaseNo, setFocusedReviewCaseNo] = useState(null);
   const [focusedAdminView, setFocusedAdminView] = useState(null);
 
@@ -184,12 +187,27 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
   // 지워진 경우)을 찾아 추가합니다. 이미 로컬에 있는 상담(coreId로 식별)의 필드는 절대 덮어쓰지
   // 않습니다 — core-api Consultation에는 분석·첨부·법률구조 대상 여부 같은 로컬 전용 필드가 없어서,
   // 통째로 덮어쓰면 상담원이 화면에서 입력해둔 내용이 사라집니다.
+  //
+  // 로그인 계정이 바뀌면 이전 계정의 목록은 통째로 버립니다. core-api는 상담원에게 본인
+  // 상담만 돌려주지만, 이 병합은 "서버에 있는데 로컬에 없는 것"만 더하는 방식이라 이전
+  // 계정의 상담을 지워주지 않습니다. 그대로 두면 계정을 바꿔 로그인해도 앞사람의 상담이
+  // 계속 보입니다 — 민원인 이름·연락처·사건 내용이 담긴 목록이라 그러면 안 됩니다.
   useEffect(() => {
     let cancelled = false;
+    const ownerEmail = currentUser?.email || '';
+    const previousOwner = readTextStorage(storageKeys.consultationsOwner, '');
+    // 소유자 기록이 아직 없으면(이 기능이 들어오기 전부터 쓰던 브라우저) 목록을 건드리지 않고
+    // 소유자만 적어둡니다. 여기서 비우면 서버에 없고 브라우저에만 있던 상담까지 날아갑니다.
+    // 계정을 실제로 바꿔 로그인하는 때부터 정리가 동작합니다.
+    const accountChanged = Boolean(ownerEmail) && Boolean(previousOwner) && previousOwner !== ownerEmail;
+    if (ownerEmail && previousOwner !== ownerEmail) {
+      writeTextStorage(storageKeys.consultationsOwner, ownerEmail);
+    }
     fetchCoreConsultations()
       .then((serverRows) => {
         if (cancelled || !Array.isArray(serverRows)) return;
-        setConsultations((items) => {
+        setConsultations((currentItems) => {
+          const items = accountChanged ? [] : currentItems;
           const serverByCoreId = new Map(serverRows.map((row) => [row.id, row]));
           // 첨부파일은 다른 필드(메모·법률구조 대상 등)와 달리 로컬 전용 값이 없습니다 — 추가/삭제가
           // 항상 core-api(Attachment 테이블)를 거쳐 확정되므로, 서버 응답이 항상 진실입니다.
@@ -218,7 +236,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
               status: '진행 중',
               date: (row.createdAt || '').slice(0, 10) || today,
               registeredTime: '',
-              workflowStatus: '상담 완료',
+              workflowStatus: '상담 접수',
               counselor: null,
               logs: [],
               analysis: null,
@@ -230,10 +248,12 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       })
       .catch(() => {
         // Core API가 꺼져 있어도 로컬 저장소 데이터로 화면은 그대로 동작해야 하므로 조용히 넘어갑니다.
+        // 다만 계정이 바뀐 상황에서는 앞사람 목록을 남겨두면 안 되므로 비웁니다.
+        if (!cancelled && accountChanged) setConsultations([]);
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser?.email]);
 
   const hydrateConsultationsWithCoreAnalyses = (analysisResults, candidateCases) => {
     const analysisByCoreId = new Map();
@@ -368,6 +388,60 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     }, ...items]);
   };
 
+  // AI 분석 실행을 화면이 아니라 여기서 맡습니다.
+  //
+  // 분석은 40~70초 걸리는데, 그동안 상담원이 다른 상담을 보거나 새 전화를 받을 수 있어야
+  // 합니다. 분석 화면 안에서 기다리면 화면을 옮기는 순간 컴포넌트와 함께 사라져서, 서버는
+  // 계속 돌지만 결과를 받을 곳이 없어 그대로 버려집니다. App은 화면이 바뀌어도 살아있으므로
+  // 여기서 돌리면 끝까지 진행되고, 끝났을 때 알림으로 알려줄 수 있습니다.
+  //
+  // 진행 중인 작업은 상담별로 들고 있습니다(여러 상담을 동시에 분석할 수 있음).
+  const [analysisRuns, setAnalysisRuns] = useState({});
+  // 중복 실행 검사에 state를 쓰면 직전 렌더의 값을 보게 되어(연타 시) 같은 분석이 두 번
+  // 시작될 수 있습니다. 검사는 항상 최신인 ref로 합니다.
+  const analysisRunIdsRef = useRef(new Set());
+
+  const startConsultationAnalysis = async (consultation) => {
+    const id = consultation?.id;
+    if (!id || analysisRunIdsRef.current.has(id)) return { ok: false, alreadyRunning: true };
+
+    analysisRunIdsRef.current.add(id);
+    setAnalysisRuns((runs) => ({ ...runs, [id]: { elapsedSec: 0 } }));
+    try {
+      const { analysis, patch } = await runConsultationAnalysis(consultation, {
+        onProgress: ({ elapsedMs }) => setAnalysisRuns((runs) => (
+          runs[id] ? { ...runs, [id]: { elapsedSec: Math.floor(elapsedMs / 1000) } } : runs
+        )),
+      });
+      setConsultations((items) => items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+      addNotification({
+        roles: 'counselor',
+        title: 'AI 분석 완료',
+        message: `${consultation.caseNo || ''} ${consultation.title || ''}`.trim() || '상담 분석이 끝났습니다.',
+        target: consultation.caseNo || '',
+        view: '기타',
+      });
+      return { ok: true, analysis };
+    } catch (error) {
+      // 실패도 알림으로 남깁니다 — 다른 화면에 가 있으면 화면 안 메시지를 볼 수 없습니다.
+      addNotification({
+        roles: 'counselor',
+        title: 'AI 분석 실패',
+        message: `${consultation.caseNo || ''} ${error.message || '분석에 실패했습니다.'}`.trim(),
+        target: consultation.caseNo || '',
+        view: '기타',
+      });
+      return { ok: false, error };
+    } finally {
+      analysisRunIdsRef.current.delete(id);
+      setAnalysisRuns((runs) => {
+        const next = { ...runs };
+        delete next[id];
+        return next;
+      });
+    }
+  };
+
   const markNotificationsRead = (targetRole, targetEmail) => {
     const personalKey = notificationUserKey(targetRole, targetEmail);
     setNotifications((items) => items.map((item) => isNotificationVisible(item, targetRole, targetEmail) ? {
@@ -449,7 +523,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       ...(coreSync || {}),
       date: today,
       registeredTime,
-      workflowStatus: '상담 완료',
+      workflowStatus: '상담 접수',
       counselor: {
         name: currentUser?.name || '상담원',
         email: currentUser?.email || '',
@@ -647,7 +721,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
           setActiveView('기타');
         }}
       />
-      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id) => { setFocusedConsultationId(id); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} /> : null}
+      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id, templateName) => { setFocusedConsultationId(id); setFocusedTemplateName(templateName || null); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
       {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} focusedAdminView={focusedAdminView} /> : null}
     </div>
@@ -786,7 +860,11 @@ function App() {
   // 전용 core-api를 호출합니다. authToken은 users 배열에 저장하지 않는 별도 상태라, 화면에 내려줄 때만
   // currentUser에 합쳐줍니다 — users 배열(및 그걸 그대로 쓰는 updateProfile)에는 절대 섞이면 안 됩니다.
   const currentUserForDisplay = currentUser ? { ...currentUser, token: authToken } : null;
-  const updateProfile = ({ email, password, organization, phone }) => {
+  // 비밀번호는 여기서 다루지 않습니다 — ProfilePanel이 core-api(/api/auth/password)로 직접
+  // 보내고, 여기에는 그 결과(passwordChanged)만 감사 로그용으로 전달됩니다.
+  // 예전에는 password를 받고도 저장하지 않으면서 로그에는 '변경'으로 남겨, 어떤 값을 넣어도
+  // 바뀌지 않는데 화면에는 저장됐다고 뜨는 상태였습니다.
+  const updateProfile = ({ email, organization, phone, passwordChanged = false }) => {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, email, organization: organization ?? currentUser.organization, phone: phone ?? currentUser.phone };
     persistUsers(users.map((user) => user.email === currentUser.email ? updatedUser : user));
@@ -807,7 +885,7 @@ function App() {
         phoneChanged: (currentUser.phone || '') !== (phone || ''),
         phoneBefore: currentUser.phone || '',
         phoneAfter: phone || '',
-        passwordChanged: Boolean(password),
+        passwordChanged,
       },
     });
   };

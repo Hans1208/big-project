@@ -58,13 +58,33 @@ public class AiAnalysisService {
     // 화면만 보고 "분석 내용 저장"을 누르기 전인데도(심지어 재분석·구조대상 판정·누락자료 점검을
     // 누를 때마다) ai_analysis 테이블에 행이 쌓였다. 실제 저장은 상담원이 결과를 확인하고
     // "분석 내용 저장"을 눌렀을 때(create()/update()) 한 번만 일어나야 한다.
+    // 지금은 비동기 방식(POST .../analyze-jobs)이 기본이고, 이 동기 엔드포인트는 전환 기간 동안만
+    // 남겨 둔다. 프론트가 전부 옮겨간 뒤 컨트롤러와 함께 지운다.
+    //
+    // 아래 세 단계로 나눠 둔 이유는 비동기 쪽 때문이다. 가운데 ai-api 호출이 몇 분 걸리는데
+    // 그동안 트랜잭션을 열어 두면 DB 커넥션 하나가 계속 묶인다. AnalysisJobRunner는 이 세 개를
+    // 따로 부르기 때문에 앞뒤만 짧은 트랜잭션이고 가운데는 트랜잭션 밖이다.
+    // 반면 여기(동기 경로)서는 셋이 한 트랜잭션 안에서 이어져 돌아 예전과 동작이 같다.
     @Transactional
     public AiAnalysisResponse analyze(Long consultationId) {
+        RawInputRequest request = prepareRawInput(consultationId);
+        ConsultAnalyzeApiResponse aiResponse = aiApiClient.analyzeConsult(request);
+        return buildAnalysisResponse(consultationId, aiResponse);
+    }
+
+    // [1단계] 상담을 "분석 중"으로 바꾸고 ai-api에 보낼 입력을 만든다.
+    @Transactional
+    public RawInputRequest prepareRawInput(Long consultationId) {
         Consultation consultation = consultationService.findById(consultationId);
         consultation.setStatus(ConsultationStatus.ANALYZING);
+        return buildRawInput(consultation);
+    }
 
-        RawInputRequest request = buildRawInput(consultation);
-        ConsultAnalyzeApiResponse aiResponse = aiApiClient.analyzeConsult(request);
+    // [3단계] ai-api 응답을 계약서 모양(AiAnalysisResponse)으로 옮기고 상담을 "완료"로 바꾼다.
+    // (2단계는 aiApiClient.analyzeConsult() 호출 자체 — DB를 건드리지 않는다.)
+    @Transactional
+    public AiAnalysisResponse buildAnalysisResponse(Long consultationId, ConsultAnalyzeApiResponse aiResponse) {
+        Consultation consultation = consultationService.findById(consultationId);
 
         JsonNode caseAnalysis = aiResponse.caseAnalysis();
         JsonNode checklist = aiResponse.reliefReviewChecklist();

@@ -60,6 +60,13 @@ function isEncryptionDataIssueMessage(message = '') {
 }
 
 function classifyCoreError(message, status) {
+  if (status === 502 || /ai-api|bad gateway/i.test(message)) {
+    return {
+      code: CORE_API_ERROR_CODE.CONNECTION_FAILED,
+      message: 'AI API 서버에 연결할 수 없습니다. ai-api가 http://127.0.0.1:8001에서 실행 중인지 확인해주세요.',
+    };
+  }
+
   if (isSchemaMismatchMessage(message)) {
     return {
       code: CORE_API_ERROR_CODE.SCHEMA_MISMATCH,
@@ -166,6 +173,18 @@ export function loginCoreUser({ email, password }) {
   return requestCoreJson('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  });
+}
+
+// 로그인한 본인의 비밀번호 변경. 대상 계정은 서버가 토큰에서 꺼내므로 여기서 보내지 않습니다
+// (이메일을 실어 보내면 남의 계정 비밀번호를 바꾸는 요청이 되어버립니다).
+//
+// 현재 비밀번호 불일치는 401, 지금과 같은 비밀번호는 409, 작성규칙 위반은 400으로 오고
+// requestCoreJson이 서버 메시지를 그대로 담은 에러를 던집니다.
+export function changeCorePassword({ currentPassword, newPassword }) {
+  return requestCoreJson('/api/auth/password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });
 }
 
@@ -451,13 +470,96 @@ export async function createCoreAnalysis({ consultation, analysis }) {
   });
 }
 
-export async function triggerCoreAnalysis(consultation) {
+// ── AI 분석 실행 ──────────────────────────────────────────────────────────
+//
+// 분석은 녹취 길이에 따라 몇 분씩 걸립니다. 그래서 요청 하나로 결과까지 받아오지 않고
+// "접수하고 → 주기적으로 다 됐는지 확인" 두 단계로 나눕니다.
+//
+// 이렇게 하는 이유 두 가지:
+//   1. 상담원 화면이 분석이 끝날 때까지 멈춰 있지 않습니다.
+//   2. 배포 환경의 로드밸런서는 응답 없이 일정 시간(보통 60초)이 지나면 연결을 끊습니다.
+//      끊긴 뒤에도 서버는 계속 분석을 돌지만 결과를 돌려줄 곳이 없어 그냥 버려집니다.
+//      접수 요청은 즉시 응답하므로 그 시간 제한에 걸리지 않습니다.
+//
+// 서버는 결과를 analysis_job 행에 담아 두므로, 폴링이 중간에 끊겨도 작업 자체는 계속 돕니다.
+const ANALYSIS_POLL_INTERVAL_MS = 3000;
+const ANALYSIS_MAX_WAIT_MS = 30 * 60 * 1000;
+// 조회가 한 번 실패했다고 분석을 포기하면 안 됩니다 — 서버에서는 계속 돌고 있고, 잠깐의
+// 네트워크 문제일 수 있습니다. 연속으로 이만큼 실패했을 때만 실패로 봅니다.
+const ANALYSIS_POLL_MAX_CONSECUTIVE_ERRORS = 3;
+
+function sleep(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+// 분석 접수. 작업 번호만 받고 즉시 돌아옵니다.
+// 이미 이 상담에 돌고 있는 작업이 있으면 서버가 새로 만들지 않고 그 작업을 돌려줍니다.
+export async function submitCoreAnalysisJob(consultation) {
   if (!consultation?.coreId) {
     throw new Error('Core API에 저장되지 않은 상담입니다.');
   }
-  return requestCoreJson(`/api/consultations/${consultation.coreId}/analyze`, {
+  return requestCoreJson(`/api/consultations/${consultation.coreId}/analyze-jobs`, {
     method: 'POST',
   });
+}
+
+export async function getCoreAnalysisJob(jobId) {
+  return requestCoreJson(`/api/analysis-jobs/${jobId}`);
+}
+
+// 아직 안 끝난 작업이 있으면 돌려줍니다(없으면 204 -> null). 화면을 새로고침했을 때
+// 돌고 있던 분석에 다시 붙기 위한 것입니다.
+export async function findActiveCoreAnalysisJob(consultation) {
+  if (!consultation?.coreId) return null;
+  return requestCoreJson(`/api/consultations/${consultation.coreId}/analyze-jobs/active`);
+}
+
+// 작업이 끝날 때까지 기다렸다가 분석 결과를 돌려줍니다.
+// onProgress는 기다리는 동안 주기적으로 불려서, 화면이 경과 시간을 보여줄 수 있게 합니다.
+export async function waitForCoreAnalysisJob(job, { onProgress } = {}) {
+  let current = job;
+  let consecutiveErrors = 0;
+  const startedAt = Date.now();
+
+  while (current && current.status !== 'SUCCEEDED' && current.status !== 'FAILED') {
+    const elapsedMs = Date.now() - startedAt;
+    if (elapsedMs > ANALYSIS_MAX_WAIT_MS) {
+      // 서버 작업 자체는 계속 돌고 있으므로 "실패"가 아니라 "확인을 그만둔다"는 뜻입니다.
+      throw new Error('분석이 30분 안에 끝나지 않았습니다. 잠시 후 다시 확인해주세요.');
+    }
+    onProgress?.({ status: current.status, elapsedMs });
+    await sleep(ANALYSIS_POLL_INTERVAL_MS);
+    try {
+      current = await getCoreAnalysisJob(current.job_id);
+      consecutiveErrors = 0;
+    } catch (error) {
+      consecutiveErrors += 1;
+      if (consecutiveErrors >= ANALYSIS_POLL_MAX_CONSECUTIVE_ERRORS) throw error;
+    }
+  }
+
+  if (current.status === 'FAILED') {
+    throw new Error(current.error_message || 'AI 분석에 실패했습니다.');
+  }
+  return current.result;
+}
+
+// 서버에 아예 닿지 못한 경우(core-api가 꺼져 있는 등)인지 구분합니다.
+//
+// 이 구분이 필요한 이유: 분석 화면은 실패하면 로컬 목업 결과로 넘어가는데, 그건 개발 중
+// 백엔드 없이 화면을 보기 위한 장치입니다. 서버까지 닿았는데 분석이 실패한 경우까지 목업으로
+// 덮어버리면, 상담원은 실패한 줄 모르고 가짜 결과를 실제 분석으로 믿고 저장하게 됩니다.
+export function isCoreConnectionError(error) {
+  return error?.code === CORE_API_ERROR_CODE.CONNECTION_FAILED;
+}
+
+// 부르는 쪽에서 보면 예전과 똑같이 "분석 결과를 돌려주는 함수"입니다.
+// 접수와 대기를 안에서 처리하므로 호출부는 바꿀 필요가 없습니다.
+export async function triggerCoreAnalysis(consultation, options = {}) {
+  const { onSubmitted, ...waitOptions } = options;
+  const job = await submitCoreAnalysisJob(consultation);
+  onSubmitted?.(job);
+  return waitForCoreAnalysisJob(job, waitOptions);
 }
 
 function normalizeMissingInfoItem(item) {
@@ -592,16 +694,6 @@ export async function updateCoreAnalysis({ consultation, analysisId, analysis })
   });
 }
 
-export function uploadCoreAttachment(consultationId, file, fileType) {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('fileType', fileType || '기타');
-  return requestCoreJson(`/api/consultations/${consultationId}/attachments`, {
-    method: 'POST',
-    body: formData,
-  });
-}
-
 // 이미 presigned URL로 S3에 올라간 파일의 메타데이터를 "기존" 상담에 등록합니다(DB에만 기록,
 // 재업로드 없음). 상담원이 "기존 상담에 자료 추가 → 자료 저장"을 눌렀을 때 새로 고른 파일마다 호출됩니다.
 // (상담을 새로 만들 때는 createCoreConsultation의 attachments 필드로 한 번에 같이 등록되므로 이 호출이 필요 없음.)
@@ -643,7 +735,7 @@ export function mapCoreAttachmentToLocal(item = {}) {
     storageBucket: item.storageBucket || '',
     fileKey: item.fileKey || '',
     uploadedUrl: item.fileUrl || item.downloadUrl || item.uploadedUrl || '',
-    status: item.id != null ? '서버 저장' : (item.fileKey || item.fileUrl) ? 'S3 업로드 완료' : '',
+    status: item.id != null ? '서버 저장' : (item.fileKey || item.fileUrl) ? '업로드 완료' : '',
   };
 }
 
@@ -691,17 +783,6 @@ export function approveCoreDocument(consultationId, documentId, note, token) {
     method: 'POST',
     headers: authHeader(token),
     body: JSON.stringify({ note: note || '' }),
-  });
-}
-
-export function requestCoreDocumentRevision(consultationId, documentId, note, requestedMaterials, token) {
-  return requestCoreJson(`/api/consultations/${consultationId}/documents/${documentId}/request-revision`, {
-    method: 'POST',
-    headers: authHeader(token),
-    body: JSON.stringify({
-      note: note || '',
-      requested_materials: requestedMaterials || [],
-    }),
   });
 }
 
