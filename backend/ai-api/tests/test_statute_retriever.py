@@ -1,5 +1,6 @@
 from rag.statute_retriever import (
     StatuteRetriever,
+    rerank_statute_candidates,
 )
 
 
@@ -210,3 +211,79 @@ def test_retrieve_rejects_empty_query():
         raise AssertionError(
             "ValueError was not raised."
         )
+
+
+
+def test_rerank_promotes_article_title_keyword_match():
+    candidates = [
+        {
+            "document_id": "statute:001706:842:0",
+            "similarity": 0.92,
+            "law_name": "\ubbfc\ubc95",
+            "article_label": "\uc81c842\uc870",
+            "article_title": (
+                "\uae30\ud0c0 \uc6d0\uc778\uc73c\ub85c "
+                "\uc778\ud55c \uc774\ud63c\uccad\uad6c\uad8c\uc758 "
+                "\uc18c\uba78"
+            ),
+        },
+        {
+            "document_id": "statute:001706:839:2",
+            "similarity": 0.89,
+            "law_name": "\ubbfc\ubc95",
+            "article_label": "\uc81c839\uc870\uc7582",
+            "article_title": (
+                "\uc7ac\uc0b0\ubd84\ud560\uccad\uad6c\uad8c"
+            ),
+        },
+    ]
+
+    results = rerank_statute_candidates(
+        query=(
+            "\uc774\ud63c \ud6c4 "
+            "\uc7ac\uc0b0\ubd84\ud560 \uccad\uad6c "
+            "\uae30\uac04\uc740 \uc5bc\ub9c8\uc778\uac00\uc694?"
+        ),
+        candidates=candidates,
+    )
+
+    assert results[0]["document_id"] == (
+        "statute:001706:839:2"
+    )
+    assert results[0]["similarity"] == 0.89
+    assert results[0]["rerank_score"] > (
+        results[1]["rerank_score"]
+    )
+
+
+def test_rerank_boosts_exact_article_label():
+    candidates = [
+        {
+            "document_id": "statute:001706:839:2",
+            "similarity": 0.82,
+            "law_name": "\ubbfc\ubc95",
+            "article_label": "\uc81c839\uc870\uc7582",
+            "article_title": (
+                "\uc7ac\uc0b0\ubd84\ud560\uccad\uad6c\uad8c"
+            ),
+        },
+        {
+            "document_id": "statute:001706:839:0",
+            "similarity": 0.90,
+            "law_name": "\ubbfc\ubc95",
+            "article_label": "\uc81c839\uc870",
+            "article_title": "\uc900\uc6a9\uaddc\uc815",
+        },
+    ]
+
+    results = rerank_statute_candidates(
+        query=(
+            "\ubbfc\ubc95 \uc81c839\uc870\uc7582 "
+            "\ub0b4\uc6a9\uc744 \uc54c\ub824\uc8fc\uc138\uc694."
+        ),
+        candidates=candidates,
+    )
+
+    assert results[0]["article_label"] == (
+        "\uc81c839\uc870\uc7582"
+    )

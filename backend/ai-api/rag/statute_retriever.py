@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from functools import lru_cache
 from typing import Any
 
@@ -15,6 +17,205 @@ from rag.vector_store import ChromaVectorStore
 
 MINIMUM_CANDIDATE_COUNT = 10
 CANDIDATE_MULTIPLIER = 5
+
+
+def _normalize_matching_text(
+    value: object,
+) -> str:
+    return re.sub(
+        r"[^0-9a-z\uac00-\ud7a3]+",
+        "",
+        str(value).casefold(),
+    )
+
+
+def _character_ngrams(
+    text: str,
+    size: int = 2,
+) -> set[str]:
+    if not text:
+        return set()
+
+    if len(text) < size:
+        return {text}
+
+    return {
+        text[index:index + size]
+        for index in range(
+            len(text) - size + 1
+        )
+    }
+
+
+ARTICLE_REFERENCE_PATTERN = re.compile(
+    r"\uc81c\s*(\d+)\s*\uc870"
+    r"(?:\s*\uc758\s*(\d+))?"
+)
+
+
+def _extract_article_labels(
+    value: object,
+) -> set[str]:
+    labels: set[str] = set()
+
+    for (
+        article_number,
+        branch_number,
+    ) in ARTICLE_REFERENCE_PATTERN.findall(
+        str(value)
+    ):
+        normalized_number = str(
+            int(article_number)
+        )
+
+        label = (
+            f"\uc81c{normalized_number}"
+            f"\uc870"
+        )
+
+        if branch_number:
+            normalized_branch = str(
+                int(branch_number)
+            )
+
+            label += (
+                f"\uc758{normalized_branch}"
+            )
+
+        labels.add(
+            _normalize_matching_text(label)
+        )
+
+    return labels
+
+
+def _calculate_lexical_boost(
+    query: str,
+    candidate: dict[str, Any],
+) -> float:
+    normalized_query = (
+        _normalize_matching_text(query)
+    )
+
+    article_title = _normalize_matching_text(
+        candidate.get("article_title", "")
+    )
+    article_label = _normalize_matching_text(
+        candidate.get("article_label", "")
+    )
+    law_name = _normalize_matching_text(
+        candidate.get("law_name", "")
+    )
+
+    boost = 0.0
+
+    article_references = (
+        _extract_article_labels(query)
+    )
+
+    if (
+        article_label
+        and article_label in article_references
+    ):
+        boost += 0.25
+
+    if (
+        article_title
+        and article_title in normalized_query
+    ):
+        boost += 0.15
+
+    elif article_title:
+        title_ngrams = _character_ngrams(
+            article_title
+        )
+        query_ngrams = _character_ngrams(
+            normalized_query
+        )
+
+        if title_ngrams:
+            overlap_ratio = (
+                len(
+                    title_ngrams
+                    & query_ngrams
+                )
+                / len(title_ngrams)
+            )
+
+            boost += min(
+                0.12,
+                overlap_ratio * 0.12,
+            )
+
+    if law_name and law_name in normalized_query:
+        boost += 0.04
+
+    return boost
+
+
+def rerank_statute_candidates(
+    query: str,
+    candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Combine vector similarity with small lexical boosts."""
+    reranked: list[dict[str, Any]] = []
+
+    for original_rank, candidate in enumerate(
+        candidates
+    ):
+        normalized = dict(candidate)
+
+        similarity = float(
+            normalized.get(
+                "similarity",
+                0.0,
+            )
+        )
+
+        normalized["rerank_score"] = (
+            similarity
+            + _calculate_lexical_boost(
+                query,
+                normalized,
+            )
+        )
+        normalized["_original_rank"] = (
+            original_rank
+        )
+
+        reranked.append(normalized)
+
+    reranked.sort(
+        key=lambda item: (
+            float(
+                item.get(
+                    "rerank_score",
+                    0.0,
+                )
+            ),
+            float(
+                item.get(
+                    "similarity",
+                    0.0,
+                )
+            ),
+            -int(
+                item.get(
+                    "_original_rank",
+                    0,
+                )
+            ),
+        ),
+        reverse=True,
+    )
+
+    for candidate in reranked:
+        candidate.pop(
+            "_original_rank",
+            None,
+        )
+
+    return reranked
 
 
 class StatuteRetriever:
@@ -119,10 +320,10 @@ class StatuteRetriever:
             selected.append(normalized)
             seen_document_ids.add(document_id)
 
-            if len(selected) >= top_k:
-                break
-
-        return selected
+        return rerank_statute_candidates(
+            query=clean_query,
+            candidates=selected,
+        )[:top_k]
 
 
 @lru_cache(maxsize=1)
