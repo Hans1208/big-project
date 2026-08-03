@@ -164,10 +164,8 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
   const [role, setRole] = useState('counselor');
   const [form, setForm] = useState({ name: '', organization: '', department: '', phone: '', branch: legalAidBranchOffices[0], email: '', password: '', confirmPassword: '' });
   // 개인정보 보호법 제15조 제2항 — 수집·이용에 대한 동의는 받아야 가입을 진행할 수 있습니다.
-  //
-  // TODO(규제): 동의한 사실 자체는 아직 저장하지 않습니다. 화면에서 받기만 합니다.
-  //   분쟁이 생기면 동의를 받았다는 증빙이 없으므로, User에 privacy_agreed_at 컬럼을 두고
-  //   가입 시각과 함께 남겨야 합니다. 스키마 변경이 필요해 이번 범위에서 뺐습니다.
+  // 동의 여부는 가입 요청에 함께 실려 서버에 동의 시각(users.privacy_agreed_at)으로 남습니다.
+  // 분쟁이 생기면 그 값이 "동의를 받았다"는 증빙이 됩니다.
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const emailInvalid = form.email.length > 0 && !form.email.includes('@');
   const passwordsMismatch = form.confirmPassword && form.password !== form.confirmPassword;
@@ -191,7 +189,7 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
     // 남아 있어서, 이 값을 그대로 넘기면 헤더 배지(layout.jsx formatIdentityBadge)가
     // currentUser.branch를 "관리자가 실제로 고른 지부"로 오인해 organization 대신
     // 엉뚱한 지부명을 보여줬습니다. 관리자는 branch를 비워서 넘깁니다.
-    onComplete({ ...form, role, organization, branch: requiresBranch ? form.branch : '' });
+    onComplete({ ...form, role, organization, branch: requiresBranch ? form.branch : '', privacyAgreed });
   };
 
   return (

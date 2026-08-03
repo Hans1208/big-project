@@ -47,7 +47,7 @@ const DIRECT_UPLOAD_ENABLED = !['0', 'false', 'off'].includes(
 );
 
 // 1단계: 백엔드에 presigned PUT URL을 요청합니다.
-async function requestPresignedUpload({ fileName, contentType, fileType }) {
+async function requestPresignedUpload({ fileName, contentType, fileType, sizeBytes }) {
   let response;
   try {
     // 이 파일은 coreApiClientV2의 requestCoreJson을 거치지 않고 fetch를 직접 부르므로,
@@ -56,7 +56,9 @@ async function requestPresignedUpload({ fileName, contentType, fileType }) {
     response = await fetch(`${CORE_API_BASE_URL}/api/attachments/presigned-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...coreAuthHeader() },
-      body: JSON.stringify({ fileName, contentType, fileType }),
+      // sizeBytes를 함께 보냅니다. 파일 바이트는 S3로 직행해 서버를 지나지 않으므로,
+      // 서버가 크기를 알 수 있는 건 이 값뿐입니다(정확한 상한은 버킷 정책 쪽 몫).
+      body: JSON.stringify({ fileName, contentType, fileType, sizeBytes }),
     });
   } catch {
     // 서버가 꺼져 있거나 네트워크 자체가 안 되는 경우 → 폴백 신호
@@ -66,6 +68,12 @@ async function requestPresignedUpload({ fileName, contentType, fileType }) {
   // 404/405 = 백엔드에 아직 이 엔드포인트가 없음 → 폴백 신호
   if (response.status === 404 || response.status === 405) {
     throw new S3UploadUnavailableError('백엔드에 presigned 업로드 엔드포인트가 아직 없습니다.');
+  }
+  // 400은 서버가 파일을 거부한 경우입니다(허용하지 않는 형식·크기 초과 등).
+  // 폴백으로 넘기지 않고 사용자에게 사유를 그대로 보여줍니다 — 폴백하면 검증을 우회하게 됩니다.
+  if (response.status === 400) {
+    const reason = await response.json().catch(() => null);
+    throw new Error(reason?.message || '이 파일은 업로드할 수 없습니다.');
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
@@ -108,6 +116,7 @@ export async function uploadFileToS3(file, fileType) {
     fileName: file.name,
     contentType: file.type || 'application/octet-stream',
     fileType,
+    sizeBytes: file.size,
   });
   await putFileToS3(uploadUrl, file);
   // fileUrl이 없으면 키만으로도 백엔드가 접근 경로를 만들 수 있으므로 키를 대체 값으로 둡니다.

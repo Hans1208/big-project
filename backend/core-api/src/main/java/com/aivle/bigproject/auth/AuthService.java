@@ -12,6 +12,7 @@ import com.aivle.bigproject.user.ApprovalStatus;
 import com.aivle.bigproject.user.User;
 import com.aivle.bigproject.user.UserRepository;
 import com.aivle.bigproject.user.UserRole;
+import java.time.LocalDateTime;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,21 +24,31 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final LoginAttemptTracker loginAttemptTracker;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
+                        LoginAttemptTracker loginAttemptTracker) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.loginAttemptTracker = loginAttemptTracker;
     }
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         validatePasswordRule(request.password(), request.email());
+        // 개인정보 수집·이용에 동의해야 가입할 수 있다(개인정보 보호법 제15조 제2항).
+        // 화면에서도 막고 있지만 이 엔드포인트를 직접 부르면 그 검사를 지나칠 수 있어 여기서도 본다.
+        if (!Boolean.TRUE.equals(request.privacyAgreed())) {
+            throw new BadRequestException("개인정보 수집·이용 동의가 필요합니다.");
+        }
         userRepository.findByEmail(request.email()).ifPresent(existing -> {
             throw new ConflictException("이미 가입된 이메일입니다: " + request.email());
         });
         User user = new User(request.name(), request.role(), request.email());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
+        // 동의한 사실을 시각과 함께 남긴다 — 분쟁이 생기면 이게 증빙이 된다.
+        user.setPrivacyAgreedAt(LocalDateTime.now());
         // ADMIN은 가입 즉시 사용 가능, CONSULTANT/LAWYER는 관리자 승인 전까지 로그인 불가(login() 참고)
         user.setApprovalStatus(request.role() == UserRole.ADMIN ? ApprovalStatus.APPROVED : ApprovalStatus.PENDING);
         User saved = userRepository.save(user);
@@ -51,17 +62,33 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new UnauthorizedException("이메일 또는 비밀번호가 올바르지 않습니다."));
-        if (user.getPasswordHash() == null || !matchesPassword(request.password(), user)) {
+        // 비밀번호를 무제한으로 넣어볼 수 없게 실패 횟수를 세어 잠시 막는다(LoginAttemptTracker).
+        // 비밀번호 검사보다 먼저 봐야 잠긴 동안의 시도가 아예 처리되지 않는다.
+        long lockedSeconds = loginAttemptTracker.lockedSecondsRemaining(request.email());
+        if (lockedSeconds > 0) {
+            throw new ForbiddenException(
+                    "로그인 시도가 너무 많습니다. %d분 %d초 후에 다시 시도해주세요."
+                            .formatted(lockedSeconds / 60, lockedSeconds % 60));
+        }
+
+        // 없는 이메일도 실패로 세고 같은 메시지를 준다 — 응답이 다르면 어떤 이메일이
+        // 가입돼 있는지 알아낼 수 있다.
+        User user = userRepository.findByEmail(request.email()).orElse(null);
+        if (user == null || user.getPasswordHash() == null || !matchesPassword(request.password(), user)) {
+            loginAttemptTracker.recordFailure(request.email());
             throw new UnauthorizedException("이메일 또는 비밀번호가 올바르지 않습니다.");
         }
+
+        // 승인 대기·거절은 비밀번호가 맞은 경우다. 본인이 맞으므로 실패로 세지 않는다 —
+        // 승인만 기다리는 사람이 여러 번 눌렀다고 잠기면 안 된다.
         if (user.getApprovalStatus() == ApprovalStatus.PENDING) {
             throw new ForbiddenException("관리자 승인 대기 중인 계정입니다.");
         }
         if (user.getApprovalStatus() == ApprovalStatus.REJECTED) {
             throw new ForbiddenException("가입이 거절된 계정입니다.");
         }
+
+        loginAttemptTracker.recordSuccess(request.email());
         return toAuthResponse(user);
     }
 
