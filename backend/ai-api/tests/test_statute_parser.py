@@ -114,3 +114,56 @@ def test_parse_statute_payload_flattens_article_units():
     assert "\u2460 \ubd80\ubaa8\uc640 \uc790\ub294" in document["text"]
     assert "1. \uba74\uc811\uc758 \ubc29\ubc95" in document["text"]
     assert "\uac00. \ub300\uba74 \uba74\uc811" in document["text"]
+
+
+
+def test_parse_statute_payload_excludes_non_article_units():
+    payload = {
+        "\ubc95\ub839": {
+            "\ubc95\ub839\ud0a4": "0017062026031721454",
+            "\uae30\ubcf8\uc815\ubcf4": {
+                "\ubc95\ub839ID": "001706",
+                "\ubc95\ub839\uba85_\ud55c\uae00": "\ubbfc\ubc95",
+                "\uc2dc\ud589\uc77c\uc790": "20260317",
+            },
+            "\uc870\ubb38": {
+                "\uc870\ubb38\ub2e8\uc704": [
+                    {
+                        "\uc870\ubb38\ud0a4": "1000000",
+                        "\uc870\ubb38\ubc88\ud638": "1000",
+                        "\uc870\ubb38\uc5ec\ubd80": "\uc804\ubb38",
+                        "\uc870\ubb38\ub0b4\uc6a9": (
+                            "\uc81c2\uc808 \uc0c1\uc18d\uc778"
+                        ),
+                    },
+                    {
+                        "\uc870\ubb38\ud0a4": "1000001",
+                        "\uc870\ubb38\ubc88\ud638": "1000",
+                        "\uc870\ubb38\uc5ec\ubd80": "\uc870\ubb38",
+                        "\uc870\ubb38\uc81c\ubaa9": (
+                            "\uc0c1\uc18d\uc758 \uc21c\uc704"
+                        ),
+                        "\uc870\ubb38\ub0b4\uc6a9": (
+                            "\uc81c1000\uc870"
+                            "(\uc0c1\uc18d\uc758 \uc21c\uc704)"
+                        ),
+                    },
+                ]
+            },
+        }
+    }
+
+    documents = parse_statute_payload(
+        payload,
+        mst="284415",
+    )
+
+    assert len(documents) == 1
+    assert documents[0]["document_id"] == (
+        "statute:001706:1000:0"
+    )
+    assert documents[0]["article_key"] == "1000001"
+    assert documents[0]["article_title"] == (
+        "\uc0c1\uc18d\uc758 \uc21c\uc704"
+    )
+    assert "\uc81c2\uc808" not in documents[0]["text"]

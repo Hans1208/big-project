@@ -204,6 +204,16 @@ def parse_statute_payload(
         if not isinstance(article, dict):
             continue
 
+        article_flag = _text_value(
+            article.get("\uc870\ubb38\uc5ec\ubd80")
+        )
+
+        if (
+            article_flag
+            and article_flag != "\uc870\ubb38"
+        ):
+            continue
+
         article_number = _clean_number(
             article.get("\uc870\ubb38\ubc88\ud638")
         )
