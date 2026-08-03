@@ -2231,30 +2231,39 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                     <span>대상 · 증빙 · 긴급도 · 체크리스트 갱신</span>
                   </div>
                 ) : null}
-                <label className="miniField">사건 유형<input value={analysis.caseType} onChange={(event) => setAnalysis({ ...analysis, caseType: event.target.value })} /></label>
-                <p className="reasonText">분류 근거: {analysis.caseTypeReason}</p>
-                <label className="miniField">긴급도 등급
-                  <select value={analysis.urgency} onChange={(event) => setAnalysis({ ...analysis, urgency: event.target.value, emergency: { ...analysis.emergency, level: event.target.value } })}><option>상</option><option>중</option><option>하</option></select>
-                </label>
-                <div className="urgencyGauge">
-                  {/* 트랙 전체를 하(초록)~중(주황)~상(빨강) 그라디언트로 항상 보여주고, 지금
-                      점수 이후 구간만 회색으로 덮어 '전체 스펙트럼 중 지금 어디쯤인지'가
-                      한눈에 들어오게 합니다. 등급과 점수를 한 줄로 같이 표시합니다. */}
-                  <div className="urgencyGaugeTrack">
-                    <div className="urgencyGaugeMask" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
-                    <div className="urgencyGaugeMarker" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                <div className="fieldPairRow">
+                  <div>
+                    <label className="miniField">사건 유형<input value={analysis.caseType} onChange={(event) => setAnalysis({ ...analysis, caseType: event.target.value })} /></label>
+                    <p className="reasonText">분류 근거: {analysis.caseTypeReason}</p>
                   </div>
-                  <span className="urgencyGaugeValue">긴급도 {analysis.emergency?.level || '미확인'} 등급 · 점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}%</span>
+                  <div>
+                    <label className="miniField">긴급도 등급
+                      <select value={analysis.urgency} onChange={(event) => setAnalysis({ ...analysis, urgency: event.target.value, emergency: { ...analysis.emergency, level: event.target.value } })}><option>상</option><option>중</option><option>하</option></select>
+                    </label>
+                    <div className="urgencyGauge">
+                      {/* 트랙 전체를 하(초록)~중(주황)~상(빨강) 그라디언트로 항상 보여주고, 지금
+                          점수 이후 구간만 회색으로 덮어 '전체 스펙트럼 중 지금 어디쯤인지'가
+                          한눈에 들어오게 합니다. 등급과 점수를 한 줄로 같이 표시합니다. */}
+                      <div className="urgencyGaugeTrack">
+                        <div className="urgencyGaugeMask" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                        <div className="urgencyGaugeMarker" style={{ left: `${Math.round((analysis.emergency?.ratio || 0) * 100)}%` }} />
+                      </div>
+                      <span className="urgencyGaugeValue">긴급도 {analysis.emergency?.level || '미확인'} 등급 · 점수 {Math.round((analysis.emergency?.ratio || 0) * 100)}%</span>
+                    </div>
+                    <p className="reasonText">긴급도 근거: {analysis.emergency?.reason}</p>
+                  </div>
                 </div>
-                <p className="reasonText">긴급도 근거: {analysis.emergency?.reason}</p>
-                <label className="miniField">무료 법률구조 대상<select value={analysis.eligibility} onChange={(event) => setAnalysis({ ...analysis, eligibility: event.target.value })}><option>검토 필요</option><option>구조 가능</option><option>부적합</option><option>보류</option></select></label>
-                {analysis.eligibilityCheck ? (
-                  <div className={analysis.eligibilityCheck.isTargetCandidate && !analysis.eligibilityCheck.evidenceSubmitted ? 'eligibilitySummary missingEvidence' : 'eligibilitySummary'}>
-                    <span>대상 유형: {analysis.eligibilityCheck.applicantType}</span>
-                    <span>필요 증빙: {analysis.eligibilityCheck.requiredEvidence}</span>
-                    <span>증빙 제출: {analysis.eligibilityCheck.evidenceSubmitted ? '확인됨' : '미제출'}</span>
-                  </div>
-                ) : null}
+                <hr />
+                <div className="fieldPairRow">
+                  {analysis.eligibilityCheck ? (
+                    <div className={analysis.eligibilityCheck.isTargetCandidate && !analysis.eligibilityCheck.evidenceSubmitted ? 'eligibilitySummary missingEvidence' : 'eligibilitySummary'}>
+                      <span>대상 유형: {analysis.eligibilityCheck.applicantType}</span>
+                      <span>필요 증빙: {analysis.eligibilityCheck.requiredEvidence}</span>
+                      <span>증빙 제출: {analysis.eligibilityCheck.evidenceSubmitted ? '확인됨' : '미제출'}</span>
+                    </div>
+                  ) : <div />}
+                  <label className="miniField">무료 법률구조 대상<select value={analysis.eligibility} onChange={(event) => setAnalysis({ ...analysis, eligibility: event.target.value })}><option>검토 필요</option><option>구조 가능</option><option>부적합</option><option>보류</option></select></label>
+                </div>
               </div>
               
               

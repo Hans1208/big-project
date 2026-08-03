@@ -9083,6 +9083,13 @@ textarea:focus-visible,
   font-size: var(--fs-sm);
 }
 
+.fieldPairRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  align-items: start;
+}
+
 .modalityStat {
   display: inline-flex;
   align-items: center;
