@@ -2060,6 +2060,14 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
             <span>AI 분석 결과</span>
             <p>상담 메모 · 첨부자료 기준</p>
           </div>
+          {/* AI 출력은 참고용이며 최종 확정은 담당자가 수행합니다. (사람이 검토·확정하는 원칙) */}
+              <div className="hitlBanner">
+                <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
+                <span>
+                  <strong>AI가 정리한 내용은 참고용이에요.</strong>
+                  <small>분류 · 긴급도 · 구조대상은 사람이 확정</small>
+                </span>
+              </div>
 
         {selectedCase ? (
           <div className="analysisProgressPanel">
@@ -2166,31 +2174,39 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
         ) : (
           <div className="workflowColumns">
             <div>
-              {/* AI 출력은 참고용이며 최종 확정은 담당자가 수행합니다. (사람이 검토·확정하는 원칙) */}
-              <div className="hitlBanner">
-                <Info className="hitlBannerIcon" size={16} strokeWidth={2.4} aria-hidden="true" />
-                <span>
-                  <strong>AI가 정리한 내용은 참고용이에요.</strong>
-                  <small>분류 · 긴급도 · 구조대상은 사람이 확정</small>
-                </span>
-              </div>
+              
               <h3>인공지능 분석 요약</h3>
               <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
-              <h3>받은 자료</h3>
-              <div className="resultCard">
+              <div className="resultInlineRow">
+                <h3>AI 응답 검증</h3>
+                <span className={`statusChip ${analysis.verification?.format ? 'tone-success' : 'tone-danger'}`}>형식 검증 {analysis.verification?.format ? '통과' : '오류'}</span>
+                <span className={`statusChip ${analysis.verification?.grounded ? 'tone-success' : 'tone-warn'}`}>근거 검증 {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
+                <span className={`statusChip ${analysis.verification?.hallucinationRisk ? 'tone-danger' : 'tone-success'}`}>환각 탐지 {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
+              </div>
+              <div className="resultInlineRow">
+                <h3>받은 자료</h3>
                 {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
                     병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
-                {(analysis.modalities || []).map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
+                {(analysis.modalities || []).map((item) => (
+                  <span key={item.key} className="modalityStat">
+                    <span className={`statusChip ${item.count > 0 ? 'tone-info' : 'tone-muted'}`}>{item.key}</span>
+                    <strong className="modalityValue">{item.count}건</strong>
+                  </span>
+                ))}
               </div>
-              <h3>자료 읽기 결과</h3>
-              <div className="resultCard">
+              <div className="resultInlineRow">
+                <h3>자료 읽기 결과</h3>
                 {analysis.extractionDetail?.length ? analysis.extractionDetail.map((item, index) => (
-                  <div key={`${item.fileLink}-${index}`} className="extractRow">
-                    <span className={`extractStatus status-${item.status}`}>{extractionStatusLabel(item.status)}</span>
-                    <span className="extractName">{item.fileLink || '(파일명 없음)'}</span>
-                    <span className="extractNote">{item.note}</span>
-                  </div>
-                )) : <p>첨부파일 없음 · 메모만 분석</p>}
+                  <span
+                    key={`${item.fileLink}-${index}`}
+                    className={`extractChip status-${item.status}`}
+                    title={[item.fileLink, item.note].filter(Boolean).join(' · ')}
+                  >
+                    <strong>{extractionStatusLabel(item.status)}</strong>
+                    <span>{item.fileLink || '(파일명 없음)'}</span>
+                    {item.note ? <em>{item.note}</em> : null}
+                  </span>
+                )) : <span className="resultInlineEmpty">첨부파일 없음 · 메모만 분석</span>}
               </div>
               <h3>개인정보는 자동으로 가려집니다</h3>
               <div className="resultCard">
@@ -2201,12 +2217,6 @@ function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsul
                 {!showMaskedStt ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
                 <p className="sttPreviewText">{showMaskedStt ? analysis.sttPreview?.masked : analysis.sttPreview?.original}</p>
                 <p className="helperText">기본값: 마스킹본 · 원문: 오류 확인용</p>
-              </div>
-              <h3>AI 응답 검증</h3>
-              <div className="resultCard">
-                <span className="miniField">형식 검증: {analysis.verification?.format ? '통과' : '오류'}</span>
-                <span className="miniField">근거 검증: {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
-                <span className="miniField">환각 탐지: {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
               </div>
               <h3>무료 법률구조 대상 검토</h3>
               <div className={analysis.aiLinked?.eligibility ? 'resultCard aiLinkedCard' : 'resultCard'}>

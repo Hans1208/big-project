@@ -9056,6 +9056,79 @@ textarea:focus-visible,
   color: var(--text-sub);
 }
 
+/* AI 분석 결과 중 정보량이 적은 항목(받은 자료/자료 읽기 결과/AI 응답 검증)은 세로로 긴
+   리스트 대신, 섹션 제목 옆에 가로로 나란히 배치해 한눈에 훑을 수 있게 합니다. */
+.resultInlineRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.analysisPanel .workflowColumns .resultInlineRow {
+  margin-top: 28px;
+}
+
+.analysisPanel .workflowColumns .resultInlineRow:first-child {
+  margin-top: 0;
+}
+
+.analysisPanel .workflowColumns .resultInlineRow h3 {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.resultInlineEmpty {
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+}
+
+.modalityStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modalityValue {
+  font-size: var(--fs-body);
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.extractChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+.extractChip strong {
+  font-size: var(--fs-caption);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.extractChip > span {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
+.extractChip em {
+  font-style: normal;
+  color: var(--text-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
+}
+
 .compactSegmented {
   margin-bottom: 10px;
 }
