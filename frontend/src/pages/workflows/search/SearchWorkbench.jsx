@@ -82,9 +82,14 @@ export function SearchWorkbench({ consultations }) {
       setExpandedIds([]);   // 결과가 바뀌면 펼쳐둔 상태도 의미가 없습니다.
       // 더 청한 만큼 안 왔으면 색인에 더 없다는 뜻이라 '더 보기'를 감춥니다.
       setStatuteExhausted(kind === '추천' || rows.length < topK);
+      // 추천이 0건인 것은 검색어 문제가 아닙니다. AI가 후보 30건을 훑고도 이
+      // 상담에 쓸 조문이 없다고 판단한 것이라, 억지로 채우지 않은 결과입니다.
+      // (상담 내용이 아직 안 적힌 상담에서 실제로 이렇게 나옵니다.)
       setReferenceMessage(rows.length
         ? `조문 ${rows.length}건 · 국가법령정보센터`
-        : '해당하는 조문을 찾지 못했습니다 · 검색어를 바꿔보세요');
+        : kind === '추천'
+          ? '이 상담에 바로 쓸 조문을 찾지 못했습니다 · 직접 검색으로 찾아보세요'
+          : '해당하는 조문을 찾지 못했습니다 · 검색어를 바꿔보세요');
     } catch (error) {
       if (!isCurrent()) return;
       setStatuteResults([]);
@@ -258,9 +263,11 @@ export function SearchWorkbench({ consultations }) {
                     <span className="referenceCardMeta">
                       {item.source}
                       {item.effectiveDate ? ` · 시행 ${formatStatuteDate(item.effectiveDate)}` : ''}
-                      {/* 유사도는 순위를 매긴 근거일 뿐 정답률이 아닙니다. 이 조문을
-                          쓸지는 상담원·변호사가 정합니다(HITL). */}
-                      {item.similarityPercent != null ? ` · 유사도 ${item.similarityPercent}%` : ''}
+                      {/* 유사도 %는 일부러 감춥니다. 상담원은 90%를 '90% 확신'으로 읽는데,
+                          실제로는 색인 2,258개가 78.7~90.6%의 12%p 안에 뭉쳐 있고 아무
+                          상관 없는 조문도 78.7%를 받습니다. 순위를 정하는 것도 이제
+                          유사도가 아니라 AI 선별이라, 숫자를 같이 띄우면 순서와 거꾸로
+                          보이기까지 합니다. 응답에는 남겨두어 디버깅에는 씁니다. */}
                       {item.similarityPercent == null && item.caseType ? ` · ${item.caseType}` : ''}
                     </span>
                     {item.reason ? <span className="referenceCardReason">{item.reason}</span> : null}

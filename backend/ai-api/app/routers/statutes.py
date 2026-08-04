@@ -14,7 +14,7 @@
 """
 from fastapi import APIRouter, HTTPException
 
-from app.ai.statutes.explainer import explain as explain_recommendations
+from app.ai.statutes.explainer import select_and_explain
 from rag.statute_retriever import retrieve_statutes
 
 router = APIRouter(prefix="/statutes", tags=["statutes"])
@@ -26,6 +26,12 @@ router = APIRouter(prefix="/statutes", tags=["statutes"])
 #     상담원이 다시 다 읽어야 해서 추천이 아니다.
 SEARCH_TOP_K = 20
 RECOMMEND_TOP_K = 5
+# 추천에서 검색기에 요구하는 후보 수. 임베딩은 2,258개에서 후보를 좁히는 일은
+# 잘하지만 그중 무엇이 맞는지는 못 고른다(실측: 정답이 1·2·3·7·9위에 흩어져
+# 있었고, 상위 5건만 잘라 쓰면 그 중 둘을 놓쳤다). 넉넉히 뽑아 판단은
+# explainer에 맡긴다. 조문 평균 본문이 175자라 30건이어도 프롬프트는 6천 자
+# 안쪽이고, LLM 호출 횟수는 그대로 한 번이다.
+RECOMMEND_CANDIDATE_K = 30
 # 색인 전체가 2,289청크라 그보다 크게 받을 이유가 없다. 한 번에 너무 많이
 # 내리면 임베딩 조회와 응답 크기가 같이 커진다.
 MAX_TOP_K = 100
@@ -124,11 +130,14 @@ def recommend_statutes(payload: dict):
             status_code=400, detail="추천할 근거가 없습니다 (사건유형·요약이 비어 있음)"
         )
 
-    results = _search(query, payload.get("law_id"), payload.get("top_k", RECOMMEND_TOP_K))
+    candidates = _search(query, payload.get("law_id"), RECOMMEND_CANDIDATE_K)
     case_label = payload.get("case_subtype") or payload.get("case_type") or "이 사건"
+    limit = max(1, min(int(payload.get("top_k") or RECOMMEND_TOP_K), RECOMMEND_CANDIDATE_K))
 
-    # 유사도만 돌려주면 추천이 아니라 순위표다. 왜 이 조문이 올라왔는지를
-    # 상담 사실에 근거해 한 줄로 붙인다(app/ai/statutes/explainer.py).
-    results = explain_recommendations(
-        results, payload.get("summary") or "", case_label)
+    # 후보 중 이 상담에 실제로 쓸 조문만 고르고, 왜 관련되는지를 상담 사실에
+    # 근거해 한 줄로 붙인다(app/ai/statutes/explainer.py). 유사도 순서를 그대로
+    # 내보내면 관련 없는 조문이 상위를 차지한다 — 양육비 상담에서 정답이 9위,
+    # 그 위 세 자리를 가족관계증명서 조문이 가져간 적이 있다.
+    results = select_and_explain(
+        candidates, payload.get("summary") or "", case_label, limit)
     return {"query": query, "results": results}
