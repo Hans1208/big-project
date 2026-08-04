@@ -23,7 +23,13 @@ from hwpx import HwpxDocument
 from app.ai.forms.verifier import llm_judge
 
 load_dotenv()
-MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+# 초안 생성·검증(verifier)·법령 추천 이유(statutes/explainer)가 함께 쓰는 모델.
+# gpt-4o-mini는 자리표시자가 많은 큰 서식에서 응답이 2만 4천 자를 넘다가 잘려
+# JSON 파싱이 깨졌다. 그러면 치환 목록이 통째로 버려져 당사자란이 빈 초안이
+# 나간다. 녹취 8건으로 비교한 결과 채워진 칸 43 -> 69개, 초안 생성 실패
+# 1 -> 0건, 유류분반환청구의 소 263 -> 34초.
+# 비용이 부담되면 .env의 LLM_MODEL로 되돌릴 수 있다.
+MODEL = os.getenv("LLM_MODEL", "gpt-5.4-mini")
 _client = None
 
 

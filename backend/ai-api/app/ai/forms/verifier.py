@@ -190,7 +190,8 @@ def llm_judge(draft_path, extracted: dict, summary: str = "") -> dict:
     )
     try:
         resp = client.chat.completions.create(
-            model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
+            # 기본값 사유는 drafter.MODEL 주석 참고.
+            model=os.getenv("LLM_MODEL", "gpt-5.4-mini"),
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0,
