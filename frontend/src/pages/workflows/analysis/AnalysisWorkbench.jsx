@@ -382,7 +382,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           : await findActiveCoreAnalysisJob(selectedCase);
         if (!knownJob || cancelled) return;
 
-        setIsAnalyzing(true);
+        setIsLocalTaskRunning(true);
         setLocalElapsedSec(0);
         setAiTaskMessage('진행 중인 AI 분석 결과를 확인하고 있습니다.');
         const coreResult = await waitForCoreAnalysisJob(knownJob, trackAnalysisProgress);
@@ -395,7 +395,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           showToast(message, 'warn');
         }
       } finally {
-        if (!cancelled) setIsAnalyzing(false);
+        if (!cancelled) setIsLocalTaskRunning(false);
       }
     };
 

@@ -14,6 +14,7 @@
 """
 from fastapi import APIRouter, HTTPException
 
+from app.ai.statutes.explainer import explain as explain_recommendations
 from rag.statute_retriever import retrieve_statutes
 
 router = APIRouter(prefix="/statutes", tags=["statutes"])
@@ -124,12 +125,10 @@ def recommend_statutes(payload: dict):
         )
 
     results = _search(query, payload.get("law_id"), payload.get("top_k", RECOMMEND_TOP_K))
-    case_type = payload.get("case_subtype") or payload.get("case_type") or "이 사건"
-    for item in results:
-        pct = item.get("similarity_percent")
-        item["reason"] = (
-            f"'{case_type}' 상담 내용과 {pct}% 유사"
-            if pct is not None
-            else f"'{case_type}' 상담 내용과 관련"
-        )
+    case_label = payload.get("case_subtype") or payload.get("case_type") or "이 사건"
+
+    # 유사도만 돌려주면 추천이 아니라 순위표다. 왜 이 조문이 올라왔는지를
+    # 상담 사실에 근거해 한 줄로 붙인다(app/ai/statutes/explainer.py).
+    results = explain_recommendations(
+        results, payload.get("summary") or "", case_label)
     return {"query": query, "results": results}
