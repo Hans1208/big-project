@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ClipboardList, CheckCircle2, Gavel, BookOpen } from 'lucide-react';
 import { WorkPageHeader, InlineEmptyNotice, friendlyErrorMessage } from '../../../components/common.jsx';
 import { searchReferenceCandidates } from '../../../services/legalAidApi.js';
@@ -61,7 +61,9 @@ export function SearchWorkbench({ consultations }) {
     effectiveDate: row.effective_date || '',
   });
 
-  const runStatuteQuery = async (kind, topK = STATUTE_PAGE_SIZE) => {
+  // isCurrent: 응답이 도착했을 때도 이 요청이 여전히 최신인지 묻습니다. 상담을
+  // 빠르게 넘기면 앞선 요청이 뒤늦게 도착해 새 상담의 결과를 덮어씁니다.
+  const runStatuteQuery = async (kind, topK = STATUTE_PAGE_SIZE, isCurrent = () => true) => {
     setStatuteLoading(true);
     setSearched(true);
     try {
@@ -73,21 +75,53 @@ export function SearchWorkbench({ consultations }) {
           extractedJson: selectedCase?.analysis?.extractedJson || {},
         })
         : await searchStatutes({ query, topK });
+      if (!isCurrent()) return;
       const rows = (payload?.results || []).map(toReferenceItem);
       setStatuteResults(rows);
       setStatuteTopK(topK);
+      setExpandedIds([]);   // 결과가 바뀌면 펼쳐둔 상태도 의미가 없습니다.
       // 더 청한 만큼 안 왔으면 색인에 더 없다는 뜻이라 '더 보기'를 감춥니다.
       setStatuteExhausted(kind === '추천' || rows.length < topK);
       setReferenceMessage(rows.length
         ? `조문 ${rows.length}건 · 국가법령정보센터`
         : '해당하는 조문을 찾지 못했습니다 · 검색어를 바꿔보세요');
     } catch (error) {
+      if (!isCurrent()) return;
       setStatuteResults([]);
       setReferenceMessage(friendlyErrorMessage(error, '법령을 불러오지 못했습니다'));
     } finally {
-      setStatuteLoading(false);
+      if (isCurrent()) setStatuteLoading(false);
     }
   };
+
+  // 추천은 '지금 고른 상담'에 딸린 결과라, 상담을 바꾸면 곧바로 다시 받아와야
+  // 합니다. 예전에는 탭 핸들러에서만 불러서, 상담을 바꿔도 앞 상담의 조문이
+  // 그대로 남아 있다가 탭을 왔다 갔다 해야 갱신됐습니다 — 화면에는 새 상담이
+  // 떠 있는데 목록은 남의 사건이라 알아채기도 어렵습니다.
+  //
+  // 호출 지점을 여기 하나로 모읍니다. 상담·자료종류·모드 중 무엇이 바뀌든 조건이
+  // 맞으면 다시 부르고, 아니면 남은 결과를 지웁니다.
+  const latestRequest = useRef(0);
+  useEffect(() => {
+    if (!isStatuteTab) {
+      setStatuteResults([]);
+      return;
+    }
+    // 직접 검색 모드에서는 상담원이 넣은 검색어가 기준이라 상담을 바꿔도
+    // 결과를 건드리지 않습니다. 지우면 방금 찾아둔 조문이 사라집니다.
+    if (mode !== '추천') return;
+    if (!selectedCase?.analysis?.summary) {
+      setStatuteResults([]);
+      setReferenceMessage('이 상담은 아직 분석 전입니다 · 실시간 분석을 먼저 실행해 주세요');
+      return;
+    }
+    // 상담을 빠르게 넘기면 앞선 요청이 뒤늦게 도착해 새 상담 화면에 옛 결과를
+    // 덮어쓸 수 있습니다. 가장 마지막 요청만 반영합니다.
+    const ticket = ++latestRequest.current;
+    runStatuteQuery('추천', undefined, () => ticket === latestRequest.current);
+    // runStatuteQuery는 매 렌더마다 새로 만들어지므로 의존성에 넣지 않습니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, referenceType, mode]);
 
   const runAiReferenceSearch = () => {
     if (isStatuteTab) {
@@ -147,7 +181,6 @@ export function SearchWorkbench({ consultations }) {
                   setSearched(mode === '추천');
                   setStatuteResults([]);
                   setReferenceMessage('');
-                  if (item.key === 'statute' && mode === '추천') runStatuteQuery('추천');
                 }}
               >
                 {item.label}
@@ -155,7 +188,7 @@ export function SearchWorkbench({ consultations }) {
             ))}
           </div>
           <div className="segmented referenceModeTabs">
-            {['추천', '직접 검색'].map((item) => <button className={mode === item ? 'active' : ''} type="button" key={item} onClick={() => { setMode(item); setSearched(item === '추천'); setStatuteResults([]); setReferenceMessage(''); if (isStatuteTab && item === '추천') runStatuteQuery('추천'); }}>{item}</button>)}
+            {['추천', '직접 검색'].map((item) => <button className={mode === item ? 'active' : ''} type="button" key={item} onClick={() => { setMode(item); setSearched(item === '추천'); setStatuteResults([]); setReferenceMessage(''); }}>{item}</button>)}
           </div>
         </div>
         {mode === '직접 검색' ? (
