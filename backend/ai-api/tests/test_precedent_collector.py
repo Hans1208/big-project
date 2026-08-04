@@ -229,3 +229,141 @@ def test_collector_respects_page_limit():
 
     assert len(results) == 2
     assert len(calls) == 2
+
+
+def test_default_jobs_limit_body_searches():
+    jobs = build_default_search_jobs()
+
+    signatures = {
+        (
+            job.query,
+            job.search_scope,
+            job.court_type_code,
+            job.referenced_law,
+        )
+        for job in jobs
+    }
+
+    assert (
+        "\uc7ac\uc0b0\ubd84\ud560",
+        2,
+        "400202",
+        "",
+    ) in signatures
+
+    assert (
+        "\ud611\uc758\uc774\ud63c",
+        2,
+        "400202",
+        "",
+    ) not in signatures
+
+    assert len(jobs) == 108
+
+
+def test_collector_filters_unrelated_tax_cases():
+    tax_case = _item(
+        "901",
+        (
+            "\ubc95\uc778\uc138\ubd80\uacfc\ucc98\ubd84"
+            "\ub4f1\ucde8\uc18c\uccad\uad6c"
+        ),
+        "20250101",
+    )
+    tax_case["case_type_name"] = (
+        "\ud589\uc815"
+    )
+
+    inheritance_case = _item(
+        "900",
+        "\uc0c1\uc18d\uc7ac\uc0b0\ubd84\ud560",
+        "20240101",
+    )
+    inheritance_case["case_type_name"] = (
+        "\ubbfc\uc0ac"
+    )
+
+    class FakeClient:
+        def search_precedents(self, **kwargs):
+            return PrecedentSearchPage(
+                total_count=2,
+                page=1,
+                items=[
+                    tax_case,
+                    inheritance_case,
+                ],
+            )
+
+    results = collect_precedent_summaries(
+        client=FakeClient(),
+        jobs=[
+            PrecedentSearchJob(
+                query="\uc0c1\uc18d",
+                search_scope=2,
+                court_type_code="400202",
+                referenced_law="\ubbfc\ubc95",
+                label=(
+                    "law:"
+                    "\ubbfc\ubc95:"
+                    "\uc0c1\uc18d:"
+                    "lower"
+                ),
+            )
+        ],
+        decision_date_from="20160101",
+        decision_date_to="20260804",
+        display=100,
+    )
+
+    assert [
+        result["precedent_id"]
+        for result in results
+    ] == [
+        "900",
+    ]
+
+
+def test_collector_keeps_generic_family_case():
+    family_case = _item(
+        "902",
+        "\uc0ac\uac74\uba85\ube44\uacf5\uac1c",
+        "20240201",
+    )
+    family_case["case_type_name"] = (
+        "\uac00\uc0ac"
+    )
+
+    class FakeClient:
+        def search_precedents(self, **kwargs):
+            return PrecedentSearchPage(
+                total_count=1,
+                page=1,
+                items=[family_case],
+            )
+
+    results = collect_precedent_summaries(
+        client=FakeClient(),
+        jobs=[
+            PrecedentSearchJob(
+                query="\uc7ac\uc0b0\ubd84\ud560",
+                search_scope=2,
+                court_type_code="400202",
+                referenced_law="",
+                label=(
+                    "keyword:body:"
+                    "\uc7ac\uc0b0\ubd84\ud560:"
+                    "lower"
+                ),
+            )
+        ],
+        decision_date_from="20160101",
+        decision_date_to="20260804",
+        display=100,
+    )
+
+    assert [
+        result["precedent_id"]
+        for result in results
+    ] == [
+        "902",
+    ]

@@ -1,7 +1,8 @@
-"""Collect family-law precedent summaries."""
+"""Collect relevant family-law precedent summaries."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Iterable
 
@@ -42,6 +43,17 @@ DOMAIN_KEYWORDS = (
     "성년후견",
 )
 
+BODY_SEARCH_KEYWORDS = (
+    "이혼",
+    "재산분할",
+    "양육비",
+    "친권",
+    "면접교섭",
+    "상속",
+    "유류분",
+    "후견",
+)
+
 SPECIALIZED_REFERENCE_LAWS = (
     "가사소송법",
     "가족관계의 등록 등에 관한 법률",
@@ -63,6 +75,27 @@ REFERENCE_ANCHORS = (
     "후견",
 )
 
+EXCLUDED_CASE_NAME_TERMS = (
+    "법인세",
+    "상속세",
+    "증여세",
+    "부가가치세",
+    "소득세",
+    "양도소득세",
+    "종합소득세",
+    "관세",
+    "조세",
+    "세금",
+    "과세",
+    "부과처분",
+    "과징금",
+    "특허",
+    "산업재해",
+    "산재",
+    "마약",
+    "뇌물",
+)
+
 
 @dataclass(frozen=True)
 class PrecedentSearchJob:
@@ -71,6 +104,42 @@ class PrecedentSearchJob:
     court_type_code: str
     referenced_law: str
     label: str
+
+
+def _normalize_text(
+    value: object,
+) -> str:
+    return re.sub(
+        r"[^0-9a-z가-힣]+",
+        "",
+        str(value).casefold(),
+    )
+
+
+def is_relevant_precedent_summary(
+    item: dict[str, Any],
+) -> bool:
+    """Decide relevance before fetching the full precedent."""
+    case_name = _normalize_text(
+        item.get("case_name", "")
+    )
+    case_type_name = _normalize_text(
+        item.get("case_type_name", "")
+    )
+
+    if any(
+        _normalize_text(term) in case_name
+        for term in EXCLUDED_CASE_NAME_TERMS
+    ):
+        return False
+
+    if "가사" in case_type_name:
+        return True
+
+    return any(
+        _normalize_text(keyword) in case_name
+        for keyword in DOMAIN_KEYWORDS
+    )
 
 
 def build_default_search_jobs(
@@ -131,13 +200,17 @@ def build_default_search_jobs(
                 ),
             )
 
+    for keyword in BODY_SEARCH_KEYWORDS:
+        for court_code, court_level in (
+            COURT_LEVELS.items()
+        ):
             add_job(
-                query=clean_keyword,
+                query=keyword,
                 search_scope=2,
                 court_type_code=court_code,
                 referenced_law="",
                 label=(
-                    f"keyword:body:{clean_keyword}:"
+                    f"keyword:body:{keyword}:"
                     f"{court_level}"
                 ),
             )
@@ -275,11 +348,18 @@ def collect_precedent_summaries(
 
             page_number += 1
 
+    relevant_records: list[dict[str, Any]] = []
+
     for record in records.values():
         record["matched_searches"].sort()
 
+        if is_relevant_precedent_summary(
+            record
+        ):
+            relevant_records.append(record)
+
     return sorted(
-        records.values(),
+        relevant_records,
         key=lambda item: (
             str(
                 item.get(
