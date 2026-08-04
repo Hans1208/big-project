@@ -22,13 +22,19 @@ def draft_form(payload: dict):
     """서식명 + 추출정보 → 초안 HWPX 생성.
 
     payload 필수 키: form_name, extracted, summary(선택)
+    payload 선택 키: applicant_name, opponent_name — 상담원이 화면에서 직접
+    확인하고 고친 이름이다. 요약문에서 뽑아낸 이름보다 이쪽이 정확하므로,
+    주면 이름칸을 코드가 직접 채운다(drafter.draft 참고).
+
     반환에 초안 파일 경로(file)와 llm_judge 환각 재검증 결과가 포함된다.
     이 결과는 항상 '검토 대기'로 취급하고, 최종 확정은 상담원/변호사가
     수행해야 한다 (HITL) — 여기서 파일을 자동 확정하지 않는다."""
     form_name = payload.get("form_name")
     if not form_name:
         raise HTTPException(status_code=400, detail="form_name이 필요합니다")
-    return draft(form_name, payload.get("extracted", {}), payload.get("summary", ""))
+    return draft(form_name, payload.get("extracted", {}), payload.get("summary", ""),
+                 payload.get("applicant_name") or "",
+                 payload.get("opponent_name") or "")
 
 
 @router.post("/verify")

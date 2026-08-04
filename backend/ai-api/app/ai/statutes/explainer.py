@@ -30,7 +30,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+# 서식 초안·검증과 같은 모델을 쓴다(기본값 사유는 forms/drafter.py MODEL 주석).
+MODEL = os.getenv("LLM_MODEL", "gpt-5.4-mini")
 
 # 후보 하나당 넣을 조문 본문 길이. 조문 평균 본문이 175자라 30건을 다 넣어도
 # 보통 6천 자 안쪽이고, 항이 많은 긴 조문만 여기서 잘린다. 어느 조문인지
