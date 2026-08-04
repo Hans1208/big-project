@@ -2,6 +2,7 @@ package com.aivle.bigproject.consultation;
 
 import com.aivle.bigproject.consultation.dto.ConsultationRequest;
 import com.aivle.bigproject.consultation.dto.ConsultationResponse;
+import com.aivle.bigproject.consultation.dto.TranscriptSaveRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -46,6 +47,13 @@ public class ConsultationController {
     @PutMapping("/api/consultations/{id}")
     public ConsultationResponse update(@PathVariable Long id, @RequestBody ConsultationRequest request) {
         return consultationService.update(id, request);
+    }
+
+    // POST /api/consultations/{id}/transcript — "상담 저장" 버튼 전용. 채널별 실시간 상담 메모를
+    // Consultation.input_text / call_input_texts / inperson_input_texts(_masked)에 반영한다.
+    @PostMapping("/api/consultations/{id}/transcript")
+    public ConsultationResponse saveTranscript(@PathVariable Long id, @RequestBody TranscriptSaveRequest request) {
+        return consultationService.saveTranscript(id, request);
     }
 
     // DELETE /api/consultations/{id} — 삭제 (첨부파일과 실제 파일도 같이 삭제됨)

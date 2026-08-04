@@ -7567,6 +7567,34 @@ textarea:focus-visible,
   margin-bottom: 16px;
 }
 
+/* 대면 상담 "녹음 재시작" 확인 팝업의 네/아니오 버튼. statusConfirmActions(오른쪽 정렬,
+   "확인"/"취소" 두 버튼 크기가 서로 다름)를 그대로 쓰면 요청받은 모양(가운데 정렬, 두 버튼
+   크기·색이 동일)이 안 나와서 이 모달 전용으로 별도 클래스를 둔다. */
+.restartConfirmActions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.restartConfirmButton {
+  width: 96px;
+  height: var(--h-control-sm);
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.restartConfirmButton:hover {
+  background: var(--accent-press);
+  box-shadow: var(--shadow-soft);
+}
+
 .modalHeader h2 {
   margin: 0;
   font-size: var(--fs-h3);

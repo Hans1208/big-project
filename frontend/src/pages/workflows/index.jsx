@@ -13,7 +13,7 @@ import { SummaryBulletList } from './components/SummaryBulletList.jsx';
 import { resolveConfirmedCaseType } from './shared/caseHelpers.js';
 import { runConsultationAnalysis, hydrateAnalysisForDisplay, pickClientName } from './shared/analysisHelpers.js';
 
-export function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, focusedConsultationId, focusedTemplateName, onOpenAnalysis, onOpenDraft, analysisRuns, onStartAnalysis }) {
+export function UtilityPanel({ view, role, consultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onSaveTranscript, onUpdateConsultation, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onGoToDashboard, onNotify, focusedConsultationId, focusedTemplateName, onOpenAnalysis, onOpenDraft, analysisRuns, onStartAnalysis }) {
   // '상담 등록'은 상담원 고유 업무입니다. 다른 역할에서 실수로 activeView가 넘어와도
   // 접수 화면이 열리지 않도록 역할을 한 번 더 확인합니다. (네비게이션 메뉴 구성과 이중 방어)
   if (view === '상담 등록') return role === 'counselor' ? (
@@ -40,7 +40,7 @@ export function UtilityPanel({ view, role, consultations, onCreateConsultation, 
   );
   if (view === '알림') return <NotificationPanel role={role} currentUser={currentUser} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} />;
   if (view === '기타' && role === 'lawyer') return <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
-  if (view === '기타') return <AnalysisWorkbench consultations={consultations} onCreateConsultation={onCreateConsultation} onUpdateConsultation={onUpdateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} currentUser={currentUser} onGoToDashboard={onGoToDashboard} onOpenDraft={onOpenDraft} focusedConsultationId={focusedConsultationId} analysisRuns={analysisRuns} onStartAnalysis={onStartAnalysis} />;
+  if (view === '기타') return <AnalysisWorkbench consultations={consultations} onCreateConsultation={onCreateConsultation} onUpdateConsultation={onUpdateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} onSaveTranscript={onSaveTranscript} currentUser={currentUser} onGoToDashboard={onGoToDashboard} onOpenDraft={onOpenDraft} focusedConsultationId={focusedConsultationId} analysisRuns={analysisRuns} onStartAnalysis={onStartAnalysis} />;
   return <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
 }
 
