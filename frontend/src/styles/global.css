@@ -4800,6 +4800,51 @@ textarea:focus-visible,
   color: var(--text-main);
 }
 
+/* 통화 중 내 음성/상대방 음성 레벨 막대. transform:scaleX만 매 프레임 바꾸므로(레이아웃 재계산 없음)
+   requestAnimationFrame으로 갱신해도 가볍습니다. */
+.callAudioVisualizer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+.callAudioVisualizerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-sub);
+}
+
+.callAudioVisualizerLabel {
+  min-width: 64px;
+  font-size: var(--fs-sm);
+}
+
+.callAudioVisualizerTrack {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.callAudioVisualizerFill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  border-radius: inherit;
+  transition: transform .08s linear;
+}
+
+.callAudioVisualizerFill.mic { background: var(--accent-strong); }
+.callAudioVisualizerFill.remote { background: var(--success-solid); }
+
 /* '분석 시작' 전용 버튼. 활성=성공 그린, 비활성=회색 + 버튼 바로 아래 상시 캡션
    (툴팁이 아니라 항상 보이는 문구로 왜 눌리지 않는지 알려줍니다). */
 .callAnalyzeButtonGroup {

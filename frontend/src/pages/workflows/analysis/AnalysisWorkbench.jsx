@@ -750,6 +750,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           callSeconds={callSeconds}
           audioStatus={audioStatus}
           liveCaptions={liveCaptions}
+          audioStreamRef={audioStreamRef}
           availableAudioCalls={availableAudioCalls}
           selectedAudioCallId={selectedAudioCallId}
           isLoadingAudioCalls={isLoadingAudioCalls}

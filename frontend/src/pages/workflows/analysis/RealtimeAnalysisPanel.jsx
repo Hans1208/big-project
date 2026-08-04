@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PhoneCall, Check, Mic, Clock, Info, Sparkles, MessageSquareText, Headphones, Radio } from 'lucide-react';
 import { buildSuggestedQuestions, formatCallDuration } from '../shared/formatters.js';
 import { CallLiveIndicator } from '../components/CallLiveIndicator.jsx';
+import { CallAudioVisualizer } from '../components/CallAudioVisualizer.jsx';
 
 export function RealtimeCallControl({
   hasCase,
@@ -196,7 +197,7 @@ export function LiveCaptionCard({ callStatus, audioStatus, captions }) {
   );
 }
 
-export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, liveCaptions, availableAudioCalls, selectedAudioCallId, isLoadingAudioCalls, onSelectAudioCall, onRefreshAudioCalls, onStartCall, onEndCall, caseMeta }) {
+export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, liveCaptions, availableAudioCalls, selectedAudioCallId, isLoadingAudioCalls, onSelectAudioCall, onRefreshAudioCalls, onStartCall, onEndCall, caseMeta, audioStreamRef }) {
   const hasCase = Boolean(selectedCase);
   const headline = callStatus === 'ongoing'
     ? '통화 중입니다. 들은 내용을 바로 적으면서 진행하세요.'
@@ -228,6 +229,9 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
+          {callStatus === 'ongoing' && audioStreamRef ? (
+            <CallAudioVisualizer audioStreamRef={audioStreamRef} active={audioStatus === 'streaming'} />
+          ) : null}
           <LiveCaptionCard callStatus={callStatus} audioStatus={audioStatus} captions={liveCaptions} />
           <RealtimeMemoCard selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
           {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}

@@ -139,6 +139,19 @@ function parseTranscriptFrame(raw) {
   return { text: parsed.text, isFinal: Boolean(parsed.isFinal) };
 }
 
+// analyser의 현재 파형에서 RMS(진폭의 제곱평균제곱근)를 구해 0~1 근처 값으로 돌려줍니다.
+// analyser나 버퍼가 아직 없으면(통화 시작 전/종료 후) 0을 돌려줍니다.
+function rmsLevel(analyser, buffer) {
+  if (!analyser || !buffer) return 0;
+  analyser.getByteTimeDomainData(buffer);
+  let sumSquares = 0;
+  for (let index = 0; index < buffer.length; index += 1) {
+    const normalized = (buffer[index] - 128) / 128;
+    sumSquares += normalized * normalized;
+  }
+  return Math.sqrt(sumSquares / buffer.length);
+}
+
 export class RealtimeAudioStream {
   constructor({ onStatus, onError, onTranscript } = {}) {
     this.onStatus = onStatus || (() => {});
@@ -151,6 +164,12 @@ export class RealtimeAudioStream {
     this.processor = null;
     this.silentGain = null;
     this.playbackCursor = 0;
+    // 내 음성(마이크)·상대방 음성(재생) 크기를 화면에 보여주기 위한 분석 노드. 오디오 자체를
+    // 바꾸지 않고 지나가는 값만 읽는 패스스루라, 기존 마이크 전송·재생 경로 중간에 그대로 끼워 넣습니다.
+    this.micAnalyser = null;
+    this.remoteAnalyser = null;
+    this.micLevelBuffer = null;
+    this.remoteLevelBuffer = null;
   }
 
   async start({ callId } = {}) {
@@ -179,7 +198,7 @@ export class RealtimeAudioStream {
       // 통화가 끝나버린 걸 알게 되면 곧바로 소켓을 닫습니다(정책 위반 close). stop()이 보내는
       // 정상 종료(코드 1000)가 아니면 오류로 알립니다.
       this.socket.addEventListener('close', (event) => {
-        this.onStatus('idle');
+        this.onStatus('ended');
         if (event.code !== 1000) {
           this.onError(new Error(event.reason || '통화 연결이 종료되었습니다.'));
         }
@@ -209,9 +228,21 @@ export class RealtimeAudioStream {
         samples.forEach((sample, index) => { payload[index] = linearToMuLaw(sample); });
         this.socket.send(payload.buffer);
       };
-      this.source.connect(this.processor);
+      // 마이크 신호는 source -> micAnalyser -> processor 순서로 그대로 흘려보내(내용은 안 바꿈),
+      // micAnalyser가 destination까지 이어진 능동 그래프의 일부가 되어 매 프레임 값을 갱신하게 합니다.
+      this.micAnalyser = this.audioContext.createAnalyser();
+      this.micAnalyser.fftSize = 256;
+      this.micLevelBuffer = new Uint8Array(this.micAnalyser.fftSize);
+      this.source.connect(this.micAnalyser);
+      this.micAnalyser.connect(this.processor);
       this.processor.connect(this.silentGain);
       this.silentGain.connect(this.audioContext.destination);
+      // 상대방 오디오는 각 프레임마다 새 AudioBufferSourceNode로 재생되므로(playIncomingAudio),
+      // 여기서는 재생 경로에 상시 끼워둘 analyser 하나만 만들어 destination 앞에 둡니다.
+      this.remoteAnalyser = this.audioContext.createAnalyser();
+      this.remoteAnalyser.fftSize = 256;
+      this.remoteLevelBuffer = new Uint8Array(this.remoteAnalyser.fftSize);
+      this.remoteAnalyser.connect(this.audioContext.destination);
       this.onStatus('streaming');
     } catch (error) {
       this.stop();
@@ -229,22 +260,38 @@ export class RealtimeAudioStream {
     buffer.copyToChannel(samples, 0);
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.audioContext.destination);
+    source.connect(this.remoteAnalyser || this.audioContext.destination);
     const startAt = Math.max(this.audioContext.currentTime, this.playbackCursor);
     source.start(startAt);
     this.playbackCursor = startAt + buffer.duration;
+  }
+
+  // 마이크(mic)·상대방(remote) 음성의 지금 이 순간 크기를 0~1 사이 값으로 돌려줍니다.
+  // 파형(time-domain) 데이터의 RMS를 씁니다 — 주파수 분해까지는 필요 없고, "지금 얼마나
+  // 크게 들리는지"만 있으면 되는 막대 표시용이라 계산이 가장 단순한 방식을 골랐습니다.
+  getLevels() {
+    return {
+      mic: rmsLevel(this.micAnalyser, this.micLevelBuffer),
+      remote: rmsLevel(this.remoteAnalyser, this.remoteLevelBuffer),
+    };
   }
 
   stop() {
     if (this.processor) this.processor.disconnect();
     if (this.source) this.source.disconnect();
     if (this.silentGain) this.silentGain.disconnect();
+    if (this.micAnalyser) this.micAnalyser.disconnect();
+    if (this.remoteAnalyser) this.remoteAnalyser.disconnect();
     if (this.audioContext && this.audioContext.state !== 'closed') this.audioContext.close();
     if (this.socket && this.socket.readyState === WebSocket.OPEN) this.socket.close(1000, 'call-ended');
     if (this.mediaStream) this.mediaStream.getTracks().forEach((track) => track.stop());
     this.processor = null;
     this.source = null;
     this.silentGain = null;
+    this.micAnalyser = null;
+    this.remoteAnalyser = null;
+    this.micLevelBuffer = null;
+    this.remoteLevelBuffer = null;
     this.audioContext = null;
     this.socket = null;
     this.mediaStream = null;
