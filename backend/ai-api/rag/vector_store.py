@@ -26,6 +26,49 @@ STATUTE_METADATA_FIELDS: tuple[str, ...] = (
     "article_effective_date",
 )
 
+PRECEDENT_METADATA_FIELDS: tuple[str, ...] = (
+    "precedent_id",
+    "case_name",
+    "case_number",
+    "decision_date",
+    "decision",
+    "court_name",
+    "court_type_code",
+    "court_level",
+    "case_type_name",
+    "case_type_code",
+    "decision_type",
+    "holding",
+    "summary",
+    "referenced_statutes",
+    "referenced_precedents",
+    "matched_searches",
+    "section_type",
+    "section_label",
+)
+
+SEARCH_METADATA_FIELDS = (
+    STATUTE_METADATA_FIELDS
+    + PRECEDENT_METADATA_FIELDS
+)
+
+
+def _metadata_value(value: Any) -> str:
+    if value is None:
+        return ""
+
+    if isinstance(
+        value,
+        (list, tuple, set),
+    ):
+        return " | ".join(
+            str(item).strip()
+            for item in value
+            if str(item).strip()
+        )
+
+    return str(value)
+
 
 class ChromaVectorStore:
     """직접 계산한 임베딩을 ChromaDB에 저장하고 검색한다."""
@@ -144,16 +187,14 @@ class ChromaVectorStore:
                 ),
             }
 
-            for field_name in STATUTE_METADATA_FIELDS:
+            for field_name in SEARCH_METADATA_FIELDS:
                 if field_name not in document:
                     continue
 
                 field_value = document[field_name]
 
                 metadata[field_name] = (
-                    ""
-                    if field_value is None
-                    else str(field_value)
+                    _metadata_value(field_value)
                 )
 
             if "chunk_index" in document:
@@ -283,7 +324,7 @@ class ChromaVectorStore:
                             "",
                         )
                         for field_name
-                        in STATUTE_METADATA_FIELDS
+                        in SEARCH_METADATA_FIELDS
                     },
                     "metadata": safe_metadata,
                 }
