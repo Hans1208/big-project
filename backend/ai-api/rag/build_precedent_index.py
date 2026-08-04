@@ -73,7 +73,9 @@ def build_precedent_index(
         )
 
     if api_client is None:
-        api_client = PrecedentApiClient()
+        api_client = PrecedentApiClient(
+            request_delay_seconds=0.20,
+        )
 
     if embedding_service is None:
         embedding_service = EmbeddingService()

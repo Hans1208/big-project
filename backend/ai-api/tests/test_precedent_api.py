@@ -201,3 +201,31 @@ def test_get_precedent_requests_detail_by_id():
     assert params["type"] == ["JSON"]
     assert params["ID"] == ["228541"]
     assert calls[0][1] == 30.0
+
+def test_client_waits_after_configured_request():
+    delays = []
+
+    payload = {
+        "PrecService": {
+            "판례정보일련번호": "300001",
+        }
+    }
+
+    client = PrecedentApiClient(
+        oc="test-oc",
+        request_delay_seconds=0.25,
+        sleeper=delays.append,
+        transport=lambda _url, _timeout: (
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ),
+    )
+
+    result = client.get_precedent(
+        precedent_id="300001",
+    )
+
+    assert result == payload
+    assert delays == [0.25]

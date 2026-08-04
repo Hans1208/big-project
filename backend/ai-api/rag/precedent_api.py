@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ from urllib.request import Request, urlopen
 LAW_API_BASE_URL = "https://www.law.go.kr/DRF"
 
 Transport = Callable[[str, float], bytes]
+Sleeper = Callable[[float], None]
 
 VALID_COURT_TYPE_CODES = {
     "400201",
@@ -135,6 +137,8 @@ class PrecedentApiClient:
         oc: str | None = None,
         timeout: float = 30.0,
         transport: Transport | None = None,
+        request_delay_seconds: float = 0.0,
+        sleeper: Sleeper | None = None,
     ) -> None:
         self._oc = (
             oc.strip()
@@ -147,10 +151,19 @@ class PrecedentApiClient:
                 "LAW_API_OC is empty."
             )
 
+        if request_delay_seconds < 0:
+            raise ValueError(
+                "request_delay_seconds must not be negative."
+            )
+
         self._timeout = timeout
         self._transport = (
             transport or _default_transport
         )
+        self._request_delay_seconds = float(
+            request_delay_seconds
+        )
+        self._sleeper = sleeper or time.sleep
 
     def _request(
         self,
@@ -174,6 +187,11 @@ class PrecedentApiClient:
                 url,
                 self._timeout,
             )
+
+            if self._request_delay_seconds:
+                self._sleeper(
+                    self._request_delay_seconds
+                )
 
             payload = json.loads(
                 raw_body.decode(

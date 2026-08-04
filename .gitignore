@@ -48,3 +48,5 @@ backend/ai-api/rag/data/parsed_templates.json
 backend/ai-api/test_*.py
 backend/ai-api/custom_mocks/
 
+# ?? RAG ?? ???
+backend/ai-api/storage/
