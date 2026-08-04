@@ -14552,6 +14552,11 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 .analysisPanel .callControlButton.start:active:not(:disabled) {
   transform: scale(0.98);
 }
+.analysisPanel .callControlButton.start:disabled {
+  background: var(--surface-muted) !important;
+  color: var(--text-sub) !important;
+  cursor: not-allowed;
+}
 .analysisPanel .callControlButton.end {
   background: var(--danger-solid) !important;
   border: none !important;

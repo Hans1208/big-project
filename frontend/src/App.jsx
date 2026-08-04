@@ -5,7 +5,7 @@ import { Header, Footer, DashboardHeader } from './components/layout.jsx';
 import { initialConsultations, initialReviews, today } from './constants.jsx';
 import { LoginPage, RegisterPage, PasswordFindPage } from './pages/auth.jsx';
 import { CounselorDashboard, LawyerDashboard, AdminDashboard } from './pages/dashboards.jsx';
-import { hydrateAnalysisForDisplay, runConsultationAnalysis } from './pages/workflows.jsx';
+import { hydrateAnalysisForDisplay, runConsultationAnalysis } from './pages/workflows/index.jsx';
 import { appendAuditLog, readStorage, readTextStorage, storageKeys, writeStorage, writeTextStorage } from './services/storage.js';
 import { LoadingProvider } from './components/loading.jsx';
 import { FeedbackProvider, useToast } from './components/feedback.jsx';
