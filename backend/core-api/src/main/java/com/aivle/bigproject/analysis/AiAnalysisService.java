@@ -20,6 +20,7 @@ import com.aivle.bigproject.user.UserRepository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -108,9 +109,9 @@ public class AiAnalysisService {
         String caseSubtype = aiResponse.consultCaseSubtype();
         String timelineJson = toJsonText(aiResponse.consultTimeline());
 
-        // extracted_json은 아직 analysis 층 결과(당사자·금액·날짜)로 바꾸지 않는다.
-        // 프론트가 이 필드에서 case_emergency_ratio / case_list[0].case_type_reason을 읽고 있어서
-        // (coreApiClientV2.js) 지금 교체하면 화면이 깨진다. 프론트와 같이 옮겨야 하는 항목.
+        // extracted_json은 그래프 결과 위에 analysis 층 결과(당사자·금액·날짜·사건개요)를
+        // 얹어서 담는다(buildExtractedJson). 교체가 아니라 병합이라 프론트가 읽던 키는
+        // 그대로 남는다.
         // checklist_status_json은 분석 직후엔 채우지 않는다. 프론트가 checklist_json(4개 평가블록
         // 객체)에서 5개 체크박스 상태를 파생시켜 보여주고(mapCoreChecklist), 상담원이 "분석 내용
         // 저장"을 누를 때 그 시점의 체크 상태를 이 컬럼에 담아 보낸다.
@@ -121,7 +122,8 @@ public class AiAnalysisService {
         // 화면에서 고친 뒤 '구조대상 판정'이나 '누락자료 점검'을 누르면, 저장 버튼을 누르지도
         // 않았는데 그 행이 AI 값으로 되돌아간다.
         AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, caseSubtype, urgencyLevel, eligible,
-                caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
+                buildExtractedJson(caseAnalysis, aiResponse.consultExtracted()),
+                aiResponse.missingItems().toString(), checklist.toString(),
                 null, null, timelineJson, null, null, aiResponse.rawInput().toString());
 
         consultation.setStatus(ConsultationStatus.COMPLETED);
@@ -371,6 +373,31 @@ public class AiAnalysisService {
     // 요청으로 받은 JsonNode -> DB(jsonb 컬럼)에 넣을 원본 JSON 텍스트
     private String toJsonText(JsonNode node) {
         return node == null ? null : node.toString();
+    }
+
+    // extracted_json에 담을 값을 만든다. 그래프 결과(case_analysis) 위에 analysis 층의
+    // 구조화 결과(consult_extracted: 당사자·금액·날짜·사건개요)를 얹는다.
+    //
+    // 교체가 아니라 병합인 이유: 프론트가 이 필드에서 case_emergency_ratio와
+    // case_list[0].case_type_reason을 읽고 있어(coreApiClientV2.js) 갈아끼우면 화면이 깨진다.
+    // 두 층의 키가 겹치지 않으므로 함께 담아도 서로 방해하지 않는다.
+    //
+    // 이걸 안 담으면 서식 초안이 당사자를 못 받는다. 그러면 extracted_json에 남는 건
+    // 사건분류와 STT 원문뿐이라, 초안 생성 LLM이 오타 섞인 대화록에서 이름을 눈치로
+    // 뽑아 쓰게 된다 — 실제로 유언에 반대하는 형이 유언자 자리에 들어간 적이 있다.
+    // analysis 층은 그 형을 '상대방(형)', 피상속인은 '미상'으로 정확히 구분해 준다.
+    private String buildExtractedJson(JsonNode caseAnalysis, JsonNode consultExtracted) {
+        boolean hasStructured = consultExtracted != null && consultExtracted.isObject();
+        if (!hasStructured) {
+            // 구조화 분석이 실패(503 등)하면 그래프 결과만이라도 남긴다.
+            return toJsonText(caseAnalysis);
+        }
+        ObjectNode merged = objectMapper.createObjectNode();
+        if (caseAnalysis != null && caseAnalysis.isObject()) {
+            merged.setAll((ObjectNode) caseAnalysis);
+        }
+        merged.setAll((ObjectNode) consultExtracted);
+        return merged.toString();
     }
 
     // 엔티티 -> 응답 DTO. DTO 변환을 컨트롤러가 아니라 여기(서비스, 트랜잭션 안)에서 하는 이유는

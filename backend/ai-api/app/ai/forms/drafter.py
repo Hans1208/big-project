@@ -1759,10 +1759,12 @@ def _seed_role_names(applicant_name: str = "", opponent_name: str = "",
     채우고 서명란은 빠뜨리거나(유언증서 검인신청서) 형을 유언자로 넣는
     일이 났다.
 
-    /forms/draft는 이 두 값을 안 받으므로(core-api가 안 보낸다), 앱 경로에서는
-    추출정보의 당사자 목록이 사실상 유일한 확정 출처다. 거기서도 뽑는다.
+    core-api가 /forms/draft에 이 두 값을 실어 보낸다. 다만 통화 중 접수처럼
+    이름을 아직 안 적은 상담이 흔해서 비어 오는 경우가 많고, 그때는 추출정보의
+    당사자 목록이 유일한 확정 출처다. 그래서 양쪽에서 다 뽑는다.
 
-    확정된 값이 있으면 그걸 쓰고, 없으면 GPT 결과에서 뽑는 기존 경로로 둔다."""
+    우선순위는 접수 때 적어둔 값 > 추출정보 > GPT 추론이다. 앞의 둘은 사람이
+    확인한 값이고 마지막만 추론이라, 사람 손을 거친 쪽이 이긴다."""
     seeded = {}
     for role, key_re in (("청구인", LIVING_KEY_RE), ("상대방", OPPONENT_KEY_RE)):
         names = _known_names_by_role(extracted, key_re)
@@ -1774,6 +1776,179 @@ def _seed_role_names(applicant_name: str = "", opponent_name: str = "",
     if opponent_name and opponent_name.strip():
         seeded["상대방"] = opponent_name.strip()
     return seeded
+
+
+# 서식을 채우는 데 쓸모가 없으면서 프롬프트만 키우는 키들.
+#   aiAnalysisResponse  프론트가 분석 응답 전체를 통째로 다시 넣은 것. 그 안에
+#                       extracted_json·raw_input_json이 또 중첩돼 있어 혼자
+#                       전체의 8할을 차지한다(실측 9,131자 중 7,684자).
+#   extracted_content   STT 원문 대화록. "유언장"이 "유원장", "무효"가 "무혈"로
+#                       적혀 있어 넣으면 오히려 잘못된 값을 만든다. 사건 내용은
+#                       summary로 따로 전달된다.
+#   case_list 등        사건 분류·긴급도. 서식 칸에 들어갈 값이 아니다.
+_DRAFT_IRRELEVANT_KEYS = {
+    "aiAnalysisResponse", "aiEligibilityResponse", "aiMissingDataResponse",
+    "raw_input_json", "extracted_content", "extracted_content_detail",
+    "attachment_links", "submitted_file_link",
+    "case_list", "case_emergency_level", "case_emergency_ratio",
+    "case_emergency_reason",
+}
+
+
+def _trim_extracted_for_draft(extracted: dict) -> tuple:
+    """초안 생성에 넣을 추출정보만 남긴다.
+
+    core-api는 AI_ANALYSIS의 extracted_json을 통째로 보낸다. 거기엔 서식과
+    무관한 것들이 잔뜩 들어 있어서, 실제 사건 상담에서 2만 5천 자까지 커진다.
+    서식 원문이 2천 자인데 추출정보가 2만 5천 자면 모델이 무엇을 채워야 할지
+    놓치고 응답이 늘어지다 잘린다 — 실제로 응답이 27,500자에서 끊겨
+    JSONDecodeError가 났고, 그러면 치환 목록이 통째로 버려져 당사자란이 빈
+    초안이 나간다(재현 3/3, 한 번에 220초).
+
+    모르는 키는 남긴다. 분석 층이 앞으로 항목을 더 붙일 수 있고, 여기서
+    화이트리스트로 막으면 그때마다 이 파일을 같이 고쳐야 한다."""
+    if not isinstance(extracted, dict):
+        return extracted, 0
+    kept = {k: v for k, v in extracted.items() if k not in _DRAFT_IRRELEVANT_KEYS}
+    dropped = len(extracted) - len(kept)
+    return kept, dropped
+
+
+# 서식이 예시 인물을 표시하는 토큰. 같은 역할이라도 토큰이 다르면 다른 사람이다.
+#   "원 고 1. ○○○ / 2. 김①○ / 3. 김②○"  ← 예시 원고 세 명
+PERSON_PH_TOKEN_RE = re.compile(
+    r"[가-힣][①②③④⑤][○◯□◇▢△▲◉]"      # 김①○
+    r"|[가-힣]?[○◯□◇▢△▲◉]{2,3}")        # ○○○, 김◇◇
+
+
+def _removed_placeholder(before: str, after: str) -> str:
+    """치환으로 '지워진 자리표시자'를 뽑는다(_inserted_name의 반대)."""
+    i = 0
+    while i < min(len(before), len(after)) and before[i] == after[i]:
+        i += 1
+    j = 0
+    while (j < min(len(before), len(after)) - i
+           and before[len(before) - 1 - j] == after[len(after) - 1 - j]):
+        j += 1
+    return before[i:len(before) - j].strip() if j else before[i:].strip()
+
+
+def _drop_surplus_person_fills(replacements: list, extracted: dict = None) -> tuple:
+    """한 사람을 서식의 여러 당사자 자리에 중복으로 넣는 치환을 버린다.
+
+    유류분반환청구의 소는 원고 3인용 서식이라 예시 인물이 ○○○·김①○·김②○ 셋이다.
+    청구인이 한 명인 사건에서 GPT가 세 자리를 전부 같은 이름으로 채웠고, 상속분
+    계산식까지 "원고 장미란 3/9 / 원고 장미란 2/9 / 원고 장미란 2/9"로 세 벌이
+    나왔다. 한 사람이 셋으로 늘어난 문서다.
+
+    판단 기준은 역할 라벨이 아니라 '같은 이름이 다른 자리에 들어가는가'다.
+    처음에는 역할별 인원수와 자리수를 비교했는데, 상속재산분할협의서처럼 당사자
+    전원이 대등한(공동상속인) 서식에서 분석이 한 명만 '청구인'으로 라벨링하면
+    나머지 세 명이 통째로 잘려나갔다. 라벨은 층마다 다르게 붙지만, 같은 사람이
+    두 자리를 차지할 수 없다는 것은 어느 서식에서나 같다.
+
+    자리표시자 토큰이 곧 그 사람의 '자리'다(○○○ 1번, 김①○ 2번). 같은 이름이
+    이미 다른 토큰에 배정돼 있으면 그 치환은 버린다. 같은 토큰이 여러 줄에
+    걸치는 것(당사자란·서명란·계산식)은 같은 사람이므로 그대로 둔다.
+
+    버린 자리는 원본 그대로 두고 C단계가 [예시:확인필요]를 붙여 상담원에게
+    넘긴다 — 있는 사람을 복사해 채우면 없는 당사자가 생긴다."""
+    # 이 사건에 실제로 있는 사람 이름. 한 줄에 여러 자리가 든 문장을 판정할 때,
+    # 그 이름이 원문보다 늘어났는지를 세는 데 쓴다.
+    real_names = set()
+    for rx in (LIVING_KEY_RE, OPPONENT_KEY_RE, DECEASED_KEY_RE):
+        real_names |= _known_names_by_role(extracted or {}, rx)
+
+    slot_of: dict[tuple, str] = {}      # (역할, 이름) -> 처음 배정된 자리 토큰
+    kept, dropped = [], []
+    for r in replacements:
+        role = (r.get("role") or "").strip()
+        before, after = r.get("before", ""), r.get("after", "")
+        tokens = PERSON_PH_TOKEN_RE.findall(before)
+        if not tokens:
+            kept.append(r)
+            continue
+
+        name = _inserted_name(before, after)
+        # 한 줄에 예시 인물이 여럿인 문장("원고 ○○○에게 …, 원고 김①○, 원고 김②○")은
+        # 일부만 고쳐 쓸 수 없다. 한 사람이 두 번 이상 늘어났으면 통째로 버린다.
+        # 이 줄은 _inserted_name이 이름 하나가 아니라 긴 덩어리를 돌려주므로,
+        # 실제 당사자 목록으로 등장 횟수를 센다.
+        if len(tokens) > 1:
+            grown = [n for n in real_names
+                     if after.count(n) >= 2 and after.count(n) > before.count(n)]
+            if grown:
+                dropped.append(f"당사자 자리 {len(tokens)}개를 '{grown[0]}' 한 사람으로 "
+                               f"채운 문장 (…{before[:34]}…)")
+                continue
+            kept.append(r)
+            continue
+
+        if not name or len(name) > 20 or PLACEHOLDER_RE.search(name):
+            kept.append(r)          # 이름 자리가 아닌 치환(주소·날짜·금액)
+            continue
+
+        token = _removed_placeholder(before, after) or tokens[0]
+        key = (role, name)
+        first = slot_of.setdefault(key, token)
+        if first != token:
+            dropped.append(f"'{name}'을(를) 다른 당사자 자리에도 넣은 치환 "
+                           f"(이미 '{first}' 자리에 배정됨)")
+            continue
+        kept.append(r)
+    return kept, dropped
+
+
+def _apply_confirmed_names_to_extracted(extracted: dict, applicant_name: str = "",
+                                        opponent_name: str = "") -> tuple:
+    """추출정보의 당사자 이름을 상담원이 확인한 이름으로 바꾼다.
+
+    치환값만 고치면 당사자란은 맞는데 본문은 틀린 문서가 나온다. 서술 문단을
+    새로 쓰는 단계(_rewrite_examples)와 표를 채우는 단계는 치환 목록이 아니라
+    추출정보를 보기 때문이다 — 실제로 "채 권 자 남기훈"과 "신청인 김분석과
+    피신청인 박분석은 협의이혼을 하였습니다"가 한 문서에 같이 나왔다.
+    이름이 섞인 초안은 틀린 이름 하나보다 나쁘다. 상담원이 어느 쪽이 맞는지
+    알 수 없고, 고칠 자리를 다 찾지도 못한다.
+
+    그래서 모든 단계가 보기 전에 출처를 고친다. 상담원이 이름을 고쳤다는 것은
+    AI가 요약문에서 잘못 뽑았다는 뜻이므로, 추출정보 쪽이 틀린 것이다.
+
+    원본은 건드리지 않는다 — 호출부(core-api)가 넘겨준 dict라 여기서 바꾸면
+    같은 분석 결과를 쓰는 다른 경로까지 영향을 받는다."""
+    pairs = [(LIVING_KEY_RE, (applicant_name or "").strip()),
+             (OPPONENT_KEY_RE, (opponent_name or "").strip())]
+    pairs = [(rx, nm) for rx, nm in pairs if nm]
+    if not pairs or not isinstance(extracted, dict):
+        return extracted, 0
+
+    fixed = dict(extracted)
+    changed = 0
+
+    parties = fixed.get("당사자")
+    if isinstance(parties, (list, tuple)):
+        new_parties = []
+        for party in parties:
+            if isinstance(party, dict):
+                role = str(party.get("역할", ""))
+                for rx, name in pairs:
+                    if rx.search(role) and str(party.get("이름", "")).strip() != name:
+                        party = {**party, "이름": name}
+                        changed += 1
+                        break
+            new_parties.append(party)
+        fixed["당사자"] = new_parties
+
+    # {"청구인": "김분석"}처럼 평평하게 적힌 모양도 함께 고친다.
+    for key, value in list(fixed.items()):
+        if key == "당사자" or not isinstance(value, str):
+            continue
+        for rx, name in pairs:
+            if rx.search(key) and value.strip() != name:
+                fixed[key] = name
+                changed += 1
+                break
+
+    return fixed, changed
 
 
 def _fill_known_role_names(doc, replacements: list, seeded: dict = None) -> int:
@@ -1846,6 +2021,15 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     doc = HwpxDocument.open(str(src))
     md = _extract_markdown(doc)
 
+    # 서식과 무관한 덩치(분석 응답 사본·STT 원문 등)를 먼저 걷어낸다.
+    extracted, dropped_keys = _trim_extracted_for_draft(extracted)
+
+    # 상담원이 확인한 이름을 가장 먼저 반영한다. 이 아래 모든 단계(치환 생성,
+    # 표 채우기, 서술 문단 작성)가 추출정보를 각자 다시 읽으므로, 여기서 안
+    # 고치면 단계마다 다른 이름이 들어가 한 문서에 두 사람이 섞인다.
+    extracted, name_corrections = _apply_confirmed_names_to_extracted(
+        extracted, applicant_name, opponent_name)
+
     # ── A. 정형 치환 ──
     gpt = _generate_fields(md, extracted, summary)
     reps = gpt.get("replacements", [])
@@ -1872,6 +2056,14 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     # 사망")에서 LLM이 다른 등장인물을 끌어다 쓰는 사고가 반복됐다.
     reps, dropped_dead = _drop_unfounded_deceased_fills(reps, extracted)
     unfilled.extend(dropped_dead)
+
+    # TODO: 서식의 예시 당사자가 실제 당사자보다 많을 때 남는 자리를 같은 사람으로
+    # 메우는 문제(_drop_surplus_person_fills)는 아직 연결하지 않는다. 중복 치환을
+    # 버리는 것까지는 정확히 동작하지만, 그렇게 비운 자리를 뒤의 모양 기반 채우기
+    # (_grow_name_slot_groups)가 역할을 보지 않고 다음 이름으로 메워버린다 —
+    # 유류분반환청구의 소에서 원고 2번 자리에 피고(장대우)가 들어갔다.
+    # 한 사람이 여러 자리를 차지하는 것보다 상대방이 청구인 자리에 오는 쪽이
+    # 훨씬 위험하므로, 채우기 단계가 역할을 인식하게 고친 뒤에 함께 켠다.
 
     # 이 사건의 당사자 이름을 문서 순서대로. 칸을 나눌 때도, 칸이 모자라 늘릴
     # 때도 같은 목록을 써야 순서가 어긋나지 않는다.
@@ -2005,6 +2197,11 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
             # 역할별 이름으로 코드가 직접 채운 칸 수(서명란 등)와,
             # 역할을 몰라 채우지 않고 비워둔 이름칸 수.
             "role_filled": role_filled,
+            # 상담원이 확인한 이름으로 분석값을 고친 횟수.
+            # 0이 계속 나오면 core-api가 이름을 안 보내고 있다는 신호다.
+            "name_corrections": name_corrections,
+            # 서식과 무관해서 프롬프트에서 걷어낸 추출정보 키 수.
+            "trimmed_keys": dropped_keys,
             "dropped_name_fills": len(dropped_names),
             "gpt_count": len(reps), "field_generation_error": gpt.get("error"),
             "marked_examples": marked_examples,
