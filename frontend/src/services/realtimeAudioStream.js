@@ -209,7 +209,14 @@ export class RealtimeAudioStream {
         }
       });
 
-      this.socket.addEventListener('message', (event) => this.playIncomingAudio(event.data));
+      this.socket.addEventListener('message', (event) => {
+        if (typeof event.data === 'string') {
+          const transcript = parseTranscriptFrame(event.data);
+          if (transcript) this.onTranscript(transcript);
+          return;
+        }
+        this.playIncomingAudio(event.data);
+      });
 
       this.audioContext = new AudioContext();
       await this.audioContext.resume();
