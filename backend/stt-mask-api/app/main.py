@@ -5,7 +5,7 @@ import numpy as np
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from faster_whisper import WhisperModel
 from pydub import AudioSegment
 from transformers import pipeline
@@ -64,12 +64,19 @@ async def transcribe_audio(file: UploadFile = File(...)):
         audio_file = io.BytesIO(audio_bytes)
         audio_segment = AudioSegment.from_file(audio_file)
         audio_segment = audio_segment.set_frame_rate(16000).set_channels(1)
-        
+
         samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32)
-        audio_array = samples / 32768.0
-        
+        # sample_width는 보통 2바이트(16비트)지만, 하드코딩된 32768.0 대신 실제 폭 기준으로
+        # 정규화한다 — 폭이 다르면 값이 잘못 스케일링돼(클리핑/왜곡) STT 품질이 나빠진다.
+        max_value = float(1 << (8 * audio_segment.sample_width - 1))
+        audio_array = samples / max_value
+
         # 1. Run transcription
-        segments, _ = model.transcribe(audio_array, language="ko")
+        # vad_filter=True: 무음/저음량 구간을 Whisper에 그대로 넘기지 않고 먼저 걸러낸다.
+        # 5초마다 MediaRecorder를 stop/restart하는 구조라 각 조각 앞부분에 무음(마이크 워밍업)이
+        # 섞이기 쉬운데, 이걸 무음 없이 그대로 넣으면 작은 모델(base)이 "아, 그.." 같은 반복
+        # 필러를 환각(hallucination)으로 만들어낸다 — 이게 신고된 증상과 정확히 일치한다.
+        segments, _ = model.transcribe(audio_array, language="ko", vad_filter=True)
         full_text = " ".join([segment.text for segment in segments]).strip()
         
         # 2. Run Privacy Filter
@@ -92,4 +99,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
         }
         
     except Exception as e:
-        return {"error": str(e)}, 500
+        # FastAPI는 (본문, 상태코드) 튜플을 Flask처럼 해석하지 않는다 — 그대로 반환하면
+        # [{"error": "..."}, 500] 배열이 HTTP 200으로 나가버려 호출하는 쪽(core-api)이 진짜
+        # 에러 메시지를 못 읽는다. JSONResponse로 상태코드와 본문을 명시적으로 지정해야 한다.
+        return JSONResponse(status_code=500, content={"error": f"{type(e).__name__}: {e}"})

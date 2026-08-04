@@ -329,6 +329,9 @@ export function timelineEmptyMessage(issueCode) {
 // 값을 반영해야 하므로 create/update 모두 같은 값을 보낸다 — analysis 안 다른 필드들과 동일한
 // 원칙("지금 analysis 상태를 그대로 저장")이라 update만 특별취급할 이유가 없다. 체크박스 상태는
 // 항상 {label, checked}[] 형태만 담는 전용 컬럼인 checklist_status_json에만 싣는다.
+// "분석 내용 저장"은 ai_analysis 테이블만 건드립니다 — Consultation(상담 원문/채널별 메모)은
+// 여기서 다루지 않습니다. 상담 원문 저장은 별도의 "상담 저장" 버튼(saveCoreConsultationTranscript)
+// 전담입니다(사용자 확인, 2026-08-04: "분석 내용 저장에서는 db의 ai_analysis에만 데이터 저장을 원함").
 function toCoreAnalysisPayload(analysis = {}) {
   return {
     summary: analysis.summary || '',
@@ -460,6 +463,17 @@ export async function updateCoreConsultation(coreId, changes) {
 
 export function updateCoreConsultationStatus(coreId, status) {
   return updateCoreConsultation(coreId, { status });
+}
+
+// "상담 저장" 버튼 전용. 채널별(전화/대면) 실시간 상담 메모를 Consultation에 반영합니다 —
+// input_text 갱신 + call_input_texts/inperson_input_texts(_masked)에 스냅샷 append까지
+// 서버(ConsultationService.saveTranscript)가 한 번에 처리합니다.
+export async function saveCoreConsultationTranscript(coreId, { callInputText, callInputTextMasked, inpersonInputText, inpersonInputTextMasked }) {
+  if (!coreId) return null;
+  return requestCoreJson(`/api/consultations/${coreId}/transcript`, {
+    method: 'POST',
+    body: JSON.stringify({ callInputText, callInputTextMasked, inpersonInputText, inpersonInputTextMasked }),
+  });
 }
 
 export async function createCoreAnalysis({ consultation, analysis }) {

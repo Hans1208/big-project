@@ -21,6 +21,8 @@ app:
     # REST(WebConfig)와 WebSocket(WebSocketConfig) 양쪽이 이 값을 공유한다. 여러 개는 콤마로 구분.
     # 운영 배포 전 반드시 CORS_ALLOWED_ORIGINS 환경변수로 실제 프론트엔드 도메인으로 교체할 것.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  stt-mask-api:
+    base-url: ${STT_MASK_API_URL:http://localhost:8002}
   audio:
     # 외부 서버(전화/SIP 게이트웨이 등)가 /ws/audio/external에 붙을 때 쓰는 공유 비밀키.
     # 운영 배포 전 반드시 AUDIO_EXTERNAL_API_KEY 환경변수로 교체할 것.

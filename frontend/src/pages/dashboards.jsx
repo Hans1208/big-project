@@ -41,7 +41,7 @@ function withAdminCardUnit(card) {
   return { ...card, value: `${card.value}${unit}` };
 }
 
-function CounselorDashboard({ consultations, setConsultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onDeleteConsultation, onOpenConsultationForm, onOpenAnalysis, onOpenDraft, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedConsultationId, focusedTemplateName, analysisRuns, onStartAnalysis }) {
+function CounselorDashboard({ consultations, setConsultations, onCreateConsultation, onRequestLegalReview, onAnalysisSaved, onSaveTranscript, onDeleteConsultation, onOpenConsultationForm, onOpenAnalysis, onOpenDraft, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedConsultationId, focusedTemplateName, analysisRuns, onStartAnalysis }) {
   const [filter, setFilter] = useState(statusAll);
   const [selectedDate, setSelectedDate] = useState(today);
   const filtered = filter === statusAll ? consultations : consultations.filter((item) => item.status === filter);
@@ -61,7 +61,7 @@ function CounselorDashboard({ consultations, setConsultations, onCreateConsultat
     // 넘어가는 다음 단계 링크(onGoToUpload)에도 그대로 재사용합니다. onOpenDraft는 분석이 끝난
     // 직후 추천 서식 패널에서 '이 서식으로 초안 만들기'를 눌렀을 때 서식 생성 화면으로 사건을
     // 그대로 이어서 넘기는 데 씁니다.
-    return <UtilityPanel view={activeView} role="counselor" consultations={consultations} onCreateConsultation={onCreateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} onUpdateConsultation={(id, updates) => setConsultations((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item))} currentUser={currentUser} onUpdateProfile={onUpdateProfile} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} onOpenConsultationForm={onOpenConsultationForm} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} analysisRuns={analysisRuns} onStartAnalysis={onStartAnalysis} />;
+    return <UtilityPanel view={activeView} role="counselor" consultations={consultations} onCreateConsultation={onCreateConsultation} onRequestLegalReview={onRequestLegalReview} onAnalysisSaved={onAnalysisSaved} onSaveTranscript={onSaveTranscript} onUpdateConsultation={(id, updates) => setConsultations((items) => items.map((item) => item.id === id ? { ...item, ...updates } : item))} currentUser={currentUser} onUpdateProfile={onUpdateProfile} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} onOpenConsultationForm={onOpenConsultationForm} onOpenAnalysis={onOpenAnalysis} onOpenDraft={onOpenDraft} analysisRuns={analysisRuns} onStartAnalysis={onStartAnalysis} />;
   }
   return (
     <>

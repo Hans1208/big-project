@@ -21,6 +21,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -129,7 +130,11 @@ public class AiAnalysisService {
         return toResponse(analysis);
     }
 
-    // Consultation -> ai-api RawInput 변환. title/inputText는 그대로, 첨부파일은 storageKey(S3 key) 목록으로.
+    // Consultation -> ai-api RawInput 변환. 첨부파일은 storageKey(S3 key) 목록으로.
+    // inputText는 "지금 라이브 메모"가 아니라 call_input_texts/inperson_input_texts 이력 전체를
+    // 종합한 값을 쓴다 — "재분석 실행"이 직전 저장(inputText)만 보면 재녹음으로 지워진 이전
+    // 세션 내용이 분석에서 빠지는 문제가 있어서(사용자 확인 후 결정, 2026-08-04). 재녹음을
+    // 반복할수록 입력이 계속 커지는 트레이드오프는 감수하기로 함.
     private RawInputRequest buildRawInput(Consultation consultation) {
         List<String> fileLinks = consultation.getAttachments().stream()
                 .map(Attachment::getStorageKey)
@@ -140,10 +145,33 @@ public class AiAnalysisService {
                 : null;
         return new RawInputRequest(new RawInputRequest.RawInputContent(
                 consultation.getTitle(),
-                consultation.getInputText(),
+                buildCombinedInputText(consultation),
                 fileLinks,
                 consultDay
         ));
+    }
+
+    private String buildCombinedInputText(Consultation consultation) {
+        String callText = String.join("\n\n", nullSafe(consultation.getCallInputTexts()));
+        String inpersonText = String.join("\n\n", nullSafe(consultation.getInpersonInputTexts()));
+
+        List<String> sections = new ArrayList<>();
+        if (!callText.isBlank()) {
+            sections.add("[전화상담]\n" + callText);
+        }
+        if (!inpersonText.isBlank()) {
+            sections.add("[대면상담]\n" + inpersonText);
+        }
+        if (!sections.isEmpty()) {
+            return String.join("\n\n", sections);
+        }
+        // 아직 "분석 내용 저장"을 한 번도 하지 않은 최초 "분석 시작"이면 채널별 이력 배열이
+        // 비어 있다 — 이때는 현재 inputText(수기 입력 등)를 그대로 폴백으로 보낸다.
+        return consultation.getInputText();
+    }
+
+    private static List<String> nullSafe(List<String> list) {
+        return list == null ? List.of() : list;
     }
 
     // ai-api analysis 층이 만든 상담 요약을 우선 쓰고, 없으면 기존 조합 문자열로 폴백한다.
