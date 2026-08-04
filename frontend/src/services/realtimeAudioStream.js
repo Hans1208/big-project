@@ -3,7 +3,8 @@
 // μ-law 바이너리 프레임으로 변환해 보냅니다. 백엔드는 이 오퍼레이터 레그를 같은 callId로 붙은
 // 외부 통화 레그(ExternalCallWebSocketHandler)와 서로 중계하는 교환대 역할을 하며, 소켓으로
 // 들어오는 바이너리 메시지도 같은 8비트 μ-law 프레임이므로 디코딩해서 스피커로 내보냅니다.
-// 어떤 통화에 붙을지는 GET /api/audio/calls로 받은 목록의 첫 번째 항목으로 정합니다.
+// 어떤 통화에 붙을지는 호출자가 start({ callId })로 넘긴 값을 그대로 씁니다
+// (연결할 통화 선택은 GET /api/audio/calls 목록에서 상담원이 직접 고릅니다).
 
 import { CORE_API_BASE_URL, coreAuthHeader } from './coreApiClientV2.js';
 
@@ -65,30 +66,6 @@ async function requestAudioTicket() {
   const body = await response.json();
   if (!body?.ticket) throw new Error('통화 연결 티켓을 받지 못했습니다.');
   return body.ticket;
-}
-
-// 붙을 통화를 고르기 전에 현재 연결되어 있는 통화 목록을 조회합니다.
-// 여러 건이 와 있어도 지금은 목록의 첫 번째 통화에 자동으로 붙습니다.
-async function requestFirstCallId() {
-  let response;
-  try {
-    response = await fetch(`${CORE_API_BASE_URL}/api/audio/calls`, {
-      headers: { ...coreAuthHeader() },
-    });
-  } catch {
-    throw new Error('통화 서버에 연결할 수 없습니다. Core API 서버가 켜져 있는지 확인해주세요.');
-  }
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('통화 목록을 조회할 권한이 없습니다. 다시 로그인해주세요.');
-  }
-  if (!response.ok) {
-    throw new Error(`통화 목록을 가져오지 못했습니다 (HTTP ${response.status})`);
-  }
-  const calls = await response.json();
-  if (!Array.isArray(calls) || calls.length === 0) {
-    throw new Error('현재 연결된 통화가 없습니다.');
-  }
-  return calls[0].callId;
 }
 
 function downsample(buffer, inputSampleRate, outputSampleRate = 8000) {
@@ -188,15 +165,14 @@ export class RealtimeAudioStream {
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
     try {
-      const callId = await requestFirstCallId();
       // 티켓은 30초짜리라 연결할 때마다 새로 받습니다(재사용도 막혀 있습니다).
       const ticket = await requestAudioTicket();
-      const url = `${audioWebSocketUrl()}?callId=${encodeURIComponent(callId)}&ticket=${encodeURIComponent(ticket)}`;
+      const url = audioWebSocketUrl({ callId, ticket });
       this.socket = new WebSocket(url);
       this.socket.binaryType = 'arraybuffer';
       await new Promise((resolve, reject) => {
         this.socket.addEventListener('open', resolve, { once: true });
-        this.socket.addEventListener('error', () => reject(new Error('오디오 스트림 서버에 연결할 수 없습니다.')), { once: true });
+        this.socket.addEventListener('error', (e) => reject(new Error('오디오 스트림 서버에 연결할 수 없습니다.' + e)), { once: true });
       });
 
       // 핸드셰이크가 성공해도, 백엔드가 그 직후 이 통화에 이미 다른 오퍼레이터가 붙어 있거나
