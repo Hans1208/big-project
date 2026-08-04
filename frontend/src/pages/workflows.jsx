@@ -134,6 +134,13 @@ function mergeContractAnalysisResponse(baseAnalysis, contractResult, extra = {})
     extractedJson: {
       ...(baseAnalysis.extractedJson || {}),
       ...(mapped.extractedJson || {}),
+      // ai-api의 구조화 분석 결과(당사자/금액/날짜/사건개요)를 최상위로 올립니다.
+      // 이게 없으면 extracted_json에 사건분류와 STT 원문만 남아서, 서식 초안을
+      // 만들 때 LLM이 요약문에서 이름을 눈치로 뽑아 쓰게 됩니다 — 실제로 유언에
+      // 반대하는 형이 유언자 자리에 들어간 적이 있습니다. 분석 층은 그 형을
+      // '상대방(형)', 피상속인은 '미상'으로 정확히 구분해 주는데, 그 값이 여기서
+      // 버려지고 있었습니다. pickClientName()도 이 당사자 목록을 읽습니다.
+      ...(contractResult?.consult_extracted || {}),
       aiAnalysisResponse: contractResult,
       ...(extra.extractedJson || {}),
     },
