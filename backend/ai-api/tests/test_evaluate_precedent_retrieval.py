@@ -23,6 +23,7 @@ def test_evaluation_counts_hits_and_duplicates():
 
     def fake_retrieve(
         query,
+        *,
         top_k,
     ):
         assert top_k == 5

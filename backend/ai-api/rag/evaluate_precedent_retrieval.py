@@ -142,7 +142,7 @@ def evaluate_precedent_retrieval(
     for case in cases:
         results = retrieve(
             case["query"],
-            5,
+            top_k=5,
         )
 
         expected_ranks = [
