@@ -198,7 +198,12 @@ export function pickClientName(analysis) {
 }
 
 export function buildAnalysisResult(selectedCase) {
-  const text = selectedCase?.memo || selectedCase?.title || '';
+  // 전화상담(memo)과 대면상담(inpersonMemo)은 화면에서는 분리해서 보여주지만, 분석 대상 텍스트는
+  // 상담원이 어느 채널로 들었든 상담 내용 전체를 반영해야 하므로 여기서 합칩니다
+  // (App.jsx notifyAnalysisSaved가 실제 저장 시 core-api에 보내는 값과 같은 방식).
+  const text = [selectedCase?.memo, selectedCase?.inpersonMemo]
+    .filter((value) => value && value.trim())
+    .join('\n\n') || selectedCase?.title || '';
   const attachments = selectedCase?.attachments || [];
   const attachmentLinks = buildAttachmentLinkMetadata(attachments);
   const submittedFileLinks = attachmentLinkValues(attachments);

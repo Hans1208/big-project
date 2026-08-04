@@ -22,6 +22,8 @@ import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -67,6 +69,63 @@ public class Consultation {
     //   복호화가 깨진다. 팀원 각자의 로컬 DB를 함께 초기화해야 하므로 합의 후 적용할 것.
     @Column(name = "input_text", columnDefinition = "TEXT")
     private String inputText;
+
+    // "상담 저장" 버튼을 누를 때마다의 채널별 input_text 스냅샷 보관용(감사/이력 목적). 매 저장마다
+    // 하나씩 쌓이기만 하고 지우지 않음 — ConsultationService.saveTranscript() 참고. "분석 내용
+    // 저장"(AiAnalysisService)은 ai_analysis 테이블만 건드리고 여기는 건드리지 않는다.
+    // 전화상담(call_*)과 대면상담(inperson_*)을 분리한 이유: 두 채널의 실시간 상담 메모/STT 결과가
+    // 화면에서 섞여 보이면 안 된다는 요구에 맞춰, 저장되는 이력도 채널별로 나눈다.
+    // 이전에 있던 단일 input_texts/input_texts_masked 컬럼을 대체한다(더 이상 관리 안 함 — DB에
+    // 남아 있어도 ddl-auto: update는 안 쓰는 컬럼을 지우지 않으므로 그냥 방치됨).
+    //
+    // DB엔 이미 행이 있던(NULL) 상태로 컬럼이 추가될 수 있어 getter에서 항상 non-null을 보장하지
+    // 않는다. null-safe 추가는 addCallInputText() 등 아래 헬퍼로만 한다.
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "call_input_texts", columnDefinition = "text[]")
+    private List<String> callInputTexts = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "call_input_texts_masked", columnDefinition = "text[]")
+    private List<String> callInputTextsMasked = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "inperson_input_texts", columnDefinition = "text[]")
+    private List<String> inpersonInputTexts = new ArrayList<>();
+
+    // 마스킹은 지금 대면 상담(mic-stt-mask) 세션에서만 실제로 일어난다 — 전화상담은 아직 자동 STT가
+    // 없어 call_input_texts_masked는 사실상 계속 비어 있을 수 있다.
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "inperson_input_texts_masked", columnDefinition = "text[]")
+    private List<String> inpersonInputTextsMasked = new ArrayList<>();
+
+    public void addCallInputText(String value) {
+        addTo(() -> this.callInputTexts, list -> this.callInputTexts = list, value);
+    }
+
+    public void addCallInputTextMasked(String value) {
+        addTo(() -> this.callInputTextsMasked, list -> this.callInputTextsMasked = list, value);
+    }
+
+    public void addInpersonInputText(String value) {
+        addTo(() -> this.inpersonInputTexts, list -> this.inpersonInputTexts = list, value);
+    }
+
+    public void addInpersonInputTextMasked(String value) {
+        addTo(() -> this.inpersonInputTextsMasked, list -> this.inpersonInputTextsMasked = list, value);
+    }
+
+    private void addTo(java.util.function.Supplier<List<String>> getter,
+                        java.util.function.Consumer<List<String>> setter, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        List<String> list = getter.get();
+        if (list == null) {
+            list = new ArrayList<>();
+            setter.accept(list);
+        }
+        list.add(value);
+    }
 
     // 상대방 이름 — 유사 사건 집단화(clustering)에 참고용으로 쓰일 필드 (ERD 주석 기준)
     @Column(name = "opponent_name")

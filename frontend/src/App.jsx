@@ -24,6 +24,7 @@ import {
   normalizeAuthResponse,
   registerCoreUser,
   rejectCoreUser,
+  saveCoreConsultationTranscript,
   updateCoreAnalysis,
   updateCoreConsultation,
   updateCoreConsultationStatus,
@@ -567,6 +568,9 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     };
   };
 
+  // "분석 내용 저장"은 ai_analysis 테이블만 건드립니다 — Consultation(상담 원문)은 여기서
+  // 다루지 않습니다(사용자 확인, 2026-08-04). 상담 원문 저장은 별도의 "상담 저장" 버튼
+  // (saveConsultationTranscript, 아래)이 전담합니다.
   const notifyAnalysisSaved = async (consultation, analysis) => {
     if (!consultation) return { ok: false, message: '상담 정보를 찾을 수 없습니다.' };
     if (!consultation.coreId) return { ok: true, synced: false, message: '로컬 저장 완료' };
@@ -578,24 +582,42 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       const savedAnalysis = existingAnalysisId
         ? await updateCoreAnalysis({ consultation, analysisId: existingAnalysisId, analysis })
         : await createCoreAnalysis({ consultation, analysis });
-      await updateCoreConsultation(consultation.coreId, {
-        status: 'ANALYZING',
-        title: consultation.title,
-        inputText: consultation.memo || consultation.title || '',
-        opponentName: consultation.opponentName || consultation.name || '',
-      });
       // 서식 추천/초안 생성 API(recommend-forms, generate-draft)는 상담 id뿐 아니라 이 분석 id도
       // 함께 있어야 호출할 수 있습니다. 응답은 AiAnalysisResponse라 snake_case(analysis_id)로 옵니다.
       const analysisId = savedAnalysis?.analysis_id || existingAnalysisId;
       if (analysisId && analysisId !== existingAnalysisId) {
         setConsultations((items) => items.map((item) => item.id === consultation.id ? { ...item, coreAnalysisId: analysisId } : item));
       }
-      return { ok: true, synced: true, message: '상담 분석 결과까지 저장되었습니다.' };
+      return { ok: true, synced: true, message: '분석 결과가 저장되었습니다.' };
     } catch (error) {
       return {
         ok: false,
         synced: false,
         message: `서버 저장 실패 — 이 브라우저에만 남았습니다. 다시 저장해주세요. (${error?.message || '원인 불명'})`,
+      };
+    }
+  };
+
+  // "상담 저장" 버튼 전용. 전화(memo)/대면(inpersonMemo) 채널의 현재 메모를 Consultation에
+  // 반영합니다 — input_text 갱신 + call_input_texts/inperson_input_texts(_masked) 이력 append까지
+  // 서버(ConsultationService.saveTranscript)가 한 번에 처리합니다. AI 분석(ai_analysis)은
+  // 전혀 건드리지 않습니다 — notifyAnalysisSaved와 정반대로 역할이 나뉩니다.
+  const saveConsultationTranscript = async (consultation) => {
+    if (!consultation) return { ok: false, message: '상담 정보를 찾을 수 없습니다.' };
+    if (!consultation.coreId) return { ok: true, synced: false, message: '로컬 저장 완료' };
+    try {
+      await saveCoreConsultationTranscript(consultation.coreId, {
+        callInputText: consultation.memo || '',
+        callInputTextMasked: consultation.memoMasked || '',
+        inpersonInputText: consultation.inpersonMemo || '',
+        inpersonInputTextMasked: consultation.inpersonMemoMasked || '',
+      });
+      return { ok: true, synced: true, message: '상담 내용이 저장되었습니다.' };
+    } catch (error) {
+      return {
+        ok: false,
+        synced: false,
+        message: `상담 저장 실패 — 다시 시도해주세요. (${error?.message || '원인 불명'})`,
       };
     }
   };
@@ -721,7 +743,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
           setActiveView('기타');
         }}
       />
-      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id, templateName) => { setFocusedConsultationId(id); setFocusedTemplateName(templateName || null); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
+      {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onSaveTranscript={saveConsultationTranscript} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id, templateName) => { setFocusedConsultationId(id); setFocusedTemplateName(templateName || null); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
       {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} focusedAdminView={focusedAdminView} /> : null}
     </div>
