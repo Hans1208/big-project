@@ -4,6 +4,7 @@ import com.aivle.bigproject.audio.AudioStreamHandshakeInterceptor;
 import com.aivle.bigproject.audio.ExternalCallAuthInterceptor;
 import com.aivle.bigproject.audio.ExternalCallWebSocketHandler;
 import com.aivle.bigproject.audio.OperatorWebSocketHandler;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -17,15 +18,19 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final ExternalCallAuthInterceptor externalCallAuthInterceptor;
     private final OperatorWebSocketHandler operatorWebSocketHandler;
     private final AudioStreamHandshakeInterceptor audioStreamHandshakeInterceptor;
+    // app.cors.allowed-origins(콤마 구분)를 WebConfig의 REST CORS 설정과 공유한다.
+    private final String[] allowedOrigins;
 
     public WebSocketConfig(ExternalCallWebSocketHandler externalCallWebSocketHandler,
                            ExternalCallAuthInterceptor externalCallAuthInterceptor,
                            OperatorWebSocketHandler operatorWebSocketHandler,
-                           AudioStreamHandshakeInterceptor audioStreamHandshakeInterceptor) {
+                           AudioStreamHandshakeInterceptor audioStreamHandshakeInterceptor,
+                           @Value("${app.cors.allowed-origins:http://localhost:5173}") String allowedOrigins) {
         this.externalCallWebSocketHandler = externalCallWebSocketHandler;
         this.externalCallAuthInterceptor = externalCallAuthInterceptor;
         this.operatorWebSocketHandler = operatorWebSocketHandler;
         this.audioStreamHandshakeInterceptor = audioStreamHandshakeInterceptor;
+        this.allowedOrigins = allowedOrigins.split("\\s*,\\s*");
     }
 
     @Override
@@ -42,6 +47,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
         // 브라우저(오퍼레이터)가 특정 통화를 골라 붙는 레그. 1회성 티켓으로 인증한다.
         registry.addHandler(operatorWebSocketHandler, "/ws/audio/operator")
                 .addInterceptors(audioStreamHandshakeInterceptor)
-                .setAllowedOrigins("http://localhost:5173");
+                .setAllowedOrigins(allowedOrigins);
     }
 }
