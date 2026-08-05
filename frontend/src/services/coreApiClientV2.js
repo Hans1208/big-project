@@ -227,7 +227,11 @@ function toCoreConsultationPayload({ userId, consultation }) {
   return {
     userId,
     title: consultation.title || consultation.caseNo || '상담 제목 미입력',
-    clientName: consultation.name || consultation.clientName || '이름 미입력',
+    // 이름이 없으면 빈 문자열로 보냅니다. 예전에는 화면 표시용 문구('이름 미입력')를
+    // 그대로 보내서 DB에 이름으로 저장됐고, 그 값이 서식 초안까지 흘러가
+    // "청구인(상속인) 이름 미입력"이 인쇄됐습니다. 표시용 문구는 읽는 쪽에서
+    // 붙이는 것이지 저장할 값이 아닙니다.
+    clientName: consultation.name || consultation.clientName || '',
     inputText: consultation.memo || consultation.title || '',
     opponentName: consultation.opponentName || '',
     category: consultation.category || '',
