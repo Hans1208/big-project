@@ -12,6 +12,7 @@ import { CasePicker } from '../components/CasePicker.jsx';
 import { ChoicePicker } from '../components/ChoicePicker.jsx';
 import { FileDropzone } from '../components/FileDropzone.jsx';
 import { CounselorFlowStage } from '../components/CounselorFlowStage.jsx';
+import { ConsultationCaseMeta } from '../components/ConsultationCaseMeta.jsx';
 import {
   legalAidApplicantTypes,
   getEligibilityBadgeText,
@@ -357,16 +358,16 @@ export function UploadWorkbench({ consultations = [], onCreateConsultation, onUp
       <div className="workflowIntro uploadWorkflowIntro">
         <h1><FileText size={22} strokeWidth={2.2} className="workflowIntroIcon" aria-hidden="true" /> 상담 자료 올리기</h1>
         <p>상담을 선택하고 자료를 추가한 뒤 변호사 검토로 전달하세요.</p>
+        <CounselorFlowStage current="upload" onNavigate={onGoToRealtimeAnalysis ? () => onGoToRealtimeAnalysis() : undefined} />
       </div>
       <section className="workflowPanel uploadPanel">
-        <CounselorFlowStage current="upload" onNavigate={onGoToRealtimeAnalysis ? () => onGoToRealtimeAnalysis() : undefined} />
         <section className="uploadWorkCard" aria-label="상담 자료 올리기 작업 영역">
         {hasExistingCase ? (
-          <div className="seg uploadModeSwitch" role="tablist" aria-label="자료 업로드 방식">
-            <button type="button" role="tab" aria-selected={!creatingNew} className={!creatingNew ? 'active' : ''} onClick={() => { setCreatingNew(false); setMessage(''); }}>
+          <div className="categoryTabs uploadModeSwitch" role="tablist" aria-label="자료 업로드 방식">
+            <button type="button" role="tab" aria-selected={!creatingNew} className={!creatingNew ? 'categoryTab active' : 'categoryTab'} onClick={() => { setCreatingNew(false); setMessage(''); }}>
               기존 상담에 자료 추가
             </button>
-            <button type="button" role="tab" aria-selected={creatingNew} className={creatingNew ? 'active' : ''} onClick={() => { setCreatingNew(true); setMessage(''); }}>
+            <button type="button" role="tab" aria-selected={creatingNew} className={creatingNew ? 'categoryTab active' : 'categoryTab'} onClick={() => { setCreatingNew(true); setMessage(''); }}>
               새 상담 만들기
             </button>
           </div>
@@ -435,11 +436,8 @@ export function UploadWorkbench({ consultations = [], onCreateConsultation, onUp
           </>
         ) : selectedCase ? (
           <>
-            <div className="uploadCaseSummary">
-              <div className="uploadCaseSummaryInfo">
-                <span><FolderOpen size={14} strokeWidth={2.4} aria-hidden="true" /> 선택한 상담</span>
-                <strong>{selectedCase.caseNo}</strong>
-              </div>
+            <ConsultationCaseMeta selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
+            <div className="uploadCaseSummary uploadCaseSummaryStatusOnly">
               <div className={`uploadCaseSummaryStatus ${canUploadAfterAnalysis ? 'is-ready' : 'is-waiting'}`}>
                 {canUploadAfterAnalysis ? <CheckCircle2 size={16} strokeWidth={2.4} aria-hidden="true" /> : <XCircle size={16} strokeWidth={2.4} aria-hidden="true" />}
                 <span>

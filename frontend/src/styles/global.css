@@ -4472,7 +4472,10 @@ textarea:focus-visible,
   margin: 0 auto 20px;
 }
 
-.workflowIntro span {
+/* > 로 직계 자식만 잡습니다 — 후손 선택자였을 때는 제목 옆으로 옮겨온 업무 단계 배너
+   (.flowStageBanner) 안의 1·2단계 번호(.flowStageIndex, 흰 글자가 목적)까지 이 파란
+   글자색을 물려받아 배경(파란 원)과 색이 같아져 숫자가 안 보이는 문제가 있었습니다. */
+.workflowIntro > span {
   display: block;
   margin-bottom: 6px;
   color: var(--accent-on-soft);
@@ -11782,9 +11785,13 @@ a:focus-visible,
 
 /* 역할/업무 화면 상단 제목 통일
  * 기준: 큰 제목 + 한 줄 보조 문구. 상담원/변호사/관리자 탭을 오갈 때도
- * 제목 크기와 굵기가 흔들리지 않도록 세 종류의 헤더를 같은 수치로 묶습니다. */
+ * 제목 크기와 굵기가 흔들리지 않도록 세 종류의 헤더를 같은 수치로 묶습니다.
+ * .workflowIntro span은 원래 h1 앞의 eyebrow 라벨(예: .roleIdentityBadge)만 지우려는
+ * 규칙인데, 후손 선택자라 상담 자료 올리기 제목 옆에 온 업무 단계 배너(.flowStageBanner)
+ * 안의 span(1·2단계 번호 .flowStageIndex 등)까지 깊숙이 지워버렸습니다. eyebrow 라벨은
+ * 항상 .workflowIntro의 직계 자식이라 > 로 좁혀도 원래 목적은 그대로 유지됩니다. */
 .dashboardIntro span,
-.workflowIntro span {
+.workflowIntro > span {
   display: none !important;
 }
 
@@ -14606,6 +14613,16 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   z-index: 5;
 }
 
+/* 실시간 상담의 사건 선택 드롭다운도 상담 자료 올리기와 완전히 같은 구성(라벨+아이콘 →
+   드롭다운)을 씁니다. .field는 원래 세로로 쌓는 폼 칸이라 기본값(display:block)이면 이
+   가로 커맨드 바 안에서 내용 너비만큼만 좁게 잡히므로, 예전에 .casePicker가 직접
+   flex:1로 넓게 차지하던 자리를 이제는 이 라벨이 대신 넓게 차지하도록 맞춥니다. */
+.analysisCommandBar > .field.uploadCaseSelector {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
 /* "상담 저장" 버튼 줄. 위 커맨드 바(사건 고르기 등)와 같은 배경/구분선을 쓰되, 채널 탭
    바로 아래 단독으로 오른쪽에 붙어야 해서 오른쪽 정렬만 별도로 얹는다. */
 .transcriptSaveBar {
@@ -15384,14 +15401,36 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   box-shadow: var(--shadow-soft) !important;
 }
 
+/* 실시간 상담의 사건 정보 박스와 같은 규칙(기본 .analysisCaseMeta의 auto-fit)을 그대로
+   써서, 두 화면의 사건 번호·상담받은 사람·상담 제목·작성 시간 칸 너비가 같은 방식으로
+   계산되게 맞춥니다. 이전엔 이 칸에서만 사건 번호·작성 시간을 고정 비율(0.5fr/0.667fr)로
+   따로 줄였는데, 실시간 상담과 나란히 보면 폭이 서로 달라 보인다는 피드백을 받았습니다. */
 .uploadPanel .analysisCaseMeta {
   align-items: stretch;
   gap: 10px;
+  /* 실시간 상담과 같은 비율(사건 번호 0.45fr · 상담받은 사람 1.16fr · 상담 제목 1.2fr ·
+     작성 시간 0.6fr)을 그대로 씁니다. 예전엔 이 칸이 기본값(auto-fit 4등분)을 써서, 상담이
+     이름 미입력 상태일 때 '상담받은 사람' 칸의 경고 아이콘·배지·안내 문구가 좁은 칸 안에서
+     겹쳐 보이는 문제가 있었습니다(실시간 상담은 이 비율 덕분에 그 칸을 넓게 받아 문제없음). */
+  grid-template-columns: minmax(150px, 0.45fr) minmax(260px, 1.16fr) minmax(230px, 1.2fr) minmax(170px, 0.6fr);
 }
 
 .uploadPanel .analysisCaseMeta > span {
   min-height: 56px;
+  min-width: 0;
   border-radius: var(--r-control);
+}
+
+/* 위 비율 자체는 칸 너비만 정할 뿐, 그리드 아이템(라벨 상자)이 안의 아이콘·배지·입력칸
+   내용만큼 최소 너비를 요구하면(grid item 기본값 min-width:auto) 비율과 무관하게 칸이
+   넘치거나 겹쳐 보입니다. 실시간 상담과 똑같이 min-width:0으로 풀어줘야 비율대로 줄어듭니다. */
+.uploadPanel .analysisCaseMetaEdit {
+  min-width: 0;
+}
+
+.uploadPanel .analysisCaseMetaEdit > input,
+.uploadPanel .analysisCaseMetaEdit > textarea {
+  max-width: 100%;
 }
 
 .uploadPanel .uploadActionRow {
@@ -15417,6 +15456,35 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   border-radius: var(--r-surface);
   overflow: hidden;
   background: var(--surface);
+}
+
+/* '선택한 상담'(사건 번호만 보여주던 칸)은 실시간 상담과 같은 사건 정보 박스(.analysisCaseMeta)로
+   대체되어 위로 옮겨갔고, 이 카드에는 이제 준비 상태 한 줄만 남습니다. 두 칸짜리 grid를
+   그대로 두면 오른쪽 절반이 빈 채로 남으므로 한 칸으로 좁힙니다. 카드 테두리도 필요 없다는
+   피드백을 받아, 감싸던 박스 선(테두리·배경·그림자)은 없애고 내용만 남깁니다. */
+.uploadPanel .uploadCaseSummary.uploadCaseSummaryStatusOnly {
+  grid-template-columns: 1fr;
+  margin-top: 14px;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 아이콘 · 굵은 제목 · 설명을 세로 두 줄이 아니라 한 줄에 나란히 놓습니다(제공된 시안처럼). */
+.uploadPanel .uploadCaseSummaryStatusOnly .uploadCaseSummaryStatus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 0;
+  padding: 4px 2px;
+}
+
+.uploadPanel .uploadCaseSummaryStatusOnly .uploadCaseSummaryStatus > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .uploadPanel .uploadCaseSummaryInfo,
@@ -16128,83 +16196,151 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   }
 }
 
-/* ── 카드 안 카드 정리: 상담 자료 올리기(.uploadPanel)의 업무 단계 배너 ──
-   .flowStageBanner는 원래 독립된 화면에 쓰라고 만든 카드라 자체 테두리·그림자를 갖는데,
-   지금은 이미 카드인 .workflowPanel.uploadPanel 안 맨 위에 놓여 있어 카드 위에 카드가
-   그림자째로 얹힌 것처럼 보입니다(검토 화면에서 고친 것과 같은 문제). 배경 톤만 살짝
-   남기고 자체 테두리·그림자·둥근 모서리는 없애, 페이지 카드 안의 한 구획으로 보이게 합니다. */
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  border: none !important;
-  border-bottom: 1px solid var(--border) !important;
-  background: var(--surface-subtle) !important;
-  /* 위쪽은 0으로 — .uploadPanel의 padding-top이 이미 0이라 상쇄할 여백이 없는데
-     -28px를 그대로 두면 이 배너(카드 맨 위)의 음수 마진이 부모 카드를 뚫고 올라가
-     margin collapsing으로 바로 위 안내 카드(.uploadWorkflowIntro)와 28px만큼
-     겹쳐 보였습니다. 좌우 -28px는 카드 옆 여백(30px)을 지우기 위한 것으로 그대로 둡니다. */
-  margin: 0 -28px 20px !important;
-  padding: 16px 28px !important;
+/* ── 상담 자료 올리기: 안내 카드 제목 옆에 업무 단계(1·2단계) 배치 ──
+   .flowStageBanner는 원래 카드 맨 위에 놓인 독립된 띠 배너였는데, 코치 피드백으로
+   안내 카드(.uploadWorkflowIntro) 제목 오른쪽에 나란히 옮겼습니다. 왼쪽 안내 문구 박스
+   (.flowStageCopy, "통화 후 자료를 정리합니다.")는 자리가 좁아져 컴포넌트에서 잠시
+   주석 처리했고, 오른쪽 2단계 스텝 카드만 제목과 나란히 놓습니다. */
+.workspacePage > .workflowIntro.uploadWorkflowIntro {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  grid-template-areas:
+    "title steps"
+    "desc  steps";
+  align-items: center;
+  column-gap: 28px;
+  padding: 26px 30px 20px;
 }
 
-/* 업로드 화면 상단 영역은 위아래 여백만 한 단계 낮춰 본문과 더 자연스럽게 이어지도록 합니다.
-   제목 글자 크기는 다른 업무 화면 제목(실시간 상담·서식 생성·상담 현황)과 같은 40px로 맞춥니다
-   — 예전엔 여기만 36px로 작아, 화면마다 제목 크기가 달라 보인다는 피드백을 받았습니다.
-   아래쪽 padding은 바로 밑에 붙는 '상담원 업무 흐름' 박스와 너무 가까워 답답해 보인다는
-   피드백을 받아 27px → 38px로 늘려 숨 쉴 공간을 더 줍니다. */
-.workspacePage > .workflowIntro.uploadWorkflowIntro {
-  padding: 18px 26px 38px;
+.workspacePage > .workflowIntro.uploadWorkflowIntro h1 {
+  grid-area: title;
 }
 
 .workspacePage > .workflowIntro.uploadWorkflowIntro > p {
+  grid-area: desc;
   top: -2px;
 }
 
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner {
-  gap: 12px;
-  padding: 11px 22px !important;
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageBanner {
+  grid-area: steps;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageCopy {
-  gap: 4px;
-  padding: 7px 10px;
-}
-
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageCopy strong {
-  font-size: var(--fs-body);
-}
-
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageSteps {
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageSteps {
   gap: 6px;
 }
 
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageStep {
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep {
   min-height: 50px;
   gap: 9px;
   padding: 8px 10px;
+  background: var(--surface-subtle);
 }
 
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageIndex {
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep.active {
+  background: var(--accent-soft);
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageIndex {
   width: 22px;
   height: 22px;
 }
 
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageText {
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageText {
   gap: 2px;
 }
 
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageText strong {
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageText strong {
   font-size: var(--fs-sm);
 }
 
-.workspacePage > .workflowPanel.uploadPanel > .flowStageBanner .flowStageText small {
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageText small {
   font-size: var(--fs-caption);
 }
 
+@media (max-width: 900px) {
+  .workspacePage > .workflowIntro.uploadWorkflowIntro {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "desc"
+      "steps";
+    row-gap: 14px;
+  }
+}
+
 @media (max-width: 640px) {
-  .workspacePage > .workflowPanel.uploadPanel > .flowStageBanner {
-    margin: -20px -20px 16px !important;
-    padding: 12px 20px !important;
+  .workspacePage > .workflowIntro.uploadWorkflowIntro {
+    padding: 22px 18px 16px;
+  }
+}
+
+/* ── 실시간 상담: 제목 옆에도 상담 자료 올리기와 같은 업무 단계(1·2단계)를 둡니다 ──
+   실시간 상담 화면은 제목·설명이 별도 카드가 아니라 WorkPageHeader(.workPageHeader)로,
+   이미 오른쪽에 부가 정보를 놓는 자리(meta → .workPageHeaderMeta)가 있어 그 자리에
+   CounselorFlowStage를 그대로 꽂습니다. 상담 자료 올리기 쪽과 같은 컴포넌트라 왼쪽 안내
+   문구 박스(.flowStageCopy)도 똑같이 주석 처리돼 있어 단계 카드만 보입니다. */
+.workflowPanel.analysisPanel > .workPageHeader {
+  align-items: center;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .workPageHeaderMeta {
+  width: min(360px, 100%);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageBanner {
+  display: block !important;
+  width: 100%;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageSteps {
+  gap: 6px;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep {
+  min-height: 50px;
+  gap: 9px;
+  padding: 8px 10px;
+  background: var(--surface-subtle);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep.active {
+  background: var(--accent-soft);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageIndex {
+  width: 22px;
+  height: 22px;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageText strong {
+  font-size: var(--fs-sm);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageText small {
+  font-size: var(--fs-caption);
+}
+
+@media (max-width: 900px) {
+  .workflowPanel.analysisPanel > .workPageHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workflowPanel.analysisPanel > .workPageHeader .workPageHeaderMeta {
+    width: 100%;
   }
 }
 
