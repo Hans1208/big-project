@@ -625,6 +625,22 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         inpersonInputText: consultation.inpersonMemo || '',
         inpersonInputTextMasked: consultation.inpersonMemoMasked || '',
       });
+      // 상담받은 사람 이름도 여기서 함께 저장합니다.
+      //
+      // 이 이름은 서식 초안의 청구인이 되는 값입니다 — core-api가 초안을 만들 때
+      // consultation.clientName을 그대로 ai-api로 넘깁니다. 그런데 이름칸은 여태
+      // 화면 상태만 바꾸고 서버에는 아무것도 안 보냈습니다. 상담을 등록할 때 한 번
+      // 보낸 값이 DB에 그대로 남아서, 화면에는 고친 이름이 보이는데 초안에는 옛
+      // 이름(또는 빈칸)이 찍혔습니다.
+      //
+      // transcript API는 메모 전용이라(TranscriptSaveRequest에 이름 자리가 없음)
+      // 이름은 상담 수정 API로 따로 보냅니다. 실패하면 아래 catch로 내려가
+      // "저장 실패"가 화면에 뜹니다 — 조용히 넘어가면 상담원은 저장된 줄 압니다.
+      if (consultation.name?.trim()) {
+        await updateCoreConsultation(consultation.coreId, {
+          clientName: consultation.name.trim(),
+        });
+      }
       return { ok: true, synced: true, message: '상담 내용이 저장되었습니다.' };
     } catch (error) {
       return {

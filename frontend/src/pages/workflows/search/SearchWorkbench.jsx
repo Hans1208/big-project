@@ -7,10 +7,19 @@ import {
 } from '../../../services/aiApiClient.js';
 import { caseOptions } from '../shared/caseHelpers.js';
 import { CasePicker } from '../components/CasePicker.jsx';
+import { FullTextModal } from '../components/FullTextModal.jsx';
 
-// 한 번에 몇 건씩 받아올지. 추천은 상위 몇 건만 의미가 있어 서버가 따로
-// 정하고(RECOMMEND_TOP_K), 이 값은 '직접 검색'에만 씁니다.
-const RAG_PAGE_SIZE = 20;
+// '직접 검색'은 색인이 주는 만큼 한 번에 다 받습니다. 상담원이 검색어를 넣어
+// 찾을 때는 몇 건인지 미리 정해줄 이유가 없고, 20건씩 끊어 '더 보기'를 누르게
+// 하면 찾는 것이 21위일 때 없다고 결론내기 쉽습니다.
+//
+// 판례는 색인 전체가 342건이라 이 값이면 걸리는 것은 다 옵니다. 조문은 색인이
+// 2,289청크라 이론상 더 있을 수 있지만, 유사도가 78~90% 안에 뭉쳐 있어 뒤로 갈수록
+// 사건과 무관한 것들입니다 — 그걸 다 그리면 화면만 무거워지고 고르기는 어려워집니다.
+//
+// 추천은 다릅니다 — AI가 상담에 맞는 것만 골라내는 것이라 상위 몇 건만 의미가
+// 있고, 건수는 서버가 정합니다(RECOMMEND_TOP_K).
+const RAG_SEARCH_LIMIT = 500;
 
 // 법령 API의 시행일은 '20260317', 판례 API의 선고일도 같은 8자리 형태입니다.
 // 그대로 두면 날짜로 안 읽힙니다.
@@ -20,16 +29,28 @@ function formatLegalDate(value) {
   return `${digits.slice(0, 4)}. ${Number(digits.slice(4, 6))}. ${Number(digits.slice(6, 8))}.`;
 }
 
+// 법령·판례 카드에는 길이와 상관없이 항상 '원문 보기'를 답니다.
+//
+// 처음에는 본문이 잘려 보일 때만(4줄/160자 초과) 버튼을 달았는데, 기준 자체가
+// 틀렸습니다. 판례 카드에 실리는 것은 판시사항 — 대법원이 "이 판결의 요점은
+// 이것"이라고 붙여놓은 한두 문장짜리 요약이지 판결문이 아닙니다. 짧아서 다
+// 보이는 것과, 그게 원문의 전부인 것은 다릅니다.
+//
+// 실측: 2016므989는 판시사항이 150자쯤이라 버튼이 안 붙었지만 판결문은 따로 있고
+// 훨씬 깁니다. 조문도 800자마다 잘려 색인에 들어가 있어(rag/chunking.py) 카드만
+// 보고 전체인지 알 수 없습니다.
+//
+// 그래서 '잘렸나'를 재지 않습니다. 원문을 따로 가진 탭이면 항상 길을 열어 둡니다.
+
 // 탭별로 다른 것은 '어느 API를 부르는가'와 화면 문구뿐입니다. 나머지 흐름
-// (추천 자동 실행, 더 보기, 카드 그리기)은 같아서 한 벌로 씁니다.
+// (추천 자동 실행, 카드 그리기)은 같아서 한 벌로 씁니다.
 const RAG_TABS = {
   statute: {
     label: '법령',
     search: ({ query, topK }) => searchStatutes({ query, topK }),
     recommend: (analysis, options) => recommendStatutes(analysis, options),
     dateLabel: '시행',
-    bodyToggleLabel: '조문 전문 보기',
-    moreLabel: `조문 ${RAG_PAGE_SIZE}건 더 보기`,
+    bodyToggleLabel: '조문 원문 보기',
     countMessage: (n) => `조문 ${n}건 · 국가법령정보센터`,
     emptyRecommend: '이 상담에 바로 쓸 조문을 찾지 못했습니다 · 직접 검색으로 찾아보세요',
     emptySearch: '해당하는 조문을 찾지 못했습니다 · 검색어를 바꿔보세요',
@@ -40,8 +61,7 @@ const RAG_TABS = {
     search: ({ query, topK }) => searchPrecedents({ query, topK }),
     recommend: (analysis, options) => recommendPrecedents(analysis, options),
     dateLabel: '선고',
-    bodyToggleLabel: '판시사항 전문 보기',
-    moreLabel: `판례 ${RAG_PAGE_SIZE}건 더 보기`,
+    bodyToggleLabel: '판례 원문 보기',
     countMessage: (n) => `판례 ${n}건 · 국가법령정보센터`,
     emptyRecommend: '이 상담에 참고할 판례를 찾지 못했습니다 · 직접 검색으로 찾아보세요',
     emptySearch: '해당하는 판례를 찾지 못했습니다 · 검색어를 바꿔보세요',
@@ -65,13 +85,9 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
   // 예시 목록을 그대로 씁니다 — 어느 쪽을 보고 있는지 화면에 밝혀둡니다.
   const [ragResults, setRagResults] = useState([]);
   const [ragLoading, setRagLoading] = useState(false);
-  // 전문을 펼쳐 둔 조문. 조문은 항이 여러 개라 접힌 채로는 요건을 확인할 수 없고,
-  // 그렇다고 전부 펼쳐두면 목록에서 훑어보며 고를 수가 없습니다.
-  const [expandedIds, setExpandedIds] = useState([]);
-  // 한 번에 받아올 조문 수. '더 보기'로 늘립니다 — 5건만 보여주면 찾는 조문이
-  // 6위였을 때 상담원이 "없다"고 결론내게 됩니다.
-  const [ragTopK, setRagTopK] = useState(RAG_PAGE_SIZE);
-  const [ragExhausted, setRagExhausted] = useState(false);
+  // '전문 보기'로 연 자료. 카드 안에서 펼치지 않고 창으로 띄웁니다 — 카드에 실린
+  // 본문은 색인이 쪼갠 조각 하나여서, 펼쳐 봐야 여전히 잘린 글입니다.
+  const [fullTextItem, setFullTextItem] = useState(null);
   const ragTab = RAG_TABS[referenceType] || null;
   const isRagTab = Boolean(ragTab);
 
@@ -96,6 +112,8 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
     similarityPercent: row.similarity_percent ?? null,
     reason: row.reason || '',
     effectiveDate: row.effective_date || '',
+    // 판례 원문은 사건 단위로 받아야 합니다(카드가 판시사항 조각에서 걸렸을 수 있음).
+    precedentId: row.precedent_id || '',
     // AI가 골라준 것인지(llm) 유사도 순으로 올라온 것인지(similarity). 담아서
     // 저장할 때 함께 남겨, 나중에 'AI 추천을 채택한 것'과 '직접 찾은 것'을
     // 구분할 수 있게 합니다.
@@ -104,7 +122,7 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
 
   // isCurrent: 응답이 도착했을 때도 이 요청이 여전히 최신인지 묻습니다. 상담을
   // 빠르게 넘기면 앞선 요청이 뒤늦게 도착해 새 상담의 결과를 덮어씁니다.
-  const runRagQuery = async (kind, topK = RAG_PAGE_SIZE, isCurrent = () => true) => {
+  const runRagQuery = async (kind, isCurrent = () => true) => {
     if (!ragTab) return;
     setRagLoading(true);
     setSearched(true);
@@ -116,7 +134,7 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
           summary: selectedCase?.analysis?.summary || '',
           extractedJson: selectedCase?.analysis?.extractedJson || {},
         })
-        : await ragTab.search({ query, topK });
+        : await ragTab.search({ query, topK: RAG_SEARCH_LIMIT });
       if (!isCurrent()) return;
       const rows = (payload?.results || []).map(toReferenceItem);
       setRagResults(rows);
@@ -128,10 +146,6 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
         const found = rows.find((row) => row.id === item.id);
         return found?.content ? { ...item, content: found.content } : item;
       }));
-      setRagTopK(topK);
-      setExpandedIds([]);   // 결과가 바뀌면 펼쳐둔 상태도 의미가 없습니다.
-      // 더 청한 만큼 안 왔으면 색인에 더 없다는 뜻이라 '더 보기'를 감춥니다.
-      setRagExhausted(kind === '추천' || rows.length < topK);
       // 추천이 0건인 것은 검색어 문제가 아닙니다. AI가 후보 30건을 훑고도 이
       // 상담에 쓸 것이 없다고 판단한 것이라, 억지로 채우지 않은 결과입니다.
       // (상담 내용이 아직 안 적힌 상담에서 실제로 이렇게 나옵니다.)
@@ -171,7 +185,7 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
     // 상담을 빠르게 넘기면 앞선 요청이 뒤늦게 도착해 새 상담 화면에 옛 결과를
     // 덮어쓸 수 있습니다. 가장 마지막 요청만 반영합니다.
     const ticket = ++latestRequest.current;
-    runRagQuery('추천', undefined, () => ticket === latestRequest.current);
+    runRagQuery('추천', () => ticket === latestRequest.current);
     // runRagQuery는 매 렌더마다 새로 만들어지므로 의존성에 넣지 않습니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId, referenceType, mode]);
@@ -371,23 +385,19 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
                 // (button 안의 button은 유효하지 않은 마크업입니다). 조문은 항이 여러 개라
                 // 접힌 상태로는 요건을 확인할 수 없으므로, 카드를 div로 바꾸고 '선택'과
                 // '전문 보기'를 각각 버튼으로 둡니다.
-                const isOpen = expandedIds.includes(item.id);
-                const isClamped = Boolean(item.content) && item.content.split('\n').length > 4;
                 return (
                   <div className={isSelected ? 'referenceCard selected' : 'referenceCard'} key={item.id}>
                     <span className="referenceCardTitle"><Gavel size={13} strokeWidth={2.2} aria-hidden="true" /> {item.title}</span>
                     {/* 조문 본문을 함께 보여줍니다. 제목만으로는 이 조문이 사건에 맞는지
                         판단할 수 없어, 상담원이 결국 법령정보센터를 따로 열어야 합니다. */}
                     {item.content ? (
-                      <span className={isOpen ? 'referenceCardBody open' : 'referenceCardBody'}>{item.content}</span>
+                      <span className="referenceCardBody">{item.content}</span>
                     ) : null}
-                    {isClamped ? (
+                    {isRagTab ? (
                       <button className="referenceCardToggle" type="button"
-                        onClick={() => setExpandedIds((current) => (isOpen
-                          ? current.filter((value) => value !== item.id)
-                          : [...current, item.id]))}
+                        onClick={() => setFullTextItem(item)}
                       >
-                        {isOpen ? '접기' : (ragTab?.bodyToggleLabel || '전문 보기')}
+                        {ragTab?.bodyToggleLabel || '원문 보기'}
                       </button>
                     ) : null}
                     <span className="referenceCardMeta">
@@ -411,14 +421,6 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
                   </div>
                 );
               }) : <InlineEmptyNotice>조건 일치 {label} 없음</InlineEmptyNotice>}
-              {isRagTab && results.length && !ragExhausted ? (
-                <button className="secondaryActionButton referenceMoreButton" type="button"
-                  disabled={ragLoading}
-                  onClick={() => runRagQuery('직접 검색', ragTopK + RAG_PAGE_SIZE)}
-                >
-                  {ragLoading ? '불러오는 중…' : ragTab.moreLabel}
-                </button>
-              ) : null}
             </div>
           </div>
           <div>
@@ -440,6 +442,13 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
           </div>
         </div>
       </section>
+      {fullTextItem ? (
+        <FullTextModal
+          item={fullTextItem}
+          referenceType={referenceType}
+          onClose={() => setFullTextItem(null)}
+        />
+      ) : null}
     </main>
   );
 }

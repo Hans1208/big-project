@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, Check, EyeOff, Headphones, Radio } from 'lucide-react';
 import { RealtimeMemoCard } from './RealtimeAnalysisPanel.jsx';
+import { correctClientName } from '../shared/nameCorrection.js';
 import { CollapsibleSection } from '../../../components/common.jsx';
 
 // RealtimeCallControl과 같은 위치·패턴이지만 통화 대신 녹음을 시작/종료합니다.
@@ -74,6 +75,9 @@ function RestartRecordingConfirmModal({ onConfirm, onCancel }) {
 // 토글로 보여줍니다. AnalysisWorkbench의 "개인정보는 자동으로 가려집니다" 카드와 같은 UX입니다.
 // 기본값을 마스킹본으로 두는 이유도 동일합니다 — 원문은 검증이 필요할 때만 확인합니다.
 //
+// 이름 교정(correctClientName)은 여기서 따로 하지 않습니다. 이 카드가 읽는
+// selectedCase.inpersonMemo(Masked)가 이미 교정을 거친 값이라, 한 번 더 돌리면
+// 같은 일을 두 곳에서 하게 됩니다.
 // 요구사항: (1) 기본적으로 보이고 (2) 녹음 시작/중에는 원문 토글을 막아 마스킹 전 상태가 잘못
 // 노출되지 않게 하고 (3) 녹음이 끝나면 다시 조작 가능해지고 (4) 그 시점에 아코디언이 자동으로
 // 펼쳐져야 합니다. status가 'done'인지 아닌지로 key를 바꿔 CollapsibleSection을 다시 마운트시켜
@@ -162,8 +166,12 @@ export function InPersonAnalysisPanel({
     const newSegments = sorted.slice(flushedCountRef.current);
     flushedCountRef.current = sorted.length;
 
-    const newText = buildTranscriptChunk(newSegments, 'text');
-    const newMaskedText = buildTranscriptChunk(newSegments, 'maskedText');
+    // 상담원이 이름칸에 적어둔 이름이 있으면, 받아쓰기가 잘못 들은 이름을 그 이름으로 되돌립니다.
+    // 이 메모가 그대로 상담 저장 -> AI 분석 -> 서식 초안까지 흘러가기 때문에, 여기서 안 고치면
+    // 청구인 이름이 틀린 채로 법률 문서가 만들어집니다.
+    const clientName = selectedCase.name || '';
+    const newText = correctClientName(buildTranscriptChunk(newSegments, 'text'), clientName);
+    const newMaskedText = correctClientName(buildTranscriptChunk(newSegments, 'maskedText'), clientName);
     if (!newText && !newMaskedText) return;
 
     const currentMemo = selectedCase.inpersonMemo || '';
@@ -174,6 +182,35 @@ export function InPersonAnalysisPanel({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, hasCase]);
+
+  // 실제 흐름은 "녹음 -> 받아쓰기에서 이름이 틀린 걸 발견 -> 이름칸을 고침" 순서입니다. 그래서
+  // 새로 들어오는 조각만 고쳐서는 부족하고, 이름이 바뀐 시점에 이미 쌓여 있는 메모까지 같이
+  // 고쳐야 저장되는 본문에서 틀린 이름이 사라집니다.
+  //
+  // 고칠 게 없으면 아무것도 안 하므로(아래 비교) 갱신이 반복되지 않습니다.
+  //
+  // 이름칸이 바로 옆(caseMeta)에 있어서 한 글자 칠 때마다 이 효과가 돕니다. 메모를 덮어쓰는
+  // 일이라 '문', '문가'처럼 아직 다 안 친 상태로 반영되면 안 되므로, 타이핑이 멎은 뒤에만
+  // 한 번 적용합니다.
+  useEffect(() => {
+    if (!hasCase) return undefined;
+    const timer = setTimeout(() => {
+      const clientName = selectedCase.name || '';
+      const memo = selectedCase.inpersonMemo || '';
+      const masked = selectedCase.inpersonMemoMasked || '';
+      const nextMemo = correctClientName(memo, clientName);
+      const nextMasked = correctClientName(masked, clientName);
+      if (nextMemo === memo && nextMasked === masked) return;
+      onUpdateConsultation(selectedCase.id, { inpersonMemo: nextMemo, inpersonMemoMasked: nextMasked });
+    }, 800);
+    return () => clearTimeout(timer);
+    // 메모 내용은 의존성에서 뺍니다. 상담원이 메모를 직접 고칠 수 있게 되면서
+    // (RealtimeMemoCard), 메모가 바뀔 때마다 이 교정이 돌면 일부러 적은 이름까지
+    // 되돌려 버립니다 — 예를 들어 상대방 이름이 내담자와 소리가 비슷하면, 적는 족족
+    // 내담자 이름으로 바뀝니다. 사람이 고친 것이 기계보다 우선입니다.
+    // 이름칸이 바뀐 순간에만 한 번 훑습니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCase?.id, selectedCase?.name]);
 
   const headline = status === 'recording'
     ? '녹음 중입니다. 대면 상담 내용이 실시간으로 전송됩니다.'

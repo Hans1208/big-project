@@ -8,9 +8,42 @@
 테스트할 때도 AWS 자격증명 없이 문자열만 넣으면 된다.
 """
 
+import re
 from typing import Optional
 
 from app.ai.analysis.llm_client import analyze_consultation
+
+# 주민등록번호·전화번호는 분석 입력에서 지운다.
+#
+# 분석은 마스킹본이 아니라 원문을 받는다(core-api buildCombinedInputText). 그래서
+# 상담에서 불러준 주민등록번호가 그대로 외부 LLM으로 나가고, 요약에도 실려 DB에
+# 저장된다 - 실측에서 요약이 "남편 백승현(870521-1284222)이"로 나왔다.
+#
+# 더 나쁜 것은 그 번호가 지어낸 값이었다는 점이다. STT가 뭉갠 소리
+# ("팔치유공산 2.1을 2글팔 4.2.2")에서 모델이 형식만 완벽한 가짜 주민번호를
+# 만들어냈다. 실제로 말한 번호와도 다르다. 법률 서류에 없는 주민번호가 올라가는
+# 것은 빈칸보다 위험하고, 형식이 그럴듯해서 사람 눈으로는 걸러지지 않는다.
+#
+# 마스킹본을 통째로 쓰지 않는 이유: 이름까지 [PRIVATE_PERSON]이 되면 분석이
+# 당사자를 못 뽑고, 그러면 서식 초안의 이름칸이 전부 빈다. 서식은 주민번호를
+# AI가 채우지 않도록 이미 막혀 있으므로(FIELD_PROMPT 2번), 번호만 지우면
+# 잃는 기능이 없다.
+#
+# 금액은 지우지 않는다. "2억", "200000000"까지 지우면 재산분할·양육비 분석이
+# 통째로 무력해진다 - 자릿수만 보고 지우면 안 되는 이유다.
+_RRN_RE = re.compile(r"\d{6}\s*[-~]\s*\d{7}")
+_PHONE_RE = re.compile(r"0\d{1,2}\s*[-)]\s*\d{3,4}\s*[-]\s*\d{4}")
+
+
+def scrub_sensitive_numbers(text: str) -> str:
+    """분석 입력에서 주민등록번호·전화번호를 지운다.
+
+    구분자가 있는 형태만 지운다. 구분자 없는 긴 숫자를 지우면 금액과 사건번호가
+    함께 사라진다."""
+    if not text:
+        return text
+    text = _RRN_RE.sub("[주민등록번호]", text)
+    return _PHONE_RE.sub("[전화번호]", text)
 
 
 class ConsultAnalysis:
@@ -62,7 +95,7 @@ def build_consult_text(summary: str, details: str, extracted_text: str) -> str:
     녹취록을 올린 경우 그 내용까지 요약·추출 대상이 되어야 하므로
     stt 단계 결과(extracted_text)가 반드시 포함되어야 한다.
     """
-    return (
+    return scrub_sensitive_numbers(
         f"[요약]\n{summary or ''}\n\n"
         f"[상세]\n{details or ''}\n\n"
         f"[추출된 첨부내용]\n{extracted_text or ''}"

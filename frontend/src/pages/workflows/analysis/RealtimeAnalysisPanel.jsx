@@ -104,16 +104,20 @@ export function RealtimeMemoCard({ selectedCase, onUpdateConsultation, field = '
           {charCount ? `${charCount}자 기록됨` : '작성 전'}
         </span>
       </div>
-      {/* 이 칸은 실제로는 읽기 전용 기록 로그입니다(입력은 아래 작은 입력창으로). 그런데
-          placeholder가 "여기 바로 적어주세요"라고 말해, 정작 이 칸을 눌러 타이핑을 시도했다가
-          아무 반응이 없는 사람이 있었습니다(코치 피드백). 안내 문구를 실제 동작에 맞춥니다. */}
+      {/* 이 칸을 눌러 타이핑을 시도했다가 아무 반응이 없는 사람이 있었습니다(코치 피드백).
+          예전에는 읽기 전용이라 안내 문구만 실제 동작에 맞췄는데, 이제 직접 고칠 수 있게 합니다.
+
+          받아쓰기가 사람 말을 자주 뭉갭니다 — 실측에서 "사망했어요"가 "사랑했어요"로,
+          "한부모가정"이 "한분 모과정"으로 들어왔습니다. 이 메모가 그대로 AI 분석과
+          서식 초안까지 흘러가므로, 틀린 채로 두면 그 틀린 값으로 법률 문서가 만들어집니다.
+          들은 사람이 그 자리에서 고치는 것이 가장 정확하고 빠릅니다. */}
       <textarea
         className="realtimeMemoTextarea"
         value={memo}
         disabled={!hasCase}
-        readOnly
+        onChange={(event) => onUpdateConsultation(selectedCase.id, { [field]: event.target.value })}
         placeholder={hasCase
-          ? '아래 입력창에 적으면 여기에 기록됩니다.'
+          ? '여기에 직접 적거나, 받아쓰기가 잘못 들은 곳을 고칠 수 있습니다.'
           : '사건 선택 또는 새 상담 시작'}
       />
       <div className="realtimeMemoComposer">
@@ -131,7 +135,7 @@ export function RealtimeMemoCard({ selectedCase, onUpdateConsultation, field = '
         />
         <button type="button" className="callAnalyzeButton" onClick={addMemo} disabled={!hasCase || !pendingMemo.trim()}>메모 추가</button>
       </div>
-      <p className="helperText">AI 분석 기준 메모</p>
+      <p className="helperText">AI 분석 기준 메모 · 받아쓰기가 잘못 들은 곳은 위에서 직접 고쳐주세요</p>
     </article>
   );
 }

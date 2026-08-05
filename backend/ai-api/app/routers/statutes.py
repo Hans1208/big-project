@@ -14,8 +14,9 @@
 """
 from fastapi import APIRouter, HTTPException
 
+from app.ai.fulltext import build_full_text
 from app.ai.statutes.explainer import select_and_explain
-from rag.statute_retriever import retrieve_statutes
+from rag.statute_retriever import get_default_statute_retriever, retrieve_statutes
 
 router = APIRouter(prefix="/statutes", tags=["statutes"])
 
@@ -32,9 +33,14 @@ RECOMMEND_TOP_K = 5
 # explainer에 맡긴다. 조문 평균 본문이 175자라 30건이어도 프롬프트는 6천 자
 # 안쪽이고, LLM 호출 횟수는 그대로 한 번이다.
 RECOMMEND_CANDIDATE_K = 30
-# 색인 전체가 2,289청크라 그보다 크게 받을 이유가 없다. 한 번에 너무 많이
-# 내리면 임베딩 조회와 응답 크기가 같이 커진다.
-MAX_TOP_K = 100
+# '직접 검색'은 상담원이 검색어를 넣어 찾는 것이라, 우리가 몇 건까지만 보라고
+# 자를 이유가 없다 - 찾는 것이 101위였을 때 "없다"고 결론내게 된다. 색인이 가진
+# 만큼 다 내주고, 어디까지 볼지는 화면에서 스크롤로 정하게 한다.
+#
+# 색인 크기(조문 2,289청크 / 판례 342건)보다 크게 잡아 사실상 상한이 없게 둔다.
+# 그래도 값을 남겨두는 것은, 잘못된 요청 하나가 서버를 통째로 붙잡는 것을 막기
+# 위해서다.
+MAX_TOP_K = 3000
 
 
 def _to_card(row: dict) -> dict:
@@ -141,3 +147,33 @@ def recommend_statutes(payload: dict):
     results = select_and_explain(
         candidates, payload.get("summary") or "", case_label, limit)
     return {"query": query, "results": results}
+
+
+@router.post("/full-text")
+def statute_full_text(payload: dict):
+    """카드 하나에 대응하는 조문 본문 전체를 돌려준다.
+
+    payload: {id: 검색 결과 카드의 id(청크 id)}
+
+    색인은 조문을 800자씩 잘라 담는다(rag/chunking.py DEFAULT_CHUNK_SIZE).
+    긴 조문은 여러 조각이 되고, 카드에는 검색에 걸린 조각 하나만 실린다 -
+    실측에서 가사소송법 제2조가 797자에서, 그것도 항목 중간에서 끊겼다.
+    '전문 보기'는 여기서 받은 것을 보여준다."""
+    chunk_id = str(payload.get("id") or "").strip()
+
+    if not chunk_id:
+        raise HTTPException(status_code=400, detail="id가 필요합니다")
+
+    try:
+        store = get_default_statute_retriever().vector_store
+        result = build_full_text(store, chunk_id)
+    except Exception as e:  # 색인이 없거나 핸들이 깨진 경우
+        raise HTTPException(
+            status_code=503,
+            detail=f"조문 원문을 불러올 수 없습니다: {type(e).__name__}",
+        )
+
+    if not result.get("found"):
+        raise HTTPException(status_code=404, detail="해당 조문을 찾지 못했습니다")
+
+    return result

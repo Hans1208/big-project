@@ -241,9 +241,35 @@ def _generate_table_fields(tables_meta: list, extracted: dict, summary: str) -> 
         return {"cell_replacements": [], "error": f"{type(e).__name__}: {e}"}
 
 
-def _apply_table_fields(table_objs: list, replacements: list) -> tuple:
+def _row_label(tables_meta: list, idx: int, row: int) -> str:
+    """그 행의 라벨(보통 0열 머리글)을 읽는다. 없으면 빈 문자열."""
+    # table_index는 목록 위치와 같게 만들어져 있지만(_collect_tables 주석),
+    # 값으로 한 번 더 맞춰 본다 — 어긋나면 엉뚱한 표의 라벨을 보게 된다.
+    meta = next((t for t in (tables_meta or [])
+                 if t.get("table_index") == idx), None)
+    if meta is None:
+        try:
+            meta = tables_meta[idx]
+        except (IndexError, TypeError):
+            return ""
+    for c in (meta.get("cells") or []):
+        if c.get("row") == row and c.get("col") == 0:
+            return re.sub(r"\s+", "", str(c.get("text", "")))
+    return ""
+
+
+def _apply_table_fields(table_objs: list, replacements: list,
+                        tables_meta: list = ()) -> tuple:
     """GPT가 제안한 셀 치환을 실제로 적용. 범위를 벗어나거나 실패하면
     조용히 건너뛴다(표 하나 잘못됐다고 전체가 죽으면 안 됨).
+
+    안내표 행은 채우지 않는다. TABLE_FIELD_PROMPT 5번에 "제출법원·관련법규·
+    비용 셀은 건드리지 마라"고 적어 두었는데도 LLM이 어긴다 — 실측에서
+    상속한정승인 심판청구서의 '제출법원' 칸에 사망자 이름이 들어갔다.
+    그 표는 서식 안내문이라 사건과 무관하게 항상 고정이고, 거기 사람 이름이
+    찍히면 서류를 읽는 사람이 무엇을 믿어야 할지 알 수 없게 된다.
+    프롬프트로 못 막는 것은 코드로 막는다.
+
     반환: (적용건수, 실패목록, 이번에 채운 (table_index,row,col) 집합)."""
     applied, missed, filled_keys = 0, [], set()
     for r in replacements:
@@ -251,6 +277,10 @@ def _apply_table_fields(table_objs: list, replacements: list) -> tuple:
         if idx is None or row is None or col is None or not value:
             continue
         if not (0 <= idx < len(table_objs)):
+            missed.append(r)
+            continue
+        label = _row_label(tables_meta, idx, row)
+        if label and any(k in label for k in TABLE_NONFILLABLE_LABELS):
             missed.append(r)
             continue
         try:
@@ -1335,7 +1365,10 @@ LIVING_KEY_RE = re.compile(r"청구인|신청인|원고|내담자")
 OPPONENT_KEY_RE = re.compile(r"상대방|피신청인|피고")
 
 # 이름이 아니라 '확인 못 했다'는 표시. 이걸 이름으로 쓰면 서식에 "미상"이 찍힌다.
-UNKNOWN_NAME_MARKS = ("미상", "불명", "확인불가", "확인 불가", "알 수 없음", "없음")
+UNKNOWN_NAME_MARKS = ("미상", "불명", "확인불가", "확인 불가", "알 수 없음", "없음",
+                      # 프론트가 빈 값 자리에 넣는 화면 표시 문구. 상담 등록 때
+                      # clientName으로 저장돼 서식까지 넘어온다.
+                      "미입력")
 
 # 이름을 모를 때 분석 층이 이름 자리에 대신 적어 넣는 지칭어들. 이름이 아니므로
 # 서식에 그대로 들어가면 안 된다 — 실측에서 상속재산포기 심판청구서의 청구인 2번 칸이
@@ -2031,9 +2064,13 @@ def _apply_confirmed_names_to_extracted(extracted: dict, applicant_name: str = "
 
     원본은 건드리지 않는다 — 호출부(core-api)가 넘겨준 dict라 여기서 바꾸면
     같은 분석 결과를 쓰는 다른 경로까지 영향을 받는다."""
+    # 이름이 아닌 값은 '확인된 이름'으로 받지 않는다. 프론트가 화면 표시용으로 쓰는
+    # 문구("이름 미입력")가 상담 등록 때 clientName으로 저장돼 여기까지 넘어온다.
+    # 그걸 확정값으로 받으면, 분석이 제대로 뽑아낸 청구인 이름(문가영)을 덮어써서
+    # 서식에 "청구인(상속인) 이름 미입력"이 인쇄된다 — 실측된 사고다.
     pairs = [(LIVING_KEY_RE, (applicant_name or "").strip()),
              (OPPONENT_KEY_RE, (opponent_name or "").strip())]
-    pairs = [(rx, nm) for rx, nm in pairs if nm]
+    pairs = [(rx, nm) for rx, nm in pairs if nm and _is_person_name(nm)]
     if not pairs or not isinstance(extracted, dict):
         return extracted, 0
 
@@ -2321,7 +2358,7 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     tables_meta = doc.get_table_map().get("tables", []) if table_objs else []
     table_gpt = _generate_table_fields(tables_meta, extracted, summary)
     table_applied, table_missed, table_filled_keys = _apply_table_fields(
-        table_objs, table_gpt.get("cell_replacements", []))
+        table_objs, table_gpt.get("cell_replacements", []), tables_meta)
     # 채운 뒤에도 남은 표 셀(자리표시자·원본 예시 인물 등) 표시.
     # tables_meta는 채우기 전 스냅샷이라 안전장치는 여기서 최신 상태를
     # 다시 읽어 판단해야 하지만, set_cell_text로 바뀐 셀은 filled_keys로

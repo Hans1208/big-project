@@ -101,8 +101,15 @@ export function mergeContractAnalysisResponse(baseAnalysis, contractResult, extr
 export function splitSummaryIntoBullets(summaryText = '') {
   // 문장으로 끊어 쓴 요약은 마침표 기준으로, "사건 유형: 이혼 / 긴급도: 중"처럼 슬래시로
   // 항목을 나열한 요약(core-api 응답 형식)은 슬래시 기준으로 쪼갭니다.
+  //
+  // 예전에는 '다'와 '요' 뒤에서도 끊었습니다("~했다", "~예요" 같은 한국어 종결어미를 잡으려던
+  // 의도). 그런데 문장 끝인지를 안 보고 글자만 봐서, 문장 한가운데가 잘렸습니다:
+  //   "남편이 남긴 채무가 재산보다 / 약 2억 원 더 많아..."   <- '재산보다'의 '다'
+  // '~보다', '~하다가', '~한다면', '~하고요' 전부 같은 일이 납니다. 종결어미는 거의 항상
+  // 마침표를 달고 오므로 문장부호만 기준으로 삼습니다. 마침표 없이 쓴 요약은 안 쪼개지고
+  // 한 줄로 남는데, 문장이 잘리는 것보다는 낫습니다.
   return summaryText
-    .split(/(?<=[.!?다요])\s+|\n+|\s+\/\s+/)
+    .split(/(?<=[.!?])\s+|\n+|\s+\/\s+/)
     .map((sentence) => sentence.trim())
     .filter(Boolean);
 }

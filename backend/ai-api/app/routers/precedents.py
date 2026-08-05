@@ -20,8 +20,10 @@
 """
 from fastapi import APIRouter, HTTPException
 
+from app.ai.fulltext import build_full_text
 from app.ai.precedents.explainer import select_and_explain
 from app.ai.precedents.rag_results import search_precedent_rag
+from rag.precedent_retriever import get_default_precedent_retriever
 
 router = APIRouter(prefix="/precedents", tags=["precedents"])
 
@@ -29,7 +31,10 @@ router = APIRouter(prefix="/precedents", tags=["precedents"])
 SEARCH_TOP_K = 20
 RECOMMEND_TOP_K = 5
 RECOMMEND_CANDIDATE_K = 30
-MAX_TOP_K = 100
+# 직접 검색은 건수를 우리가 자르지 않는다(statutes.py의 같은 상수 주석 참고).
+# 색인 전체가 판례 342건이라 그보다 크게 잡아 사실상 상한을 없앤다. 값을
+# 남겨두는 것은 잘못된 요청 하나가 서버를 붙잡는 것을 막기 위해서다.
+MAX_TOP_K = 3000
 
 # 사건 단위 중복 제거로 줄어드는 몫을 미리 더 받는다. 한 사건이 판시사항·요약·
 # 전문으로 서너 청크가 되므로, 청크를 그만큼 더 받아야 사건 수가 채워진다.
@@ -170,3 +175,55 @@ def recommend_precedents(payload: dict):
     results = select_and_explain(
         candidates, payload.get("summary") or "", case_label, limit)
     return {"query": query, "results": results}
+
+
+# 판례 한 건은 판시사항/판결요지/판례내용이 각각 별개 문서로 색인된다
+# (rag/precedent_documents.py SECTION_FIELDS). '전문'은 이 중 판례내용이다.
+# 카드가 판시사항에서 걸렸다면 그 청크의 document_id로는 판시사항밖에 못 모아
+# 오므로, 사건 번호로 판례내용 문서를 직접 지목한다.
+PRECEDENT_FULL_TEXT_SECTION = "full_text"
+PRECEDENT_SECTION_FALLBACKS = ("full_text", "summary", "holding")
+
+
+@router.post("/full-text")
+def precedent_full_text(payload: dict):
+    """카드 하나에 대응하는 판례 본문 전체를 돌려준다.
+
+    payload: {precedent_id(우선), id: 카드의 청크 id}
+
+    목록 카드는 검색에 걸린 청크 하나만 싣는다. 판례 한 건이 열 조각쯤으로
+    쪼개져 있어, 그 조각이 문장 중간에서 시작하거나 끝나는 일이 흔하다
+    (실측: 2022느단5199가 chunk-0002만 걸려 "비율에 따라"로 시작했다).
+    '전문 보기'는 여기서 받은 것을 보여준다."""
+    precedent_id = str(payload.get("precedent_id") or "").strip()
+    chunk_id = str(payload.get("id") or "").strip()
+
+    if not precedent_id and not chunk_id:
+        raise HTTPException(status_code=400, detail="precedent_id 또는 id가 필요합니다")
+
+    try:
+        store = get_default_precedent_retriever().vector_store
+
+        result = None
+        if precedent_id:
+            # 판례내용이 없는 사건도 있다(요지만 공개된 경우). 있는 것 중
+            # 가장 온전한 구획으로 내려간다.
+            for section in PRECEDENT_SECTION_FALLBACKS:
+                found = build_full_text(
+                    store, f"precedent:{precedent_id}:{section}")
+                if found.get("found"):
+                    result = found
+                    break
+
+        if result is None and chunk_id:
+            result = build_full_text(store, chunk_id)
+    except Exception as e:  # 색인이 없거나 핸들이 깨진 경우
+        raise HTTPException(
+            status_code=503,
+            detail=f"판례 원문을 불러올 수 없습니다: {type(e).__name__}",
+        )
+
+    if not result or not result.get("found"):
+        raise HTTPException(status_code=404, detail="해당 판례를 찾지 못했습니다")
+
+    return result
