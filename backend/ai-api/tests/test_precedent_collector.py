@@ -258,7 +258,7 @@ def test_default_jobs_limit_body_searches():
         "",
     ) not in signatures
 
-    assert len(jobs) == 108
+    assert len(jobs) == 226
 
 
 def test_collector_filters_unrelated_tax_cases():
@@ -367,3 +367,82 @@ def test_collector_keeps_generic_family_case():
     ] == [
         "902",
     ]
+
+
+def test_default_jobs_cover_all_service_categories():
+    jobs = build_default_search_jobs()
+
+    signatures = {
+        (
+            job.query,
+            job.search_scope,
+            job.court_type_code,
+            job.referenced_law,
+        )
+        for job in jobs
+    }
+
+    title_terms = (
+        "\ud63c\uc778\ubb34\ud6a8",
+        "\uac00\uc871\uad00\uacc4\ub4f1\ub85d\ubd80\uc815\uc815",
+        "\uc720\uc5b8\ud6a8\ub825",
+        "\uc785\uc591",
+    )
+
+    for term in title_terms:
+        for court_code in (
+            "400201",
+            "400202",
+        ):
+            assert (
+                term,
+                1,
+                court_code,
+                "",
+            ) in signatures
+
+    body_terms = (
+        "\uac00\uc871\uad00\uacc4\ub4f1\ub85d\ubd80\uc815\uc815",
+        "\ucd9c\uc0dd\uc2e0\uace0",
+        "\uc785\uc591",
+        "\ud30c\uc591",
+        "\uce5c\uc0dd\uc790\uad00\uacc4",
+        "\uc778\uc9c0\uccad\uad6c",
+        "\uc131\ub144\ud6c4\uacac",
+        "\ubbf8\uc131\ub144\ud6c4\uacac",
+        "\uc720\uc5b8",
+        "\uc0c1\uc18d\ud3ec\uae30",
+        "\ud55c\uc815\uc2b9\uc778",
+    )
+
+    for term in body_terms:
+        for court_code in (
+            "400201",
+            "400202",
+        ):
+            assert (
+                term,
+                2,
+                court_code,
+                "",
+            ) in signatures
+
+    reference_anchors = (
+        "\uac00\uc871\uad00\uacc4\ub4f1\ub85d\ubd80\uc815\uc815",
+        "\uc785\uc591",
+        "\uce5c\uc0dd\uc790\uad00\uacc4",
+        "\uc778\uc9c0\uccad\uad6c",
+        "\uc720\uc5b8",
+    )
+
+    for anchor in reference_anchors:
+        for court_code in (
+            "400201",
+            "400202",
+        ):
+            assert (
+                anchor,
+                2,
+                court_code,
+                "\ubbfc\ubc95",
+            ) in signatures
