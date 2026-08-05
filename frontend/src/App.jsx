@@ -13,6 +13,7 @@ import {
   approveCoreUser,
   createCoreAnalysis,
   createCoreConsultation,
+  consultationMemosFromRow,
   deleteCoreConsultation,
   fetchCoreAnalyses,
   fetchCoreConsultations,
@@ -232,7 +233,11 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
               coreId: row.id,
               name: row.clientName || '이름 미입력',
               title: row.title || '제목 미입력',
-              memo: row.inputText || '',
+              // 전화/대면 메모와 각 개인정보 가림본까지 되살립니다. 예전에는 memo에 inputText
+              // (두 채널 합본)만 넣어서, 다른 PC나 변호사 계정으로 열면 대면 녹음 결과와
+              // 가림본이 통째로 비어 보였습니다 — "개인정보가 가려진 상담 내용" 카드가 정작
+              // 검토자 화면에서 항상 비어 있던 원인입니다.
+              ...consultationMemosFromRow(row),
               opponentName: row.opponentName || '',
               status: '진행 중',
               date: (row.createdAt || '').slice(0, 10) || today,

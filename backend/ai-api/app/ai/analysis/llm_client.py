@@ -9,6 +9,9 @@ LLM 기반 법률상담 구조화 모델 - 신규 Google GenAI SDK (google-genai
 
 import json
 import os
+import re
+from copy import deepcopy
+from datetime import date
 from pathlib import Path
 from typing import List, Type
 
@@ -17,10 +20,14 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from app.schemas.analysis import AIAnalysisSchema
-from app.ai.analysis.prompts import SYSTEM_PROMPT
+from app.ai.analysis.prompts import build_system_prompt
 
 # parents[2] == app/ (이 파일이 app/ai/analysis/ 아래에 있음)
 _DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "few_shot_examples.json"
+
+# 파일 파싱은 1회만. 예시의 상대날짜를 실제 날짜로 바꾸는 일은 호출할 때마다
+# 하므로(서버가 며칠 떠 있어도 "오늘"이 따라가야 한다) 원본만 들고 있는다.
+_RAW_EXAMPLES = json.loads(_DATA_PATH.read_text(encoding="utf-8"))["examples"]
 
 _client: genai.Client | None = None
 
@@ -76,29 +83,61 @@ def _prepare_gemini_schema(pydantic_model: Type[BaseModel]) -> dict:
     return resolve_and_clean(raw_schema)
 
 
-def _load_few_shot_contents() -> List[dict]:
+_RELATIVE_DATE_RE = re.compile(r"^\s*약?\s*(\d+)\s*(년|개월|달)\s*전\s*$")
+
+
+def _resolve_relative_dates(output: dict, today: date) -> dict:
+    """few-shot 예시의 날짜를 오늘 기준 실제 날짜로 바꾼다.
+
+    예시 파일은 날짜를 "약 3년 전", "6개월 전"처럼 상대표현 그대로 적어 두었다.
+    few-shot은 지시문보다 강한 신호라, 이대로 두면 프롬프트에 날짜 규칙을 아무리
+    써도 모델이 예시를 따라 상대표현을 뱉는다. 그런 값은 연·월·일이 없어서
+    _extracted_dates가 통째로 버리므로 서식의 날짜칸이 영영 안 채워진다.
+
+    "약 3년 전"은 연도까지만 알 수 있는 값이라 연도만 적는다 — 없는 월·일을
+    지어내면 프롬프트에 적은 "모르는 자리를 채우지 말라"는 규칙과 예시가 어긋난다.
+    """
+    dates = (output.get("extracted_json") or {}).get("날짜")
+    if not isinstance(dates, list):
+        return output
+
+    for item in dates:
+        if not isinstance(item, dict):
+            continue
+        m = _RELATIVE_DATE_RE.match(str(item.get("값", "")))
+        if not m:
+            continue
+        n, unit = int(m.group(1)), m.group(2)
+        if unit == "년":
+            item["값"] = str(today.year - n)
+        else:
+            months = today.year * 12 + (today.month - 1) - n
+            item["값"] = f"{months // 12}-{months % 12 + 1:02d}"
+    return output
+
+
+def _load_few_shot_contents(today: date = None) -> List[dict]:
     """few_shot_examples.json -> google-genai contents 대화 배열로 변환"""
-    raw = json.loads(_DATA_PATH.read_text(encoding="utf-8"))
+    today = today or date.today()
     contents: List[dict] = []
-    for ex in raw["examples"]:
+    for ex in _RAW_EXAMPLES:
         contents.append({"role": "user", "parts": [{"text": ex["input"]}]})
+        output = _resolve_relative_dates(deepcopy(ex["output"]), today)
         contents.append(
             {
                 "role": "model",
-                "parts": [{"text": json.dumps(ex["output"], ensure_ascii=False)}],
+                "parts": [{"text": json.dumps(output, ensure_ascii=False)}],
             }
         )
     return contents
 
 
-# 모듈 로드 시 1회만 파싱
-_FEW_SHOT_CONTENTS = _load_few_shot_contents()
 _GEMINI_CLEANED_SCHEMA = _prepare_gemini_schema(AIAnalysisSchema)
 
 
 def build_contents(consultation_text: str) -> List[dict]:
     """few-shot 대화 흐름 뒤에 실제 입력 상담글을 붙여 대화 배열 생성"""
-    contents: List[dict] = list(_FEW_SHOT_CONTENTS)
+    contents: List[dict] = _load_few_shot_contents()
     contents.append({"role": "user", "parts": [{"text": consultation_text}]})
     return contents
 
@@ -123,6 +162,9 @@ def analyze_consultation(
     model_name = model_name or os.environ.get("KLAC_GEMINI_MODEL") or FALLBACK_MODEL
     client = _get_client()
     contents = build_contents(consultation_text)
+    # 프롬프트를 모듈 상수로 굳히면 서버가 며칠 떠 있는 동안 "오늘"이 기동일에
+    # 멈춘다. 호출할 때마다 만들어 날짜가 따라가게 한다.
+    system_prompt = build_system_prompt()
 
     last_error: str | None = None
     raw_content: str = ""
@@ -151,7 +193,7 @@ def analyze_consultation(
 
         # 정제된 Gemini 전용 스키마 전달
         config = types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=system_prompt,
             response_mime_type="application/json",
             response_schema=_GEMINI_CLEANED_SCHEMA,
             temperature=0.1,

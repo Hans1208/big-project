@@ -1108,7 +1108,7 @@ CONTESTED_ROLE_LABEL_RE = re.compile(
 )
 
 
-def _drop_unidentified_name_fills(replacements: list) -> tuple:
+def _drop_unidentified_name_fills(replacements: list, extracted: dict = None) -> tuple:
     """역할을 특정하지 못한 채(role='기타') 이름 자리를 채우는 치환을 버린다.
 
     GPT는 역할을 모를 때 role='기타'를 붙이는데, 그 상태로 이름을 넣으면
@@ -1123,7 +1123,17 @@ def _drop_unidentified_name_fills(replacements: list) -> tuple:
     유언자처럼 사람이 뒤바뀌면 문서 의미가 뒤집히는 자리에서만 버리고,
     공동상속인·성명처럼 나란한 자리는 남긴다.
 
+    role은 GPT가 붙이는 값이라 자주 '기타'로 흘러내린다. 그것 하나만 보고 버리면
+    분석이 역할까지 확실히 아는 이름도 같이 버려진다 — 재감사에서 버려진 3건이
+    전부 그랬다(추출정보에 "역할: 피상속인, 이름: 남정호"가 있는데도 유언자 칸이
+    한 곳도 안 채워졌다). 근거가 분석에 있으면 GPT의 role이 무엇이든 신뢰한다.
+    이 필터가 막으려는 건 '근거 없는 이름'이지 '라벨이 흐린 이름'이 아니다.
+
     반환: (남길 치환 목록, 버린 자리 설명 목록)"""
+    deceased = _known_names_by_role(extracted or {}, DECEASED_KEY_RE)
+    living = _known_names_by_role(extracted or {}, LIVING_KEY_RE)
+    opponent = _known_names_by_role(extracted or {}, OPPONENT_KEY_RE)
+
     kept, dropped = [], []
     for r in replacements:
         before, after = r.get("before", ""), r.get("after", "")
@@ -1133,7 +1143,47 @@ def _drop_unidentified_name_fills(replacements: list) -> tuple:
                 and CONTESTED_ROLE_LABEL_RE.search(before)
                 and NAME_PLACEHOLDER_RE.search(before)
                 and not NAME_PLACEHOLDER_RE.search(after)):
+            # 그 칸이 어떤 역할의 자리인지 라벨로 보고, 들어간 이름이 분석에서
+            # 그 역할로 확인된 사람이면 남긴다. 라벨과 다른 쪽 이름이 들어갔다면
+            # 그건 이 필터가 원래 막으려던 사람 뒤바뀜이므로 그대로 버린다.
+            name = _inserted_name(before, after)
+            grounded = (deceased if DECEASED_LABEL_RE.search(before)
+                        else living if LIVING_LABEL_RE.search(before)
+                        else opponent)
+            if name and name in grounded:
+                kept.append(r)
+                continue
             dropped.append(f"이름칸(역할불명·상담원확인): {before[:30]}")
+            continue
+        kept.append(r)
+    return kept, dropped
+
+
+def _drop_non_name_person_fills(replacements: list) -> tuple:
+    """이름칸을 이름이 아닌 지칭어로 채우는 치환을 버린다.
+
+    분석은 이름을 못 들었을 때 이름 자리에 "첫째, 둘째"처럼 관계를 적어 넣는데,
+    서식에 그대로 들어가면 "청구인(상속인) 2. 첫째, 둘째(주민등록번호)"가 된다.
+    사람 이름처럼 찍히지만 실제로는 아무도 특정하지 못한 상태다.
+
+    비워두면 C단계가 '확인필요' 표시를 붙이고 상담원이 채운다 — 그게 맞는 처리다.
+
+    반환: (남길 치환 목록, 버린 자리 설명 목록)"""
+    kept, dropped = [], []
+    for r in replacements:
+        before, after = r.get("before", ""), r.get("after", "")
+        # 이름칸이었던 자리만 본다. 주소·날짜칸은 이 검사 대상이 아니다.
+        if not (before and NAME_PLACEHOLDER_RE.search(before)
+                and not NAME_PLACEHOLDER_RE.search(after)):
+            kept.append(r)
+            continue
+        name = _inserted_name(before, after)
+        # 한 줄에서 이름과 날짜를 한꺼번에 바꾸는 치환도 있다("망 △△△의 …로서 20○○. ○. ○."
+        # → "망 백승현의 …로서 2024. 6. 18."). 그때 _inserted_name은 가운데 덩어리를 통째로
+        # 돌려주므로 이름으로 판정하면 안 된다 — 실제로 맞게 채운 것을 버렸다.
+        # 이름 길이 범위일 때만 이름으로 보고 판단한다.
+        if name and 2 <= len(name) <= 10 and not _is_person_name(name):
+            dropped.append(f"이름칸(이름 아님·상담원확인): {before[:30]} ← '{name[:20]}'")
             continue
         kept.append(r)
     return kept, dropped
@@ -1206,11 +1256,23 @@ PERSON_LABELS = {
 }
 
 # 사망한 사람을 가리키는 라벨과, 서류를 내는 산 사람을 가리키는 라벨.
-DECEASED_LABEL_RE = re.compile(r"유\s*언\s*자|피\s*상\s*속\s*인|망\s*인|사\s*망\s*자")
+# "망 백승현"처럼 '망' 한 글자로 사망을 표시하는 자리도 사망자 칸이다. 이걸 빼면
+# 청구취지("청구인들의 망 ○○○에 대한 재산상속포기 신고는 이를 수리한다")가 청구인 칸으로
+# 분류되어, 거기 들어간 사망자 이름이 '청구인 이름'으로 등록된다. 그러면 _drop_self_
+# contradicting_fills가 진짜 사망자 칸 치환을 전부 모순으로 보고 버린다 — 실측된 사고다
+# (상속재산포기 심판청구서에서 백승현이 사건본인·피상속인 칸에 한 번도 안 들어갔다).
+# '희망'·'사망'처럼 다른 낱말에 섞인 망은 앞 글자가 한글이라 걸리지 않게 한다.
+DECEASED_LABEL_RE = re.compile(
+    r"유\s*언\s*자|피\s*상\s*속\s*인|망\s*인|사\s*망\s*자"
+    r"|(?<![가-힣])망\s*(?=[가-힣○□◎◇◉●△▽])")
 LIVING_LABEL_RE = re.compile(r"청\s*구\s*인|신\s*청\s*인|원\s*고")
 
+# "유언자와의 관계 : 배우자"처럼 사람 이름이 아니라 지칭어가 들어가는 칸.
+# 이름칸 필터가 여기까지 오면 안 된다.
+RELATION_SLOT_RE = re.compile(r"관\s*계\s*[)）]?\s*[:：]")
 
-def _drop_self_contradicting_fills(replacements: list) -> tuple:
+
+def _drop_self_contradicting_fills(replacements: list, living_extra=()) -> tuple:
     """서류를 내는 사람을 사망자 자리에 넣는 치환을 버린다.
 
     실측된 사고 두 건이 모두 이 모양이었다:
@@ -1224,7 +1286,12 @@ def _drop_self_contradicting_fills(replacements: list) -> tuple:
     사망자 이름은 상담에 없는 경우가 많아 지어냈을 가능성이 훨씬 높다.
 
     반환: (남길 치환 목록, 버린 자리 설명 목록)"""
-    living = _living_names(replacements)
+    # 산 사람 이름을 치환 목록에서만 모으면 필터가 통째로 꺼지는 구멍이 있다.
+    # 청구인 이름이 상담기록(applicant_name)이나 추출정보에서 와서 GPT 치환에는
+    # 없을 수 있는데, 그러면 living이 비어 그대로 반환된다 — 실측에서 GPT가
+    # "청구인들의 망 문가영에 대한 재산상속포기"를 만들었는데 걸러지지 않았다.
+    # 확정된 이름을 함께 넣어야 LLM이 흔들려도 같은 사고가 막힌다.
+    living = _living_names(replacements) | {n for n in (living_extra or ()) if n}
     if not living:
         return replacements, []
 
@@ -1270,6 +1337,31 @@ OPPONENT_KEY_RE = re.compile(r"상대방|피신청인|피고")
 # 이름이 아니라 '확인 못 했다'는 표시. 이걸 이름으로 쓰면 서식에 "미상"이 찍힌다.
 UNKNOWN_NAME_MARKS = ("미상", "불명", "확인불가", "확인 불가", "알 수 없음", "없음")
 
+# 이름을 모를 때 분석 층이 이름 자리에 대신 적어 넣는 지칭어들. 이름이 아니므로
+# 서식에 그대로 들어가면 안 된다 — 실측에서 상속재산포기 심판청구서의 청구인 2번 칸이
+# "첫째, 둘째(주민등록번호)"로 나갔다. 분석은 자녀 이름을 못 들었을 뿐인데, 서식에는
+# 그게 사람 이름처럼 찍힌다. 모르면 비워두고 누락자료로 남기는 게 맞다.
+NON_NAME_PERSON_RE = re.compile(
+    r"첫\s*째|둘\s*째|셋\s*째|넷\s*째|막내|장남|차남|장녀|차녀"
+    r"|미성년|자녀|아이들?|본인|배우자|공동상속인|상속인들|형제|자매|남매"
+    r"|모름|해당\s*없음|추후|확인\s*필요|예시")
+
+
+def _is_person_name(value: str) -> bool:
+    """서식의 이름칸에 그대로 넣어도 되는 '사람 이름'인가.
+
+    쉼표가 들어가면 여러 명을 한 칸에 몰아넣은 것이라 이름이 아니다
+    ("첫째, 둘째"). 지칭어·미확인 표시도 이름이 아니다."""
+    v = str(value or "").strip()
+    v = re.sub(r"^망\s*", "", v).strip()
+    if not (2 <= len(v) <= 10):
+        return False
+    if "," in v or "·" in v or "/" in v:
+        return False
+    if any(m in v for m in UNKNOWN_NAME_MARKS):
+        return False
+    return not NON_NAME_PERSON_RE.search(v)
+
 
 def _known_names_by_role(extracted: dict, role_re) -> set:
     """추출정보에서 특정 역할에 해당하는 사람 이름을 모은다.
@@ -1288,7 +1380,7 @@ def _known_names_by_role(extracted: dict, role_re) -> set:
     def add(value):
         v = str(value).strip()
         v = re.sub(r"^망\s*", "", v).strip()
-        if 2 <= len(v) <= 10 and not any(m in v for m in UNKNOWN_NAME_MARKS):
+        if _is_person_name(v):
             names.add(v)
 
     for key, value in (extracted or {}).items():
@@ -1322,6 +1414,14 @@ def _drop_unfounded_deceased_fills(replacements: list, extracted: dict) -> tuple
         before = r.get("before") or ""
         if DECEASED_LABEL_RE.search(before):
             name = _inserted_name(before, r.get("after") or "")
+            # 관계칸("유언자와의 관계 : 배우자" → "… : 아들")은 이름칸이 아니다.
+            # 라벨에 '유언자'가 들어있어 여기까지 오지만, 들어간 값이 지칭어라
+            # 이 필터가 막으려는 '엉뚱한 사람을 사망자로 세우는 사고'와 무관하다.
+            # 그런데 버리면 서식 제작자의 예시값('배우자')이 그대로 남아, 빈칸도
+            # 아니고 C단계 표시도 안 붙어 확정된 사실처럼 보인다 — 실측된 오차단.
+            if name in RELATION_WORDS and RELATION_SLOT_RE.search(before):
+                kept.append(r)
+                continue
             if name and 2 <= len(name) <= 10 and name not in allowed:
                 dropped.append(
                     f"사망자 이름이 상담에 없어 비워둠({name}): {before[:26]}")
@@ -1382,7 +1482,8 @@ def _fill_names_in_narrative(doc, replacements: list) -> tuple:
     다시 쓰지 않는다 — 법조문 인용과 정형 문구가 원문 그대로 살아 있어야 한다.
 
     반환: (채운 자리 수, 바뀐 문단 텍스트 집합)"""
-    pairs = _label_name_pairs(replacements, _living_names(replacements))
+    living = _living_names(replacements)
+    pairs = _label_name_pairs(replacements, living)
     if not pairs:
         return 0, set()
 
@@ -1403,9 +1504,18 @@ def _fill_names_in_narrative(doc, replacements: list) -> tuple:
                 continue
             new_text = text
             for pat, name in patterns:
-                new_text = pat.sub(
-                    lambda m, _n=name: m.group(0)[:m.start(1) - m.start(0)] + _n,
-                    new_text)
+                # 라벨과 자리표시자 사이에 사망 표시가 끼어 있는데 넣으려는 이름이
+                # 산 사람이면 건드리지 않는다. "청구인들의 망 ○○○에 대한 재산상속
+                # 포기 신고는…"은 라벨이 '청구인'이라 매칭되지만 그 칸의 주인은
+                # 사망자다 — 여기에 청구인을 넣으면 산 사람의 상속을 포기하는 문서가
+                # 된다. 반대로 "유언자 망 □□□"는 유언자 본인이 사망자이므로 채운다.
+                def _sub(m, _n=name):
+                    head = m.group(0)[:m.start(1) - m.start(0)]
+                    if _n in living and DECEASED_LABEL_RE.search(head):
+                        return m.group(0)
+                    return head + _n
+
+                new_text = pat.sub(_sub, new_text)
             if new_text != text and _set_paragraph_text(p, new_text):
                 filled += 1
                 written.add(new_text)
@@ -1957,6 +2067,77 @@ def _apply_confirmed_names_to_extracted(extracted: dict, applicant_name: str = "
     return fixed, changed
 
 
+# 서식의 날짜 라벨 ← 분석이 뽑는 날짜 '항목' 이름. 항목명은 사건마다 달라서
+# (사망 / 사망일 / 사망일자 …) 포함으로 맞춘다.
+DATE_LABEL_KEYS = (
+    ("사망일자", ("사망",)),
+    ("사망일", ("사망",)),
+    ("생년월일", ("생년월일", "출생")),
+    ("혼인일자", ("혼인", "결혼")),
+    ("계약일자", ("계약",)),
+    ("계약일", ("계약",)),
+)
+
+# "20○○. ○. ○." / "20○○년 ○월 ○일" 두 모양을 쓴다. 어느 쪽이든 원래 모양을 지켜 채운다.
+DATE_PLACEHOLDER_DOT_RE = re.compile(r"(?:19|20)○○\s*\.\s*○+\s*\.\s*○+\s*\.?")
+DATE_PLACEHOLDER_KOR_RE = re.compile(r"(?:19|20)○○\s*년\s*○+\s*월\s*○+\s*일")
+
+
+def _extracted_dates(extracted: dict) -> list:
+    """추출정보의 날짜 목록을 (항목, 연, 월, 일)로 정규화한다."""
+    out = []
+    for item in (extracted or {}).get("날짜", []) or []:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("항목", "")).strip()
+        raw = str(item.get("값", "")).strip()
+        m = re.search(r"((?:19|20)\d\d)\D+(\d{1,2})\D+(\d{1,2})", raw)
+        if not (label and m):
+            continue    # 연·월·일이 다 있어야 채운다. "7월 초" 같은 값은 못 쓴다.
+        out.append((label, int(m.group(1)), int(m.group(2)), int(m.group(3))))
+    return out
+
+
+def _fill_known_dates(doc, extracted: dict) -> int:
+    """라벨이 분명한 날짜칸을 추출된 날짜로 채운다.
+
+    라벨 없이 홀로 있는 날짜칸(서명란 위 작성일자)은 건드리지 않는다 — 그건 사건
+    사실이 아니라 상담원이 제출하는 날 직접 적는 칸이라, 임의로 채우면 안 된다
+    (FIELD_PROMPT 6번과 같은 이유). 라벨을 요구하는 것으로 자연히 걸러진다."""
+    dates = _extracted_dates(extracted)
+    if not dates:
+        return 0
+
+    filled = 0
+    for sec in doc.sections:
+        for p in sec.paragraphs:
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(r, "text", "") or "" for r in runs)
+            compact = re.sub(r"\s+", "", text)
+            for form_label, keys in DATE_LABEL_KEYS:
+                if form_label not in compact:
+                    continue
+                hit = next((d for d in dates
+                            if any(k in d[0] for k in keys)), None)
+                if not hit:
+                    continue
+                _, y, mo, d = hit
+                if DATE_PLACEHOLDER_DOT_RE.search(text):
+                    new_text = DATE_PLACEHOLDER_DOT_RE.sub(
+                        f"{y}. {mo}. {d}.", text, count=1)
+                elif DATE_PLACEHOLDER_KOR_RE.search(text):
+                    new_text = DATE_PLACEHOLDER_KOR_RE.sub(
+                        f"{y}년 {mo}월 {d}일", text, count=1)
+                else:
+                    break
+                if new_text != text and _set_paragraph_text(p, new_text):
+                    filled += 1
+                break
+    return filled
+
+
 def _fill_known_role_names(doc, replacements: list, seeded: dict = None) -> int:
     """이미 확정된 역할별 이름으로, 아직 남은 같은 역할의 이름칸을 채운다.
 
@@ -1995,8 +2176,26 @@ def _fill_known_role_names(doc, replacements: list, seeded: dict = None) -> int:
             # 공백을 걷어내고 비교하지 않으면 못 알아본다 — 실제로 친권 일부제한
             # 심판청구서에서 "사건본인"(붙어 있음)만 채워지고 "청 구 인"·"상 대 방"이
             # 빈 채로 나갔다.
+            # 자리표시자 바로 앞에 사망 표시가 있으면 그 칸의 주인은 사망자다.
+            # "청구인들의 망 ○○○에 대한 재산상속포기 신고는 이를 수리한다"는 줄에
+            # '청구인'이 들어 있다는 이유로 청구인 이름을 넣으면, 살아 있는 청구인이
+            # 자기 상속을 포기당하는 문서가 된다(실측 사고).
+            #
+            # 잘라낸 앞부분에서 찾으면 안 된다 — DECEASED_LABEL_RE의 '망'은 뒤에 이름이나
+            # 자리표시자가 와야 성립하는데, 자리표시자를 잘라내면 그 조건이 깨져 못 찾는다.
+            # 자리표시자까지 포함해 찾고, 그 앞에서 시작했는지로 판단한다.
+            ph = NAME_PLACEHOLDER_RE.search(text)
+            slot_deceased = False
+            if ph:
+                dm = DECEASED_LABEL_RE.search(text[:ph.end()])
+                slot_deceased = bool(dm and dm.start() < ph.start())
+
             compact = re.sub(r"\s+", "", text)
             for role, name in role_names.items():
+                # 사망자 칸에는 산 사람 역할(청구인·상대방)을 넣지 않는다.
+                # 사건본인은 서식에 따라 사망자 본인이므로 그대로 채운다.
+                if slot_deceased and role in ("청구인", "상대방"):
+                    continue
                 if not any(label in compact for label in ROLE_LABELS[role]):
                     continue
                 # 이미 이름이 들어 있으면 건드리지 않는다. A단계가 자리표시자를
@@ -2042,8 +2241,12 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     unfilled = gpt.get("unfilled", [])
 
     # 역할을 모른 채 이름칸을 채운 치환은 버린다(엉뚱한 사람이 올라간다).
-    reps, dropped_names = _drop_unidentified_name_fills(reps)
+    reps, dropped_names = _drop_unidentified_name_fills(reps, extracted)
     unfilled.extend(dropped_names)
+
+    # 이름칸에 이름이 아닌 지칭어가 들어간 치환은 버린다("첫째, 둘째").
+    reps, dropped_nonname = _drop_non_name_person_fills(reps)
+    unfilled.extend(dropped_nonname)
 
     # 자리표시자를 지우는 대신 뒤에 이어 붙이는 치환은 버린다
     # ("신 청 인" → "신 청 인 남기훈"). 정상 치환과 겹치면 이름이 두 번 들어간다.
@@ -2055,7 +2258,10 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     unfilled.extend(dropped_values)
 
     # 서류를 내는 사람을 사망자 자리에 넣는 치환은 버린다(청구인=피상속인 모순).
-    reps, dropped_contra = _drop_self_contradicting_fills(reps)
+    # 상담기록의 확정 청구인 이름과 추출정보의 청구인도 함께 넘긴다 — GPT 치환에만
+    # 기대면 그 이름이 치환에 안 잡힌 경우 필터가 통째로 꺼진다.
+    reps, dropped_contra = _drop_self_contradicting_fills(
+        reps, _known_names_by_role(extracted, LIVING_KEY_RE) | {applicant_name})
     unfilled.extend(dropped_contra)
 
     # 사망자 이름은 추출정보에 명시됐을 때만 채운다. 관계만 적힌 상담("부친이
@@ -2090,6 +2296,12 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     role_filled = _fill_known_role_names(
         doc, reps, _seed_role_names(applicant_name, opponent_name, extracted))
     applied += role_filled
+
+    # 라벨이 분명한 날짜칸("사망일자   20○○. ○. ○.")을 추출된 날짜로 채운다.
+    # 이름과 같은 이유다 — GPT가 자주 빠뜨리는데, 추출정보에 값이 있으면 판단이
+    # 아니라 옮겨 적기다.
+    date_filled = _fill_known_dates(doc, extracted)
+    applied += date_filled
 
     # 긴 서술 문단 안에 남은 이름칸을 확정된 이름으로 채운다(A단계는 긴 문단을
     # 대상에서 빼고, B단계는 법조문·신청취지에서 손을 떼므로 그 사이가 빈다).
