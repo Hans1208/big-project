@@ -746,6 +746,19 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   const isConsultationOngoing = callStatus === 'ongoing' || inPersonStatus === 'connecting' || inPersonStatus === 'recording';
   const isTranscriptConverting = inPersonStatus === 'processing';
 
+  // 변환 중(STT·마스킹 처리)이 얼마나 걸릴지는 녹음 후처리를 맡는 서버 쪽 사정이라 프론트가
+  // 알 수 없습니다. 분석 중 캡션(analysisElapsedSec)과 같은 방식으로 변환 시작부터 지난
+  // 시간만이라도 보여줘 멈춘 것처럼 보이지 않게 합니다.
+  const [transcriptConvertingElapsedSec, setTranscriptConvertingElapsedSec] = useState(0);
+  useEffect(() => {
+    if (!isTranscriptConverting) {
+      setTranscriptConvertingElapsedSec(0);
+      return undefined;
+    }
+    const timer = setInterval(() => setTranscriptConvertingElapsedSec((seconds) => seconds + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isTranscriptConverting]);
+
   let transcriptButtonContent = '상담 저장';
   let transcriptButtonDisabled = !hasTranscriptContent;
   let showEmptyTranscriptCaption = !hasTranscriptContent;
@@ -820,9 +833,8 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                   name: event.target.value,
                   nameSource: 'counselor',
                 })}
-                placeholder="통화 중 이름 입력 · 분석 후 자동 정리"
+                placeholder="이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요"
               />
-              {!selectedCase.name ? <small>이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요.</small> : null}
               {selectedCase.name && selectedCase.nameSource === 'ai'
                 ? <small>통화 내용에서 찾은 이름입니다. 잘못 들었을 수 있으니 맞는지 봐주세요.</small>
                 : null}
@@ -861,15 +873,23 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         />
         {selectedCase ? (
           <div className="inlineControls analysisCommandBar transcriptSaveBar">
-            {showEmptyTranscriptCaption ? <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small> : null}
-            <button
-              type="button"
-              className={`callAnalyzeButton${isTranscriptSaved ? ' done' : ''}`}
-              onClick={handleSaveTranscript}
-              disabled={transcriptButtonDisabled}
-            >
-              {transcriptButtonContent}
-            </button>
+            {/* "분석 시작" 그룹과 같은 모양(버튼+캡션 컬럼)으로 둬서, 캡션이 뜨고 안 뜨고에
+                상관없이 두 버튼의 위쪽 위치가 항상 같은 줄에 맞습니다. */}
+            <div className="callAnalyzeButtonGroup">
+              <button
+                type="button"
+                className={`callAnalyzeButton${isTranscriptSaved ? ' done' : ''}`}
+                onClick={handleSaveTranscript}
+                disabled={transcriptButtonDisabled}
+              >
+                {transcriptButtonContent}
+              </button>
+              {isTranscriptConverting ? (
+                <small className="callAnalyzeCaption">변환 중... {formatElapsed(transcriptConvertingElapsedSec)}</small>
+              ) : showEmptyTranscriptCaption ? (
+                <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small>
+              ) : null}
+            </div>
             <div className="callAnalyzeButtonGroup">
               <button
                 type="button"

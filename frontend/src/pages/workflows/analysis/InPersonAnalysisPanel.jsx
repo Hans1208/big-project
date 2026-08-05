@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, Check } from 'lucide-react';
+import { Mic, Check, EyeOff } from 'lucide-react';
 import { RealtimeMemoCard } from './RealtimeAnalysisPanel.jsx';
+import { CollapsibleSection } from '../../../components/common.jsx';
 
 // RealtimeCallControl과 같은 위치·패턴이지만 통화 대신 녹음을 시작/종료합니다.
 // 통화 경과 시간 카운트 같은 통화 전용 로직은 옮기지 않고, 녹음 상태(status)는 useInPersonRecording에서
@@ -82,15 +83,17 @@ export function InPersonSttPreview({ segments }) {
   const hasError = segments.some((segment) => segment.error);
   const text = buildTranscript(segments, showMasked ? 'maskedText' : 'text');
   return (
-    <div className="resultCard sttReferenceCard">
-      <div className="segmented compactSegmented">
-        <button type="button" className={showMasked ? 'active' : ''} onClick={() => setShowMasked(true)}>개인정보 가림</button>
-        <button type="button" className={!showMasked ? 'active' : ''} onClick={() => setShowMasked(false)}>원문</button>
+    <CollapsibleSection icon={EyeOff} title="개인정보 마스크 결과">
+      <div className="resultCard sttReferenceCard">
+        <div className="segmented compactSegmented">
+          <button type="button" className={showMasked ? 'active' : ''} onClick={() => setShowMasked(true)}>개인정보 가림</button>
+          <button type="button" className={!showMasked ? 'active' : ''} onClick={() => setShowMasked(false)}>원문</button>
+        </div>
+        {!showMasked ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
+        <p className="sttPreviewText">{text || '녹음 결과가 없습니다.'}</p>
+        {hasError ? <p className="helperText">일부 구간은 변환에 실패해 메모에서 제외되었습니다.</p> : null}
       </div>
-      {!showMasked ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
-      <p className="sttPreviewText">{text || '녹음 결과가 없습니다.'}</p>
-      {hasError ? <p className="helperText">일부 구간은 변환에 실패해 메모에서 제외되었습니다.</p> : null}
-    </div>
+    </CollapsibleSection>
   );
 }
 

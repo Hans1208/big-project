@@ -4904,6 +4904,7 @@ textarea:focus-visible,
   color: var(--warn-text);
   font-size: var(--fs-caption);
   font-weight: 700;
+  text-align: center;
 }
 
 /* 코치 피드백: AI 요약을 줄글이 아닌 개요(bullet) 형식으로. 마커는 옅은 점 대신 짧은 대시로,
@@ -14536,6 +14537,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
    바로 아래 단독으로 오른쪽에 붙어야 해서 오른쪽 정렬만 별도로 얹는다. */
 .transcriptSaveBar {
   justify-content: flex-end;
+  /* .inlineControls 기본값(align-items:center)을 쓰면 "상담 저장"/"분석 실행" 중 한쪽에만
+     캡션이 붙을 때 그룹 높이가 달라져 버튼끼리 수평이 어긋납니다. 위쪽 기준으로 고정해
+     캡션 유무와 상관없이 두 버튼이 항상 같은 줄에 있게 합니다. */
+  align-items: flex-start;
 }
 
 /* 새 상담 준비 = 보조 액션이라 toss.md의 '보조 버튼'(연한 파랑 배경 + 파란 글자)으로 */
@@ -15155,7 +15160,9 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   padding: 0 !important;
   overflow: hidden;
   border: 1px solid var(--border) !important;
-  background: var(--surface) !important;
+  /* 헤더(회색)와 본문(흰색)이 나뉘어 보이던 것을 하나의 회색 배경으로 통일합니다.
+     안의 개별 카드(연결할 통화/녹음 컨트롤·메모·AI 추천 질문)는 각자 흰 배경을 갖고 있어 계속 구분됩니다. */
+  background: var(--surface-subtle) !important;
   box-shadow: var(--shadow-soft) !important;
 }
 
