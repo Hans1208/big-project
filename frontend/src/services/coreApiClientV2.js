@@ -350,13 +350,52 @@ function toCoreAnalysisPayload(analysis = {}) {
   };
 }
 
+// call_input_texts 같은 이력 배열에서 화면에 되살릴 값을 고른다.
+//
+// 이 배열은 "상담 저장"을 누를 때마다 그 시점의 메모 전체가 하나씩 덧붙는 스냅샷 이력이다
+// (ConsultationService.saveTranscript). 그래서 마지막 항목이 곧 현재 메모이고, 전부 이어붙이면
+// 같은 내용이 저장 횟수만큼 반복된다. 분석 입력은 일부러 전부 합치지만(이전 녹음 세션 내용이
+// 빠지지 않게 — AiAnalysisService.buildCombinedInputText), 화면 표시는 마지막 것만 쓴다.
+export function latestSnapshot(list) {
+  if (!Array.isArray(list) || !list.length) return '';
+  return list[list.length - 1] || '';
+}
+
+// 서버 상담 행에서 화면이 쓰는 채널별 메모 4종을 뽑는다.
+//
+// 상담 목록을 불러오는 경로(App.jsx)와 상담을 새로 만드는 경로(createCoreConsultation)가
+// 서로 다른 곳에서 행을 화면 모양으로 바꾸고 있어, 한쪽만 고치면 다른 쪽이 계속 비어 있게 된다.
+// 두 곳이 같이 쓰도록 여기로 모은다.
+export function consultationMemosFromRow(row = {}) {
+  const callText = latestSnapshot(row.callInputTexts);
+  const inpersonText = latestSnapshot(row.inpersonInputTexts);
+  const hasChannelHistory = Boolean(callText || inpersonText);
+  return {
+    memo: hasChannelHistory ? callText : (row.inputText || ''),
+    memoMasked: latestSnapshot(row.callInputTextsMasked),
+    inpersonMemo: inpersonText,
+    inpersonMemoMasked: latestSnapshot(row.inpersonInputTextsMasked),
+    // 저장 여부 판단("상담 저장"/"저장 완료")의 기준값. 방금 서버에서 읽은 값이 곧 마지막으로
+    // 저장된 값이므로, 복원 직후에는 저장 완료 상태로 잠겨야 한다.
+    transcriptSavedMemo: hasChannelHistory ? callText : (row.inputText || ''),
+    transcriptSavedInpersonMemo: inpersonText,
+  };
+}
+
 function normalizeCoreConsultation(row = {}) {
+  // 새로고침하거나 다음 날 다시 열어도 상담 내용과 마스킹본이 남아 있어야 한다. 예전에는
+  // memo만 복원해서, 대면 녹음 결과와 개인정보 가림본이 브라우저를 벗어나면 사라졌다
+  // (변호사 검토 화면에서는 그래서 항상 비어 있었다).
+  //
+  // memo에 inputText를 그대로 넣던 것도 함께 고친다 — inputText는 전화·대면을 이어붙인
+  // 합본이라 복원하면 대면 내용이 전화 메모칸에 섞여 들어온다. 채널별 배열이 있으면
+  // 그걸 쓰고, 아직 배열이 없는 예전 상담만 합본으로 폴백한다.
   return {
     coreId: row.id,
     coreUserId: row.userId,
     title: row.title || '',
     clientName: row.clientName || '',
-    memo: row.inputText || '',
+    ...consultationMemosFromRow(row),
     opponentName: row.opponentName || '',
     coreStatus: row.status || '',
     createdAt: row.createdAt || '',
