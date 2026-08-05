@@ -15232,6 +15232,37 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   color: #fff !important;
 }
 
+/* 통화/녹음 컨트롤이 헤더 밖으로 나오면서 헤더에는 안내문 블록 하나만 남습니다. */
+.analysisPanel .realtimeWorkbenchHeader {
+  grid-template-columns: 1fr !important;
+}
+
+/* '상담원 업무'·'실시간 상담'(또는 '대면 상담') 태그를 세로 대신 가로로 나란히 둡니다. */
+.analysisPanel .realtimeHeaderTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysisPanel .realtimeHeaderTags .roleIdentityBadge {
+  margin-bottom: 0;
+}
+
+/* '연결할 통화'(또는 녹음 컨트롤)와 '실시간 상담 메모'를 가로 1:1로 배치합니다. */
+.analysisPanel .realtimeSplitRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .analysisPanel .realtimeSplitRow {
+    grid-template-columns: 1fr;
+  }
+}
+
 .uploadPanel .uploadWorkCard {
   display: grid;
   gap: 18px;

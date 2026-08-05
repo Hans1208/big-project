@@ -802,30 +802,42 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           <button type="button" className="quickStartButton" onClick={startQuickRealtimeSession} disabled={isStartingQuickSession}>
             <PhoneCall size={15} strokeWidth={2.4} /> {isStartingQuickSession ? '준비하는 중...' : '새 상담 준비'}
           </button>
-          <div className="callAnalyzeButtonGroup">
-            <button
-              type="button"
-              className={`callAnalyzeButton${analyzed ? ' done' : ''}`}
-              onClick={startAnalysis}
-              disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing' || !isTranscriptSaved}
-            >
-              {isAnalyzing ? (
-                // 몇 분씩 걸리는 작업이라 경과 시간을 같이 보여줍니다 — 없으면 멈춘 것처럼 보입니다.
-                `분석 중... ${formatElapsed(analysisElapsedSec)}`
-              ) : analyzed ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 재분석 실행</span>
-              ) : '분석 시작'}
-            </button>
-            {/* 툴팁이 아니라 항상 보이는 캡션으로 둬서, 왜 눌리지 않는지 바로 알 수 있게 합니다. */}
-            {/* 분석은 DB에 저장된 상담 내용을 대상으로 돌기 때문에, 저장 전 상태(내용 없음/미저장/저장 중)에서는
-                막아둡니다 — 방금 입력했지만 저장 안 한 메모가 분석에 반영되지 않아 헷갈리는 상황을 막기 위함입니다. */}
-            {callStatus === 'ongoing' ? (
-              <small className="callAnalyzeCaption">통화 종료 후 분석 가능</small>
-            ) : !isTranscriptSaved && !isAnalyzing ? (
-              <small className="callAnalyzeCaption">상담 내용을 저장한 뒤 분석할 수 있습니다</small>
-            ) : null}
-          </div>
         </div>
+        {selectedCase ? (
+          <div className="analysisCaseMeta">
+            <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
+            <label className={`analysisCaseMetaEdit realtimeRequiredNameField${selectedCase.name ? '' : ' missing'}`}>
+              <span>
+                {!selectedCase.name ? <AlertTriangle size={13} strokeWidth={2.4} className="realtimeRequiredNameFieldIcon" aria-hidden="true" /> : null}
+                상담받은 사람
+                {selectedCase.name
+                  ? (selectedCase.nameSource === 'ai' ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em> : null)
+                  : <em>필수 입력</em>}
+              </span>
+              <input
+                value={selectedCase.name || ''}
+                onChange={(event) => onUpdateConsultation(selectedCase.id, {
+                  name: event.target.value,
+                  nameSource: 'counselor',
+                })}
+                placeholder="통화 중 이름 입력 · 분석 후 자동 정리"
+              />
+              {!selectedCase.name ? <small>이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요.</small> : null}
+              {selectedCase.name && selectedCase.nameSource === 'ai'
+                ? <small>통화 내용에서 찾은 이름입니다. 잘못 들었을 수 있으니 맞는지 봐주세요.</small>
+                : null}
+            </label>
+            <label className="analysisCaseMetaEdit">
+              <span>상담 제목</span>
+              <input
+                value={selectedCase.title || ''}
+                onChange={(event) => onUpdateConsultation(selectedCase.id, { title: event.target.value })}
+                placeholder="상담 제목 입력"
+              />
+            </label>
+            <span>작성 시간 <strong>{selectedCase.date || '-'}{selectedCase.registeredTime ? ` ${selectedCase.registeredTime}` : ''}</strong></span>
+          </div>
+        ) : null}
         <ConsultationChannelTabs
           selectedCase={selectedCase}
           onUpdateConsultation={onUpdateConsultation}
@@ -846,41 +858,6 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           inPersonErrorMessage={inPersonErrorMessage}
           onStartInPersonRecording={startInPersonRecording}
           onStopInPersonRecording={stopInPersonRecording}
-          caseMeta={selectedCase ? (
-            <div className="analysisCaseMeta">
-              <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
-              <label className={`analysisCaseMetaEdit realtimeRequiredNameField${selectedCase.name ? '' : ' missing'}`}>
-                <span>
-                  {!selectedCase.name ? <AlertTriangle size={13} strokeWidth={2.4} className="realtimeRequiredNameFieldIcon" aria-hidden="true" /> : null}
-                  상담받은 사람
-                  {selectedCase.name
-                    ? (selectedCase.nameSource === 'ai' ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em> : null)
-                    : <em>필수 입력</em>}
-                </span>
-                <input
-                  value={selectedCase.name || ''}
-                  onChange={(event) => onUpdateConsultation(selectedCase.id, {
-                    name: event.target.value,
-                    nameSource: 'counselor',
-                  })}
-                  placeholder="통화 중 이름 입력 · 분석 후 자동 정리"
-                />
-                {!selectedCase.name ? <small>이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요.</small> : null}
-                {selectedCase.name && selectedCase.nameSource === 'ai'
-                  ? <small>통화 내용에서 찾은 이름입니다. 잘못 들었을 수 있으니 맞는지 봐주세요.</small>
-                  : null}
-              </label>
-              <label className="analysisCaseMetaEdit">
-                <span>상담 제목</span>
-                <input
-                  value={selectedCase.title || ''}
-                  onChange={(event) => onUpdateConsultation(selectedCase.id, { title: event.target.value })}
-                  placeholder="상담 제목 입력"
-                />
-              </label>
-              <span>작성 시간 <strong>{selectedCase.date || '-'}{selectedCase.registeredTime ? ` ${selectedCase.registeredTime}` : ''}</strong></span>
-            </div>
-          ) : null}
         />
         {selectedCase ? (
           <div className="inlineControls analysisCommandBar transcriptSaveBar">
@@ -893,6 +870,29 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
             >
               {transcriptButtonContent}
             </button>
+            <div className="callAnalyzeButtonGroup">
+              <button
+                type="button"
+                className={`callAnalyzeButton${analyzed ? ' done' : ''}`}
+                onClick={startAnalysis}
+                disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing' || !isTranscriptSaved}
+              >
+                {isAnalyzing ? (
+                  // 몇 분씩 걸리는 작업이라 경과 시간을 같이 보여줍니다 — 없으면 멈춘 것처럼 보입니다.
+                  `분석 중... ${formatElapsed(analysisElapsedSec)}`
+                ) : analyzed ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 재분석 실행</span>
+                ) : '분석 시작'}
+              </button>
+              {/* 툴팁이 아니라 항상 보이는 캡션으로 둬서, 왜 눌리지 않는지 바로 알 수 있게 합니다. */}
+              {/* 분석은 DB에 저장된 상담 내용을 대상으로 돌기 때문에, 저장 전 상태(내용 없음/미저장/저장 중)에서는
+                  막아둡니다 — 방금 입력했지만 저장 안 한 메모가 분석에 반영되지 않아 헷갈리는 상황을 막기 위함입니다. */}
+              {callStatus === 'ongoing' ? (
+                <small className="callAnalyzeCaption">통화 종료 후 분석 가능</small>
+              ) : !isTranscriptSaved && !isAnalyzing ? (
+                <small className="callAnalyzeCaption">상담 내용을 저장한 뒤 분석할 수 있습니다</small>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {selectedCase ? (

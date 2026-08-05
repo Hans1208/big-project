@@ -108,7 +108,7 @@ export function InPersonSttPreview({ segments }) {
 // AnalysisWorkbench로부터 props로 받습니다 — "상담 저장" 버튼이 녹음 상태(상담 중/변환 중)에
 // 따라 라벨을 바꿔야 해서, 그 버튼이 있는 AnalysisWorkbench가 이 훅을 대신 소유합니다.
 export function InPersonAnalysisPanel({
-  selectedCase, onUpdateConsultation, caseMeta,
+  selectedCase, onUpdateConsultation,
   inPersonStatus: status, inPersonSegments: segments, inPersonErrorMessage: errorMessage,
   onStartInPersonRecording, onStopInPersonRecording,
 }) {
@@ -168,32 +168,33 @@ export function InPersonAnalysisPanel({
     <section className="realtimeWorkbenchPanel" aria-label="대면 상담 메모">
       <div className="realtimeWorkbenchHeader">
         <div>
-          <span className="flowStageEyebrow">대면 상담</span>
+          <div className="realtimeHeaderTags">
+            <span className="flowStageEyebrow">대면 상담</span>
+          </div>
           <strong>{headline}</strong>
           <p>마이크 녹음 중 개인정보가 가려진 대화 내용이 실시간으로 상담 메모에 반영됩니다.</p>
         </div>
-        <InPersonRecordingControl
-          hasCase={hasCase}
-          status={status}
-          onStart={handleStartClick}
-          onStop={onStopInPersonRecording}
-        />
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
-          <RealtimeMemoCard
-            selectedCase={selectedCase}
-            onUpdateConsultation={onUpdateConsultation}
-            field="inpersonMemo"
-            composerPlaceholder="대면 상담 내용을 바로 적어주세요."
-          />
+          <div className="realtimeSplitRow">
+            <InPersonRecordingControl
+              hasCase={hasCase}
+              status={status}
+              onStart={handleStartClick}
+              onStop={onStopInPersonRecording}
+            />
+            <RealtimeMemoCard
+              selectedCase={selectedCase}
+              onUpdateConsultation={onUpdateConsultation}
+              field="inpersonMemo"
+              composerPlaceholder="대면 상담 내용을 바로 적어주세요."
+            />
+          </div>
           {/* "개인정보 가림"/"원문" 토글은 녹음 종료 후 결과만 보여달라는 요구에 맞춰
               status === 'done'일 때만 렌더링합니다(위 실시간 메모와는 별개 요구사항). */}
           {status === 'done' ? <InPersonSttPreview segments={segments} /> : null}
         </div>
-        <aside className="realtimeConsultationSide">
-          {caseMeta}
-        </aside>
       </div>
       {pendingRestartConfirm ? (
         <RestartRecordingConfirmModal
