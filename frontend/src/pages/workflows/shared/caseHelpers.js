@@ -72,8 +72,30 @@ export function resolveEligibilityFromCase(selectedCase, fallbackCheck) {
   const eligibility = isTargetCandidate ? (evidenceSubmitted ? '구조 가능' : '검토 필요') : '부적합';
   return { eligibilityCheck, isTargetCandidate, evidenceSubmitted, eligibility };
 }
+// 상담 목록을 최신순으로 돌려줍니다.
+//
+// 예전에는 정렬이 아예 없어서, 서버에서 이번에 처음 받아온 상담이 맨 앞에 오고 그 뒤에
+// 브라우저에 있던 것이 붙는 순서였습니다(App의 [...additions, ...mergedItems]). 화면은
+// 그 0번을 기본 선택으로 쓰기 때문에, 새 브라우저로 열면 제일 오래된 상담이 먼저 떴습니다.
+//
+// 이 함수는 기본 선택(각 workbench)과 목록 표시(CasePicker)가 모두 거쳐가는 자리라,
+// 여기서 한 번 정렬하면 화면마다 따로 맞출 필요가 없습니다.
+//
+// 접수일(date, YYYY-MM-DD)과 접수시각(registeredTime, HH:MM)을 이어 붙여 문자열로 비교합니다
+// — 둘 다 앞자리가 큰 자리라 사전순 비교가 곧 시간순입니다. 서버에서 복원한 상담은
+// registeredTime이 비어 있어 같은 날짜 안에서는 뒤로 가는데, 그때는 id로 가릅니다
+// (로컬에서 나중에 만들수록 id가 큽니다).
 export function caseOptions(consultations) {
-  return consultations.length ? consultations : [{ id: 'empty', caseNo: '상담 선택', title: '등록된 상담이 없습니다.' }];
+  if (!consultations.length) {
+    return [{ id: 'empty', caseNo: '상담 선택', title: '등록된 상담이 없습니다.' }];
+  }
+  const receivedAt = (item) => `${item?.date || ''} ${item?.registeredTime || ''}`.trim();
+  // 원본을 건드리지 않습니다 — React 상태 배열이라 제자리 정렬하면 렌더가 어긋납니다.
+  return [...consultations].sort((left, right) => {
+    const compared = receivedAt(right).localeCompare(receivedAt(left));
+    if (compared !== 0) return compared;
+    return Number(right?.id || 0) - Number(left?.id || 0);
+  });
 }
 
 // 서식 추천(legalTemplateSeed)과 법령·판례 검색은 소분류(caseSubtype) 단위로 데이터가 연결돼 있습니다.
