@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from app.schemas.analysis import AIAnalysisSchema
 
 SYSTEM_PROMPT = """
@@ -87,6 +89,7 @@ case_type은 반드시 아래 4개 중 하나이며, case_subtype은 반드시 �
   - 당사자: 상담에서 확인되는 인물만, 역할은 "청구인/상대방/신청인/피상속인" 등 실제 지위로 기술
   - 금액: 재산분할·양육비·위자료 등 구체적 금액이 언급된 경우만 채우고, 없으면 null
   - 날짜: 혼인일/별거시작일/사망일 등 상담에서 실제 언급된 날짜만 key-value로 기록
+    (해석 방법은 아래 "날짜 해석" 절을 반드시 따르세요)
   - 사건개요: 1~2문장
   - 확인 불가능한 값은 임의로 채우지 말고 missing_info_json에 어떤 자료가 필요한지 적으세요
 - missing_info_json: 입증·서식 작성을 위해 추가로 받아야 할 자료 목록 (예: "혼인관계증명서", "가족관계증명서")
@@ -101,6 +104,76 @@ case_type은 반드시 아래 4개 중 하나이며, case_subtype은 반드시 �
 - urgency_level과 eligibility는 "후보/제안"입니다. 최종 판단은 상담원·변호사가 합니다.
 - case_subtype은 반드시 case_type 소속 목록 안에서만 선택하세요.
 """
+
+# 날짜 절은 오늘 날짜가 박혀야 하므로 호출 시점에 만든다. 상담은 말로 이루어져서
+# "올해 3월", "지난 5월"처럼 기준 없이는 못 푸는 표현이 대부분인데, 모델에게 오늘을
+# 알려주지 않으면 학습 시점 기준으로 풀어버린다 — 실측에서 "올해 3월 12일"이
+# 2년 전으로 나왔다. 상속포기(3개월)·소멸시효처럼 기간이 걸린 사건에서는 연도가
+# 틀리면 기한 판단이 통째로 뒤집힌다.
+DATE_SECTION_TEMPLATE = """
+# 날짜 해석
+
+오늘은 {today}({weekday}요일)이고, 이 상담은 오늘 이루어졌습니다.
+상담은 말로 진행되므로 날짜가 "올해 3월", "지난 5월", "두 달 전"처럼 오늘을 기준으로 한
+상대적 표현으로 나옵니다. 아래 기준으로 실제 날짜를 계산하세요.
+학습 시점이나 임의의 연도를 쓰면 안 됩니다.
+
+## 기준 연도
+- 올해 / 금년 / 이번 → {y}
+- 작년 / 지난해 → {y1}
+- 재작년 → {y2}
+- 내년 → {yn}
+- "N년 전" → {y}에서 N을 뺀 해
+- 상담자가 연도를 직접 말했으면("2019년 4월에") 계산하지 말고 그 연도를 그대로 쓰세요.
+
+## 연도 없이 월만 말한 경우
+"3월에", "지난 5월", "작년 말고 5월에"처럼 연도가 빠진 경우:
+- 그 달이 올해 이미 지났거나 이번 달이면 → {y}년
+- 그 달이 아직 오지 않았으면 → {y1}년
+오늘이 {today}이므로, 1월~{m}월은 {y}년이고 {m_next}월~12월은 {y1}년입니다.
+
+## 그 밖의 표현
+- "지난달" → {prev_ym}
+- "이번 달" → {this_ym}
+- "N개월 전" → {this_ym}에서 N달을 뺀 달
+- "며칠 전", "얼마 전", "최근", "한참 됐다"처럼 날짜를 특정할 수 없는 말은
+  날짜로 만들지 마세요. 억지로 계산하면 없는 사실이 생깁니다.
+- "1994년 8월 17일생"처럼 생년월일을 말하면 항목을 "생년월일"로 기록하세요.
+
+## 형식
+- 값은 `YYYY-MM-DD` 형식으로 적으세요. "2024년 3월 12일"처럼 쓰지 마세요.
+- 연·월까지만 알면 `YYYY-MM`, 연도만 알면 `YYYY`로 적고, 모르는 자리를 지어내지 마세요.
+  서식 초안은 연·월·일이 다 있는 날짜만 사용하므로, 빠진 자리를 임의로 채우면
+  확정된 날짜인 것처럼 서류에 찍힙니다. 모르면 비워 두고 missing_info_json에 적으세요.
+- 항목 이름은 무슨 날인지 알 수 있게 쓰세요: "사망", "혼인", "이혼", "별거시작",
+  "유언장작성", "이행명령", "생년월일", "상속포기기한" 등.
+- 상담자가 기한을 직접 말했으면("9월 18일까지라고 하더라고요") 그것도 날짜로 기록하세요.
+"""
+
+_WEEKDAYS = ("월", "화", "수", "목", "금", "토", "일")
+
+
+def build_date_section(today: date = None) -> str:
+    """오늘 날짜가 박힌 '날짜 해석' 절을 만든다."""
+    today = today or date.today()
+    prev = today.replace(day=1) - timedelta(days=1)
+    return DATE_SECTION_TEMPLATE.format(
+        today=today.isoformat(),
+        weekday=_WEEKDAYS[today.weekday()],
+        y=today.year,
+        y1=today.year - 1,
+        y2=today.year - 2,
+        yn=today.year + 1,
+        m=today.month,
+        m_next=today.month + 1 if today.month < 12 else 1,
+        prev_ym=f"{prev.year}-{prev.month:02d}",
+        this_ym=f"{today.year}-{today.month:02d}",
+    )
+
+
+def build_system_prompt(today: date = None) -> str:
+    """분석에 쓸 시스템 프롬프트. 날짜 절이 호출 시점 기준으로 붙는다."""
+    return SYSTEM_PROMPT + build_date_section(today)
 
 def analyze_consultation(input_text: str) -> AIAnalysisSchema:
     completion = client.beta.chat.completions.parse(
