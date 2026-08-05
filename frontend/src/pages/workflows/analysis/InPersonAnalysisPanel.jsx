@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, Check, EyeOff } from 'lucide-react';
+import { Mic, Check, EyeOff, Headphones, Radio } from 'lucide-react';
 import { RealtimeMemoCard } from './RealtimeAnalysisPanel.jsx';
 import { CollapsibleSection } from '../../../components/common.jsx';
 
@@ -170,23 +170,27 @@ export function InPersonAnalysisPanel({
   return (
     <section className="realtimeWorkbenchPanel" aria-label="대면 상담 메모">
       <div className="realtimeWorkbenchHeader">
-        <div>
-          <div className="realtimeHeaderTags">
-            <span className="flowStageEyebrow">대면 상담</span>
-          </div>
-          <strong>{headline}</strong>
-          <p>마이크 녹음 중 개인정보가 가려진 대화 내용이 실시간으로 상담 메모에 반영됩니다.</p>
+        <div className="realtimeHeaderTags">
+          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
+          <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
         </div>
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
           <div className="realtimeSplitRow">
-            <InPersonRecordingControl
-              hasCase={hasCase}
-              status={status}
-              onStart={handleStartClick}
-              onStop={onStopInPersonRecording}
-            />
+            <div className="realtimeSplitColumn">
+              <strong>{headline}</strong>
+              <p>마이크 녹음 중 개인정보가 가려진 대화 내용이 실시간으로 상담 메모에 반영됩니다.</p>
+              <InPersonRecordingControl
+                hasCase={hasCase}
+                status={status}
+                onStart={handleStartClick}
+                onStop={onStopInPersonRecording}
+              />
+              {/* "개인정보 가림"/"원문" 토글은 녹음 종료 후 결과만 보여달라는 요구에 맞춰
+                  status === 'done'일 때만 렌더링합니다(위 실시간 메모와는 별개 요구사항). */}
+              {status === 'done' ? <InPersonSttPreview segments={segments} /> : null}
+            </div>
             <RealtimeMemoCard
               selectedCase={selectedCase}
               onUpdateConsultation={onUpdateConsultation}
@@ -194,9 +198,6 @@ export function InPersonAnalysisPanel({
               composerPlaceholder="대면 상담 내용을 바로 적어주세요."
             />
           </div>
-          {/* "개인정보 가림"/"원문" 토글은 녹음 종료 후 결과만 보여달라는 요구에 맞춰
-              status === 'done'일 때만 렌더링합니다(위 실시간 메모와는 별개 요구사항). */}
-          {status === 'done' ? <InPersonSttPreview segments={segments} /> : null}
         </div>
       </div>
       {pendingRestartConfirm ? (

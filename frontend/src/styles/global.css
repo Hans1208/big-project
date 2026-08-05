@@ -12402,7 +12402,7 @@ textarea:focus-visible,
 }
 
 .analysisPanel .realtimeWorkbenchPanel {
-  margin-bottom: 18px;
+  margin-bottom: 8px;
 }
 
 .analysisPanel .analysisProgressPanel,
@@ -13890,7 +13890,9 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 22px;
-  margin-top: 26px;
+  /* 헤더가 태그 한 줄로 짧아진 만큼, 헤더와 본문 사이 여백(예전엔 헤드라인·설명까지 감안한
+     26px)도 같이 줄입니다. */
+  margin-top: 0;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -14541,6 +14543,9 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
      캡션이 붙을 때 그룹 높이가 달라져 버튼끼리 수평이 어긋납니다. 위쪽 기준으로 고정해
      캡션 유무와 상관없이 두 버튼이 항상 같은 줄에 있게 합니다. */
   align-items: flex-start;
+  /* .analysisCommandBar 공용 패딩(14px 0)은 위쪽 커맨드 바와 공유하는 값이라, 바로 위
+     상담 채널 박스와의 간격만 이 줄에서 따로 줄입니다. */
+  padding-top: 6px !important;
 }
 
 /* 새 상담 준비 = 보조 액션이라 toss.md의 '보조 버튼'(연한 파랑 배경 + 파란 글자)으로 */
@@ -14684,6 +14689,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   border-radius: var(--r-surface) !important;
   border: none !important;
   box-shadow: var(--shadow-soft) !important;
+  /* 카드가 realtimeSplitRow의 stretch로 늘어난 만큼, 안의 메모 입력칸(textarea)이
+     그 여유 높이를 그대로 흡수하도록 세로 flex로 바꿉니다(위 라벨·아래 입력줄은 고정 크기). */
+  display: flex;
+  flex-direction: column;
 }
 .analysisPanel .realtimeMemoTextarea {
   background: var(--surface-subtle) !important;
@@ -14693,6 +14702,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   font-size: var(--fs-md) !important;
   line-height: 1.6 !important;
   box-shadow: none !important;
+  /* 기존 220px 지정이 다른 곳의 공용 필드 초기화(min-height:42px)에 밀려 있던 것을 이 자리에서
+     다시 잡고, 기존 대비 1.5배 정도(220px → 330px)로 키운 뒤 flex:1로 남는 세로 공간까지 채웁니다. */
+  flex: 1 1 auto !important;
+  min-height: 330px !important;
 }
 .analysisPanel .realtimeMemoTextarea::placeholder {
   color: var(--text-placeholder) !important;
@@ -15174,19 +15187,11 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
      둘 다 위쪽 기준으로 맞춰 제목·설명이 오른쪽 상태 칩과 같은 줄에서 시작하게 합니다. */
   align-items: start !important;
   gap: 24px !important;
-  padding: 20px 22px !important;
+  /* 헤더에 태그 한 줄만 남으면서 예전(헤드라인·설명까지 있던 시절) 위아래 여백이 상대적으로
+     커 보여, 태그 한 줄 기준으로 위아래 패딩을 줄입니다. */
+  padding: 12px 22px !important;
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle) !important;
-}
-
-.analysisPanel .realtimeWorkbenchHeader > div:first-child {
-  display: grid;
-  gap: 7px;
-}
-
-.analysisPanel .realtimeWorkbenchHeader > div:first-child strong {
-  font-size: var(--fs-lg);
-  line-height: 1.4;
 }
 
 .analysisPanel .realtimeStatusChips {
@@ -15217,7 +15222,7 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 
 .analysisPanel .realtimeConsultationLayout {
   gap: 16px !important;
-  padding: 20px 22px 22px;
+  padding: 14px 22px 22px;
 }
 
 .analysisPanel .realtimeTranscriptCard,
@@ -15239,7 +15244,8 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   color: #fff !important;
 }
 
-/* 통화/녹음 컨트롤이 헤더 밖으로 나오면서 헤더에는 안내문 블록 하나만 남습니다. */
+/* 안내문(굵은 헤드라인·설명)과 통화/녹음 컨트롤이 헤더 밖, 왼쪽 칸으로 옮겨가면서
+   헤더에는 역할·상태 태그만 남습니다. */
 .analysisPanel .realtimeWorkbenchHeader {
   grid-template-columns: 1fr !important;
 }
@@ -15256,12 +15262,40 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   margin-bottom: 0;
 }
 
-/* '연결할 통화'(또는 녹음 컨트롤)와 '실시간 상담 메모'를 가로 1:1로 배치합니다. */
+/* '연결할 통화'(또는 녹음 컨트롤)와 '실시간 상담 메모'를 가로 1:1로 배치합니다.
+   align-items:stretch로 둬서, 왼쪽 칸(헤드라인·컨트롤·질문/마스크 카드가 쌓여 더 긴 쪽)의
+   높이에 맞춰 오른쪽 메모 카드도 같이 늘어납니다. */
 .analysisPanel .realtimeSplitRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 16px;
+}
+
+/* 왼쪽 칸: 통화/녹음 컨트롤과 그에 딸린 카드(AI 추천 질문·개인정보 마스크 결과)를 세로로
+   쌓습니다. 메모는 오른쪽 칸에 혼자 둡니다 — 두 칸 높이가 달라지면서, 카드 두 개의 아래
+   테두리가 우연히 같은 줄에 겹쳐 보이던 가로줄도 자연히 사라집니다. */
+.analysisPanel .realtimeSplitColumn {
+  display: grid;
+  /* realtimeSplitRow가 오른쪽 메모 높이에 맞춰 이 칸 전체를 늘려도(align-items:stretch),
+     grid의 기본값(align-content/align-items: normal→stretch)은 그 남는 높이를 카드들
+     사이·안쪽에 억지로 늘려 채워 속이 텅 빈 것처럼 보이게 합니다. 내용은 위로 붙이고
+     남는 공간은 맨 아래 빈칸으로만 남게 고정합니다. */
+  align-content: start;
   align-items: start;
   gap: 16px;
+  min-width: 0;
+}
+
+/* 헤더에 있던 안내문(헤드라인·설명) 스타일을 그대로 왼쪽 칸으로 옮깁니다. */
+.analysisPanel .realtimeSplitColumn > strong {
+  color: var(--text-main);
+  font-size: var(--fs-lg);
+}
+
+.analysisPanel .realtimeSplitColumn > p {
+  margin: 0;
+  color: var(--text-sub);
 }
 
 @media (max-width: 900px) {

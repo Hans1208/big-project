@@ -211,13 +211,9 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
   return (
     <section className="realtimeWorkbenchPanel roleAccent-counselor" aria-label="실시간 상담 메모">
       <div className="realtimeWorkbenchHeader">
-        <div>
-          <div className="realtimeHeaderTags">
-            <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
-            <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
-          </div>
-          <strong>{headline}</strong>
-          <p>통화 내용 자동 받아쓰기를 준비 중입니다. 현재는 메모를 기준으로 분석합니다.</p>
+        <div className="realtimeHeaderTags">
+          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
+          <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
         </div>
       </div>
       <div className="realtimeConsultationLayout">
@@ -227,22 +223,26 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
           ) : null}
           <LiveCaptionCard callStatus={callStatus} audioStatus={audioStatus} captions={liveCaptions} />
           <div className="realtimeSplitRow">
-            <RealtimeCallControl
-              hasCase={hasCase}
-              callStatus={callStatus}
-              callSeconds={callSeconds}
-              audioStatus={audioStatus}
-              availableAudioCalls={availableAudioCalls}
-              selectedAudioCallId={selectedAudioCallId}
-              isLoadingAudioCalls={isLoadingAudioCalls}
-              onSelectAudioCall={onSelectAudioCall}
-              onRefreshAudioCalls={onRefreshAudioCalls}
-              onStartCall={onStartCall}
-              onEndCall={onEndCall}
-            />
+            <div className="realtimeSplitColumn">
+              <strong>{headline}</strong>
+              <p>통화 내용 자동 받아쓰기를 준비 중입니다. 현재는 메모를 기준으로 분석합니다.</p>
+              <RealtimeCallControl
+                hasCase={hasCase}
+                callStatus={callStatus}
+                callSeconds={callSeconds}
+                audioStatus={audioStatus}
+                availableAudioCalls={availableAudioCalls}
+                selectedAudioCallId={selectedAudioCallId}
+                isLoadingAudioCalls={isLoadingAudioCalls}
+                onSelectAudioCall={onSelectAudioCall}
+                onRefreshAudioCalls={onRefreshAudioCalls}
+                onStartCall={onStartCall}
+                onEndCall={onEndCall}
+              />
+              {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}
+            </div>
             <RealtimeMemoCard selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
           </div>
-          {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}
         </div>
       </div>
     </section>
