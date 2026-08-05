@@ -47,9 +47,22 @@ PRECEDENT_METADATA_FIELDS: tuple[str, ...] = (
     "section_label",
 )
 
+CONSULTATION_METADATA_FIELDS: tuple[str, ...] = (
+    "consultation_id",
+    "source_type",
+    "service_category",
+    "legal_path",
+    "question",
+    "answer",
+    "source_file",
+    "source_row",
+    "source_date",
+)
+
 SEARCH_METADATA_FIELDS = (
     STATUTE_METADATA_FIELDS
     + PRECEDENT_METADATA_FIELDS
+    + CONSULTATION_METADATA_FIELDS
 )
 
 
@@ -123,6 +136,21 @@ class ChromaVectorStore:
     def count(self) -> int:
         """현재 컬렉션에 저장된 레코드 수를 반환한다."""
         return self.collection.count()
+
+    def clear(self) -> None:
+        """현재 컬렉션의 레코드만 삭제한다."""
+        raw_records = self.collection.get(
+            include=[],
+        )
+
+        record_ids = list(
+            raw_records.get("ids") or []
+        )
+
+        if record_ids:
+            self.collection.delete(
+                ids=record_ids,
+            )
 
     def upsert_documents(
         self,
