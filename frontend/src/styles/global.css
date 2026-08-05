@@ -3783,7 +3783,11 @@ button:disabled:active {
      둥글어 화면마다 카드 느낌이 미묘하게 달라 보였습니다. 나머지와 같은 --r-surface로 통일. */
   border-radius: var(--r-surface) var(--r-surface) 0 0 !important;
   background: var(--surface) !important;
-  box-shadow: var(--shadow-soft) !important;
+  /* --shadow-soft(0 0 0 1px var(--line) + 그림자)를 그대로 쓰면 위에서 지운 아래쪽 테두리를
+     그림자 링이 되살려, 바로 아래 이어지는 .uploadPanel과의 이음매에 회색 선이 남고 카드
+     전체도 테두리+그림자 링이 겹쳐 "뭔가 더 있는" 느낌으로 두꺼워 보였습니다. 그림자만
+     남기고 링은 뺍니다(위·좌·우는 실제 border가 담당, 아래는 의도대로 선이 없습니다). */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
 }
 
 .workspacePage > .workflowIntro.uploadWorkflowIntro + .uploadPanel {
@@ -3794,7 +3798,10 @@ button:disabled:active {
   border-top: 0 !important;
   border-radius: 0 0 var(--r-surface) var(--r-surface) !important;
   background: var(--surface) !important;
-  box-shadow: var(--shadow-soft) !important;
+  /* --shadow-soft(0 0 0 1px var(--line) + 그림자)를 그대로 쓰면 위 규칙의 border-top:0으로
+     지운 윗변을 그림자 링이 되살려, 탭(기존 상담에 자료 추가·새 상담 만들기) 바로 위에
+     회색 선이 남아 있었습니다. 그림자만 남기고 링은 뺍니다(좌우아래는 실제 border가 담당). */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
 }
 
 .workspacePage > .workflowIntro.uploadWorkflowIntro h1 {
@@ -12704,17 +12711,34 @@ table.dataTable td .reviewActionButton {
   justify-content: flex-start;
 }
 
+/* 파일이 늘어날수록 카드가 옆으로 넓게 퍼지던 가로 나열(display:flex, 기본 row + 세로
+   stretch로 파일 한 개당 카드가 넓적하고 두꺼워짐)을 없애고, 위→아래로 쌓는 세로 목록으로
+   바꿉니다. grid-template-rows를 5줄로 고정해 5개가 차면 오른쪽에 새 열이 이어지게 합니다
+   (6번째 파일부터 두 번째 열 1행에 놓임). */
 .uploadPanel .eligibilityPanel + .workflowColumns .scrollBox {
-  display: flex;
-  flex: 1;
-  min-height: 150px;
-  align-items: stretch;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(5, auto);
+  grid-auto-columns: minmax(220px, 1fr);
+  align-items: start;
   justify-content: flex-start;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
   margin: 0;
   border-radius: var(--r-card);
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+/* 위 grid의 gap(8px)이 이미 항목 사이 간격을 담당하므로, 세로 목록용이던 각 항목의
+   margin-bottom(8px)을 더하면 간격이 이중으로 벌어집니다. */
+.uploadPanel .eligibilityPanel + .workflowColumns .scrollBox .uploadItem {
+  margin-bottom: 0;
 }
 
 .uploadPanel .eligibilityPanel + .workflowColumns .scrollBox > p {
+  grid-column: 1 / -1;
   align-self: center;
   margin: auto;
   color: var(--text-sub);
@@ -14623,6 +14647,20 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   margin-bottom: 0;
 }
 
+/* .inlineControls 기본값(align-items:center)을 쓰면 이 라벨(캡션 "상담 선택" + 드롭다운)
+   전체 높이를 기준으로 가운데 정렬돼, '새 상담 준비' 버튼이 드롭다운보다 위쪽(캡션 쪽)으로
+   치우쳐 보였습니다. flex-end로 바닥을 맞추면 이번엔 버튼이 드롭다운 아래쪽에 붙어
+   보였습니다. 줄 시작(위)에 맞춘 뒤, 버튼만 캡션 높이(라벨 상단→드롭다운 상단 30px)만큼
+   내리고 드롭다운·버튼 높이 차(54-44=10px)의 절반을 더해, 버튼이 드롭다운의 세로 중앙과
+   맞도록 직접 내립니다. */
+.analysisCommandBar {
+  align-items: flex-start;
+}
+
+.analysisCommandBar > .quickStartButton {
+  margin-top: 35px;
+}
+
 /* "상담 저장" 버튼 줄. 위 커맨드 바(사건 고르기 등)와 같은 배경/구분선을 쓰되, 채널 탭
    바로 아래 단독으로 오른쪽에 붙어야 해서 오른쪽 정렬만 별도로 얹는다. */
 .transcriptSaveBar {
@@ -15392,13 +15430,17 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   }
 }
 
+/* 실시간 상담(.analysisPanel)은 바깥 카드(.workflowPanel) 하나에 내용을 바로 담고, 안에
+   또 카드를 두지 않습니다. 상담 자료 올리기도 .uploadPanel이 이미 그 바깥 카드 역할을 하는데
+   .uploadWorkCard가 안에서 테두리·둥근 모서리·배경·그림자를 또 갖고 있어 카드 안에 카드가
+   있는 것처럼 보였습니다. 레이아웃(grid·간격)만 남기고 박스 모양은 초기화합니다. */
 .uploadPanel .uploadWorkCard {
   display: grid;
   gap: 12px;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--r-panel-lg) !important;
-  background: var(--surface) !important;
-  box-shadow: var(--shadow-soft) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* 탭·사건 선택·사건 정보·상태 줄·법률구조 확인·파일 영역 각각이 다른 화면에서 쓰던
@@ -15408,6 +15450,14 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 .uploadPanel .uploadWorkCard > * {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
+}
+
+/* 실시간 상담은 사건 선택 드롭다운이 든 커맨드 바 밑에 구분선을 긋고, 그 아래에 사건 정보
+   (사건 번호 등) 행을 둡니다(.analysisCommandBar의 border-bottom). 상담 자료 올리기도 같은
+   자리에 같은 선을 그어 보이는 형태를 맞춥니다. */
+.uploadPanel .uploadCaseSelector {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
 }
 
 /* 실시간 상담의 사건 정보 박스와 같은 규칙(기본 .analysisCaseMeta의 auto-fit)을 그대로
@@ -16614,11 +16664,10 @@ body,
   border-color: rgba(47, 130, 246, 0.2) !important;
 }
 
+/* 위에서 박스 모양을 초기화했으므로, 이 카드 전용 유리질감 틴트(테두리색·반투명 배경·
+   윗줄 하이라이트)도 더는 필요 없습니다 — 이제 테두리·배경 자체가 없어 보일 게 없습니다. */
 .uploadPanel .uploadWorkCard {
-  overflow: hidden;
-  border-color: rgba(47, 130, 246, 0.18) !important;
-  background: rgba(255, 255, 255, 0.58) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  overflow: visible;
 }
 
 .uploadPanel .uploadCaseSummary,
