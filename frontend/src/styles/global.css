@@ -14532,6 +14532,12 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   z-index: 5;
 }
 
+/* "상담 저장" 버튼 줄. 위 커맨드 바(사건 고르기 등)와 같은 배경/구분선을 쓰되, 채널 탭
+   바로 아래 단독으로 오른쪽에 붙어야 해서 오른쪽 정렬만 별도로 얹는다. */
+.transcriptSaveBar {
+  justify-content: flex-end;
+}
+
 /* 새 상담 준비 = 보조 액션이라 toss.md의 '보조 버튼'(연한 파랑 배경 + 파란 글자)으로 */
 .analysisPanel .quickStartButton {
   background: var(--accent-soft) !important;

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Mic, Check } from 'lucide-react';
-import { useInPersonRecording } from '../../../hooks/useInPersonRecording.js';
 import { RealtimeMemoCard } from './RealtimeAnalysisPanel.jsx';
 
 // RealtimeCallControl과 같은 위치·패턴이지만 통화 대신 녹음을 시작/종료합니다.
@@ -104,10 +103,16 @@ export function InPersonSttPreview({ segments }) {
 // 다만 전체를 통째로 다시 쓰면 그 사이 상담원이 직접 입력한 메모(같은 칸의 "메모 추가")를
 // 덮어써 버리므로, 이미 반영한 segment 개수(flushedCountRef)를 추적해 "새로 도착한 조각만"
 // 기존 값 뒤에 이어붙입니다.
-export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, caseMeta }) {
+//
+// status/segments/startRecording/stopRecording은 useInPersonRecording을 여기서 직접 부르지 않고
+// AnalysisWorkbench로부터 props로 받습니다 — "상담 저장" 버튼이 녹음 상태(상담 중/변환 중)에
+// 따라 라벨을 바꿔야 해서, 그 버튼이 있는 AnalysisWorkbench가 이 훅을 대신 소유합니다.
+export function InPersonAnalysisPanel({
+  selectedCase, onUpdateConsultation, caseMeta,
+  inPersonStatus: status, inPersonSegments: segments, inPersonErrorMessage: errorMessage,
+  onStartInPersonRecording, onStopInPersonRecording,
+}) {
   const hasCase = Boolean(selectedCase);
-  const { status, segments, errorMessage, startRecording, stopRecording } =
-    useInPersonRecording({ consultationId: selectedCase?.coreId });
 
   const [pendingRestartConfirm, setPendingRestartConfirm] = useState(false);
   const hasExistingMemo = Boolean((selectedCase?.inpersonMemo || '').trim() || (selectedCase?.inpersonMemoMasked || '').trim());
@@ -116,12 +121,12 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
       setPendingRestartConfirm(true);
       return;
     }
-    startRecording();
+    onStartInPersonRecording();
   };
   const confirmRestart = () => {
     setPendingRestartConfirm(false);
     onUpdateConsultation(selectedCase.id, { inpersonMemo: '', inpersonMemoMasked: '' });
-    startRecording();
+    onStartInPersonRecording();
   };
 
   const flushedCountRef = useRef(0);
@@ -171,7 +176,7 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
           hasCase={hasCase}
           status={status}
           onStart={handleStartClick}
-          onStop={stopRecording}
+          onStop={onStopInPersonRecording}
         />
       </div>
       <div className="realtimeConsultationLayout">

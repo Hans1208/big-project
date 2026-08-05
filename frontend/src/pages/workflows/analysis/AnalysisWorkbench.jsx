@@ -21,6 +21,7 @@ import {
 } from '../../../services/coreApiClientV2.js';
 import { readCachedFormRecommendations } from '../../../services/draftDocumentStore.js';
 import { createRealtimeAudioStream, fetchAvailableAudioCalls } from '../../../services/realtimeAudioStream.js';
+import { useInPersonRecording } from '../../../hooks/useInPersonRecording.js';
 import { caseOptions, computeCaseEmergency, resolveEligibilityFromCase, emergencyReason, levelFromRatio, fitRatioToLevel } from '../shared/caseHelpers.js';
 import {
   mergeContractAnalysisResponse,
@@ -178,6 +179,16 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
     const timer = setInterval(() => setCallSeconds((seconds) => seconds + 1), 1000);
     return () => clearInterval(timer);
   }, [callStatus]);
+  // 대면 상담 녹음 상태도 여기서 소유합니다(전에는 InPersonAnalysisPanel 안에서 직접 이 훅을
+  // 불렀음) — "상담 저장" 버튼이 녹음 상태(상담 중/변환 중)에 따라 라벨을 바꿔야 하는데,
+  // 그 버튼은 채널 탭 바깥(AnalysisWorkbench)에 있어서 상태를 여기까지 끌어올려야 합니다.
+  const {
+    status: inPersonStatus,
+    segments: inPersonSegments,
+    errorMessage: inPersonErrorMessage,
+    startRecording: startInPersonRecording,
+    stopRecording: stopInPersonRecording,
+  } = useInPersonRecording({ consultationId: selectedCase?.coreId });
   const startCall = async () => {
     if (!selectedCase) return;
     setCallStatus('ongoing');
@@ -728,8 +739,38 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
     && currentCallMemo === (selectedCase?.transcriptSavedMemo || '')
     && currentInpersonMemo === (selectedCase?.transcriptSavedInpersonMemo || '');
 
+  // 전화("상담 중")/대면("상담 중" → "변환 중") 채널 상태에 따라 버튼 자체를 잠급니다 — 상담이
+  // 진행 중이거나 STT/마스킹이 아직 처리 중인 텍스트를 "저장 완료"로 잠가버리면 안 되기 때문입니다.
+  // 대면 녹음의 'error' 상태는 여기서 막지 않습니다 — 그 상태로 무기한 잠기면 그때까지 쌓인
+  // 내용을 저장할 방법이 없어집니다.
+  const isConsultationOngoing = callStatus === 'ongoing' || inPersonStatus === 'connecting' || inPersonStatus === 'recording';
+  const isTranscriptConverting = inPersonStatus === 'processing';
+
+  let transcriptButtonContent = '상담 저장';
+  let transcriptButtonDisabled = !hasTranscriptContent;
+  let showEmptyTranscriptCaption = !hasTranscriptContent;
+  if (isConsultationOngoing) {
+    transcriptButtonContent = '상담 중...';
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  } else if (isTranscriptConverting) {
+    transcriptButtonContent = '변환 중...';
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  } else if (savingTranscript) {
+    transcriptButtonContent = '저장 중...';
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  } else if (isTranscriptSaved) {
+    transcriptButtonContent = (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 저장 완료</span>
+    );
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  }
+
   const handleSaveTranscript = async () => {
-    if (!selectedCase || savingTranscript) return;
+    if (!selectedCase || savingTranscript || isConsultationOngoing || isTranscriptConverting) return;
     setSavingTranscript(true);
     try {
       const result = await onSaveTranscript?.(selectedCase);
@@ -794,6 +835,11 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           onRefreshAudioCalls={refreshAvailableAudioCalls}
           onStartCall={startCall}
           onEndCall={endCall}
+          inPersonStatus={inPersonStatus}
+          inPersonSegments={inPersonSegments}
+          inPersonErrorMessage={inPersonErrorMessage}
+          onStartInPersonRecording={startInPersonRecording}
+          onStopInPersonRecording={stopInPersonRecording}
           caseMeta={selectedCase ? (
             <div className="analysisCaseMeta">
               <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
@@ -831,20 +877,16 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           ) : null}
         />
         {selectedCase ? (
-          <div className="inlineControls analysisCommandBar">
+          <div className="inlineControls analysisCommandBar transcriptSaveBar">
+            {showEmptyTranscriptCaption ? <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small> : null}
             <button
               type="button"
               className={`callAnalyzeButton${isTranscriptSaved ? ' done' : ''}`}
               onClick={handleSaveTranscript}
-              disabled={savingTranscript || isTranscriptSaved || !hasTranscriptContent}
+              disabled={transcriptButtonDisabled}
             >
-              {savingTranscript ? (
-                '저장 중...'
-              ) : isTranscriptSaved ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 저장 완료</span>
-              ) : '상담 저장'}
+              {transcriptButtonContent}
             </button>
-            {!hasTranscriptContent ? <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small> : null}
           </div>
         ) : null}
         {selectedCase ? (
