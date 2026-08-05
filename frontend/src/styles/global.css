@@ -16683,3 +16683,88 @@ body:has(.analysisPanel) {
     align-items: flex-start;
   }
 }
+
+/* ── 담은 자료 화면 ─────────────────────────────────────────────
+   법령·판례 검색 화면에서 담아 저장한 자료를 상담별로 모아 보는 읽기 전용 목록.
+   검색 화면의 카드(.referenceCard)와 달리 고르는 동작이 없어, 선택 표시나
+   버튼 없이 사건 단위로 묶어 쌓기만 합니다. */
+.adoptedReferenceList {
+  display: grid;
+  gap: 12px;
+}
+
+.adoptedReferenceCase {
+  display: grid;
+  gap: 10px;
+}
+
+.adoptedReferenceCaseHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.adoptedReferenceCaseHead strong {
+  font-size: var(--fs-md);
+}
+
+.adoptedReferenceCaseHead span {
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+}
+
+.adoptedReferenceItems {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adoptedReferenceLine {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft, rgba(0, 0, 0, 0.08));
+  border-radius: 8px;
+}
+
+.adoptedReferenceTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.adoptedReferenceMeta {
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+}
+
+/* 근거 문구는 검색 화면과 같은 색으로 둡니다 — 같은 값이라 다르게 보이면 안 됩니다. */
+.adoptedReferenceReason {
+  color: var(--brand-strong, var(--text-sub));
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* 담은 자료를 법령/판례로 나눠 쌓습니다. 둘은 쓰임이 달라(법령=요건, 판례=실제 판단)
+   섞어 두면 무엇이 몇 건인지 세어가며 봐야 합니다. */
+.adoptedReferenceGroups {
+  display: grid;
+  gap: 18px;
+}
+
+.adoptedReferenceGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.adoptedReferenceGroup h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-md);
+}

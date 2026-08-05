@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Bell, ClipboardCheck, ClipboardList, FileText, LayoutDashboard, PhoneCall, Radio, Scale, Settings, UserRound } from 'lucide-react';
+import { Bell, BookMarked, ClipboardCheck, ClipboardList, FileText, LayoutDashboard, PhoneCall, Radio, Scale, Settings, UserRound } from 'lucide-react';
 import { formatCallDuration } from '../utils/date.js';
 
 function Brand({ onClick }) {
@@ -105,6 +105,9 @@ function DashboardHeader({ role, activeView, onViewChange, onLogout, currentUser
     lawyer: [
       { view: '대시보드', label: '검토' },
       { view: '법률, 판례', label: '법령·판례' },
+      // 검색 화면은 사건을 하나 골라야 그 사건에 담아둔 것이 보입니다. 여러 사건을
+      // 훑으며 확인하는 자리를 따로 둡니다(읽기 전용).
+      { view: '담은 자료', label: '담은 자료' },
       { view: '알림', label: '알림' },
       { view: '프로필', label: '내 정보' },
     ],
@@ -122,6 +125,7 @@ function DashboardHeader({ role, activeView, onViewChange, onLogout, currentUser
     '상담 등록': FileText,
     // 법령·판례 페이지 제목이 Scale(저울) 아이콘을 쓰므로 메뉴도 맞춥니다.
     '법률, 판례': Scale,
+    '담은 자료': BookMarked,
     // 서식 생성 화면(DraftWorkbench)의 페이지 제목·'서식 초안' 섹션 제목이 모두 FileText를
     // 쓰므로 메뉴도 같은 아이콘으로 맞춥니다.
     '서식 생성': FileText,
