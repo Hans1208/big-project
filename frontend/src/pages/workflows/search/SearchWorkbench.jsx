@@ -120,6 +120,14 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
       if (!isCurrent()) return;
       const rows = (payload?.results || []).map(toReferenceItem);
       setRagResults(rows);
+      // 저장해 둔 자료를 되살릴 때는 원문이 없을 수 있습니다(원문을 함께 저장하기
+      // 전에 담아둔 것). 그 상태로 다시 저장하면 빈 원문이 그대로 다시 저장되므로,
+      // 검색 결과에 같은 항목이 있으면 원문을 채워 넣습니다.
+      setSelected((current) => current.map((item) => {
+        if (item.content) return item;
+        const found = rows.find((row) => row.id === item.id);
+        return found?.content ? { ...item, content: found.content } : item;
+      }));
       setRagTopK(topK);
       setExpandedIds([]);   // 결과가 바뀌면 펼쳐둔 상태도 의미가 없습니다.
       // 더 청한 만큼 안 왔으면 색인에 더 없다는 뜻이라 '더 보기'를 감춥니다.
@@ -179,6 +187,7 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
         source: item.source || '',
         effectiveDate: item.date || '',
         reason: item.reason || '',
+        content: item.content || '',
         referenceType: item.type || 'statute',
         referenceLabel: item.type === 'precedent' ? '판례' : '법령',
         selectedBy: item.selected_by || 'manual',
@@ -227,6 +236,11 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
         source: item.source || '',
         date: item.effectiveDate || '',
         reason: item.reason || '',
+        // 본문도 같이 저장합니다. 제목과 근거만 남기면 나중에 '담은 자료'에서
+        // 조문·판시사항을 다시 읽을 수 없고, 읽으려면 검색 화면으로 돌아가
+        // 같은 것을 다시 찾아야 합니다. 상담 한 건에 담는 양이 많아야 열 건
+        // 안팎이라 저장 크기는 문제되지 않습니다.
+        content: item.content || '',
         selected_by: item.selectedBy || 'manual',
       }));
       const analysis = {

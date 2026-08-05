@@ -19,7 +19,7 @@ function formatLegalDate(value) {
   return `${digits.slice(0, 4)}. ${Number(digits.slice(4, 6))}. ${Number(digits.slice(6, 8))}.`;
 }
 
-function ReferenceLine({ item }) {
+function ReferenceLine({ item, isOpen, onToggle }) {
   const isPrecedent = item.type === 'precedent';
   return (
     <li className="adoptedReferenceLine">
@@ -37,12 +37,29 @@ function ReferenceLine({ item }) {
         {item.selected_by === 'llm' ? ' · AI 추천 채택' : ''}
       </span>
       {item.reason ? <span className="adoptedReferenceReason">{item.reason}</span> : null}
+      {/* 원문은 접어 둡니다. 조문은 항이 여러 개고 판시사항도 길어서, 다 펼쳐두면
+          몇 건을 담았는지 훑어볼 수가 없습니다. */}
+      {item.content ? (
+        <>
+          <button className="referenceCardToggle" type="button" onClick={onToggle}>
+            {isOpen ? '접기' : (isPrecedent ? '판시사항 보기' : '조문 전문 보기')}
+          </button>
+          {isOpen ? <p className="adoptedReferenceBody">{item.content}</p> : null}
+        </>
+      ) : (
+        // 원문을 저장하기 전에 담아둔 자료입니다. 다시 담으면 함께 저장됩니다.
+        <span className="adoptedReferenceMeta">원문이 저장되지 않았습니다 · 다시 담으면 함께 저장됩니다</span>
+      )}
     </li>
   );
 }
 
 export function AdoptedReferencePanel({ consultations = [] }) {
   const [caseId, setCaseId] = useState(caseOptions(consultations)[0].id);
+  const [openIds, setOpenIds] = useState([]);
+  const toggleOpen = (id) => setOpenIds((current) => (current.includes(id)
+    ? current.filter((value) => value !== id)
+    : [...current, id]));
   const selectedCase = consultations.find((item) => String(item.id) === String(caseId));
 
   const adopted = Array.isArray(selectedCase?.analysis?.recommendation?.adopted)
@@ -97,7 +114,14 @@ export function AdoptedReferencePanel({ consultations = [] }) {
                   {group.title} <span className="statusChip tone-muted">{group.items.length}건</span>
                 </h3>
                 <ul className="adoptedReferenceItems">
-                  {group.items.map((item) => <ReferenceLine key={item.id} item={item} />)}
+                  {group.items.map((item) => (
+                    <ReferenceLine
+                      key={item.id}
+                      item={item}
+                      isOpen={openIds.includes(item.id)}
+                      onToggle={() => toggleOpen(item.id)}
+                    />
+                  ))}
                 </ul>
               </section>
             ))}
