@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, Check } from 'lucide-react';
-import { useInPersonRecording } from '../../../hooks/useInPersonRecording.js';
+import { Mic, Check, EyeOff, Headphones, Radio } from 'lucide-react';
 import { RealtimeMemoCard } from './RealtimeAnalysisPanel.jsx';
+import { CollapsibleSection } from '../../../components/common.jsx';
 
 // RealtimeCallControl과 같은 위치·패턴이지만 통화 대신 녹음을 시작/종료합니다.
 // 통화 경과 시간 카운트 같은 통화 전용 로직은 옮기지 않고, 녹음 상태(status)는 useInPersonRecording에서
@@ -83,15 +83,17 @@ export function InPersonSttPreview({ segments }) {
   const hasError = segments.some((segment) => segment.error);
   const text = buildTranscript(segments, showMasked ? 'maskedText' : 'text');
   return (
-    <div className="resultCard sttReferenceCard">
-      <div className="segmented compactSegmented">
-        <button type="button" className={showMasked ? 'active' : ''} onClick={() => setShowMasked(true)}>개인정보 가림</button>
-        <button type="button" className={!showMasked ? 'active' : ''} onClick={() => setShowMasked(false)}>원문</button>
+    <CollapsibleSection icon={EyeOff} title="개인정보 마스크 결과">
+      <div className="resultCard sttReferenceCard">
+        <div className="segmented compactSegmented">
+          <button type="button" className={showMasked ? 'active' : ''} onClick={() => setShowMasked(true)}>개인정보 가림</button>
+          <button type="button" className={!showMasked ? 'active' : ''} onClick={() => setShowMasked(false)}>원문</button>
+        </div>
+        {!showMasked ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
+        <p className="sttPreviewText">{text || '녹음 결과가 없습니다.'}</p>
+        {hasError ? <p className="helperText">일부 구간은 변환에 실패해 메모에서 제외되었습니다.</p> : null}
       </div>
-      {!showMasked ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
-      <p className="sttPreviewText">{text || '녹음 결과가 없습니다.'}</p>
-      {hasError ? <p className="helperText">일부 구간은 변환에 실패해 메모에서 제외되었습니다.</p> : null}
-    </div>
+    </CollapsibleSection>
   );
 }
 
@@ -104,10 +106,16 @@ export function InPersonSttPreview({ segments }) {
 // 다만 전체를 통째로 다시 쓰면 그 사이 상담원이 직접 입력한 메모(같은 칸의 "메모 추가")를
 // 덮어써 버리므로, 이미 반영한 segment 개수(flushedCountRef)를 추적해 "새로 도착한 조각만"
 // 기존 값 뒤에 이어붙입니다.
-export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, caseMeta }) {
+//
+// status/segments/startRecording/stopRecording은 useInPersonRecording을 여기서 직접 부르지 않고
+// AnalysisWorkbench로부터 props로 받습니다 — "상담 저장" 버튼이 녹음 상태(상담 중/변환 중)에
+// 따라 라벨을 바꿔야 해서, 그 버튼이 있는 AnalysisWorkbench가 이 훅을 대신 소유합니다.
+export function InPersonAnalysisPanel({
+  selectedCase, onUpdateConsultation,
+  inPersonStatus: status, inPersonSegments: segments, inPersonErrorMessage: errorMessage,
+  onStartInPersonRecording, onStopInPersonRecording,
+}) {
   const hasCase = Boolean(selectedCase);
-  const { status, segments, errorMessage, startRecording, stopRecording } =
-    useInPersonRecording({ consultationId: selectedCase?.coreId });
 
   const [pendingRestartConfirm, setPendingRestartConfirm] = useState(false);
   const hasExistingMemo = Boolean((selectedCase?.inpersonMemo || '').trim() || (selectedCase?.inpersonMemoMasked || '').trim());
@@ -116,12 +124,12 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
       setPendingRestartConfirm(true);
       return;
     }
-    startRecording();
+    onStartInPersonRecording();
   };
   const confirmRestart = () => {
     setPendingRestartConfirm(false);
     onUpdateConsultation(selectedCase.id, { inpersonMemo: '', inpersonMemoMasked: '' });
-    startRecording();
+    onStartInPersonRecording();
   };
 
   const flushedCountRef = useRef(0);
@@ -162,33 +170,35 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
   return (
     <section className="realtimeWorkbenchPanel" aria-label="대면 상담 메모">
       <div className="realtimeWorkbenchHeader">
-        <div>
-          <span className="flowStageEyebrow">대면 상담</span>
-          <strong>{headline}</strong>
-          <p>마이크 녹음 중 개인정보가 가려진 대화 내용이 실시간으로 상담 메모에 반영됩니다.</p>
+        <div className="realtimeHeaderTags">
+          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
+          <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
         </div>
-        <InPersonRecordingControl
-          hasCase={hasCase}
-          status={status}
-          onStart={handleStartClick}
-          onStop={stopRecording}
-        />
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
-          <RealtimeMemoCard
-            selectedCase={selectedCase}
-            onUpdateConsultation={onUpdateConsultation}
-            field="inpersonMemo"
-            composerPlaceholder="대면 상담 내용을 바로 적어주세요."
-          />
-          {/* "개인정보 가림"/"원문" 토글은 녹음 종료 후 결과만 보여달라는 요구에 맞춰
-              status === 'done'일 때만 렌더링합니다(위 실시간 메모와는 별개 요구사항). */}
-          {status === 'done' ? <InPersonSttPreview segments={segments} /> : null}
+          <div className="realtimeSplitRow">
+            <div className="realtimeSplitColumn">
+              <strong>{headline}</strong>
+              <p>마이크 녹음 중 개인정보가 가려진 대화 내용이 실시간으로 상담 메모에 반영됩니다.</p>
+              <InPersonRecordingControl
+                hasCase={hasCase}
+                status={status}
+                onStart={handleStartClick}
+                onStop={onStopInPersonRecording}
+              />
+              {/* "개인정보 가림"/"원문" 토글은 녹음 종료 후 결과만 보여달라는 요구에 맞춰
+                  status === 'done'일 때만 렌더링합니다(위 실시간 메모와는 별개 요구사항). */}
+              {status === 'done' ? <InPersonSttPreview segments={segments} /> : null}
+            </div>
+            <RealtimeMemoCard
+              selectedCase={selectedCase}
+              onUpdateConsultation={onUpdateConsultation}
+              field="inpersonMemo"
+              composerPlaceholder="대면 상담 내용을 바로 적어주세요."
+            />
+          </div>
         </div>
-        <aside className="realtimeConsultationSide">
-          {caseMeta}
-        </aside>
       </div>
       {pendingRestartConfirm ? (
         <RestartRecordingConfirmModal

@@ -4904,6 +4904,7 @@ textarea:focus-visible,
   color: var(--warn-text);
   font-size: var(--fs-caption);
   font-weight: 700;
+  text-align: center;
 }
 
 /* 코치 피드백: AI 요약을 줄글이 아닌 개요(bullet) 형식으로. 마커는 옅은 점 대신 짧은 대시로,
@@ -5625,6 +5626,9 @@ textarea:focus-visible,
   font-size: var(--fs-sm);
   font-weight: 800;
   line-height: 1;
+  /* 라벨 줄 높이는 사건 번호·작성 시간(아이콘/배지 없는 일반 텍스트, 13px)이 기준입니다.
+     상담받은 사람만 아이콘+배지 때문에 커지지 않도록 아래에서 그 아이콘·배지 크기를
+     줄여 맞춥니다(이 span 자체에 min-height를 걸어 다른 칸을 늘리는 방식은 쓰지 않습니다). */
 }
 
 .analysisCaseMetaEdit > input {
@@ -11324,6 +11328,18 @@ a:focus-visible,
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+/* 한글은 line-height:1이어도 글자 자체의 실제 렌더링 높이가 그보다 훨씬 크게 잡혀(flex
+   컨텍스트 안에서 특히), 라벨 텍스트가 아이콘·배지보다 훨씬 큰 줄 높이를 차지하고 있었습니다.
+   height + overflow:hidden으로 사건 번호·작성 시간과 같은 13px 줄 높이로 고정합니다. */
+.realtimeRequiredNameFieldLabelText {
+  display: inline-flex;
+  align-items: center;
+  height: 13px;
+  overflow: hidden;
+  line-height: 1;
 }
 
 .realtimeRequiredNameField em {
@@ -11331,12 +11347,18 @@ a:focus-visible,
      주의 표시에 쓰는 warn(주황) 톤으로 맞춰 전체 색감과 자연스럽게 어울리게 합니다. */
   display: inline-flex;
   align-items: center;
-  min-height: 20px;
+  /* 사건 번호·작성 시간의 라벨 줄(13px)에 맞추려고 낮췄습니다 — 이 배지가 라벨 줄 중 가장
+     키가 커서 전체 줄 높이를 밀어올리고 있었습니다. min-height는 한글 폰트의 실제 줄 높이가
+     line-height:1 지정보다 커서 안 먹혔고(24px로 그대로 유지됨), height + overflow:hidden으로
+     강제해야 실제로 13px로 줄어듭니다. */
+  height: 13px;
+  overflow: hidden;
   padding: 0 8px;
   border-radius: var(--r-pill);
   background: var(--warn-soft);
   color: var(--warn-text);
   font-size: 11px;
+  line-height: 1;
   font-style: normal;
   font-weight: 800;
 }
@@ -12401,7 +12423,7 @@ textarea:focus-visible,
 }
 
 .analysisPanel .realtimeWorkbenchPanel {
-  margin-bottom: 18px;
+  margin-bottom: 8px;
 }
 
 .analysisPanel .analysisProgressPanel,
@@ -13040,7 +13062,9 @@ table.dataTable td .reviewActionButton {
 }
 
 .analysisPanel .analysisCaseMeta {
-  grid-template-columns: minmax(150px, 0.9fr) minmax(260px, 1.45fr) minmax(230px, 1.2fr) minmax(170px, 0.9fr);
+  /* 사건번호 0.9→0.45fr(절반), 상담받은 사람 1.45→1.16fr(4/5), 작성 시간 0.9→0.6fr(2/3)로
+     줄이고, 상담 제목은 그대로 1.2fr로 둬서 나머지 세 칸이 내준 폭을 자연히 흡수합니다. */
+  grid-template-columns: minmax(150px, 0.45fr) minmax(260px, 1.16fr) minmax(230px, 1.2fr) minmax(170px, 0.6fr);
   align-items: stretch;
 }
 
@@ -13050,9 +13074,57 @@ table.dataTable td .reviewActionButton {
   min-height: 74px;
 }
 
+/* 네 칸 중 하나(상담받은 사람)가 안내 문구 때문에 더 길어지면 align-items:stretch로
+   나머지 칸도 같은 높이로 늘어납니다. .analysisCaseMetaEdit(상담 제목 등 입력칸)는 이미
+   align-content:start라 내용이 위에 붙지만, 사건 번호·작성 시간이 쓰는 일반 span은
+   grid 기본값(normal→stretch)이 남는 높이를 값(strong) 쪽에 그대로 늘려버려 라벨-값
+   간격이 입력칸 쪽과 달라 보였습니다. 여기도 위쪽 기준으로 맞춥니다. */
+.analysisPanel .analysisCaseMeta > span {
+  align-content: start;
+  align-items: start;
+  /* 라벨 줄이 <span>이 아니라 그냥 텍스트 노드(예: "작성 시간 ")라 .analysisCaseMetaEdit > span의
+     line-height:1 같은 압축 지정을 받지 못해, 같은 gap:5px인데도 실제로는 상담 제목 쪽보다
+     더 벌어져 보였습니다. 첫 줄(라벨) 텍스트 노드에 같은 line-height를 적용합니다. */
+  line-height: 1;
+}
+
 .analysisPanel .analysisCaseMetaEdit > input,
 .analysisPanel .analysisCaseMetaEdit > textarea {
   max-width: 100%;
+}
+
+/* 입력칸이 박스 배경(--surface-subtle)과 같은 투명색이라 경계가 잘 안 보였습니다.
+   박스보다 아주 살짝 진하게 넣어 입력 영역이 눈에 띄게 합니다(10%는 너무 진해서 4%로
+   낮춤 — 진할수록 입력칸 위 여백이 실제로는 같은데도 더 좁아 보이는 착시가 생겼습니다).
+   상담받은 사람이 비어있을 때(.missing)는 별도의 경고색 배경을 쓰므로 여기서는 건드리지 않습니다. */
+.analysisPanel .analysisCaseMetaEdit:not(.missing) > input {
+  background: color-mix(in srgb, var(--surface-subtle) 96%, black 4%);
+  border-radius: var(--r-control);
+}
+
+/* 상담받은 사람이 비어있을 때 안내 문구를 입력칸 placeholder 대신 '필수 입력' 배지 옆에
+   작게 붙여 보여줍니다. .realtimeRequiredNameField small(경고색·줄바꿈·margin-top 8px,
+   AI가 채운 이름 확인 문구용)이 이 small에도 걸려 색이 바뀌고 아래로 밀려 보였던 것을
+   조상 클래스까지 포함해 specificity를 올려 바로잡습니다. */
+.realtimeRequiredNameField .analysisCaseMetaHint {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1;
+  /* '필수 입력' 옆 한 줄에 붙는 짧은 안내라, 줄바꿈되면 높이가 늘어나 badge와 세로 위치가
+     어긋나 보입니다. 한 줄로 고정하되, 폭이 좁아 다 못 들어가면(옆 칸을 침범하는 대신)
+     줄임표로 자연스럽게 잘리게 합니다. min-width:0은 flex 아이템 기본값(auto)이 줄어들지
+     못하게 막는 것을 풀어줘야 overflow:hidden이 실제로 동작합니다. 높이도 아이콘·배지와
+     같은 13px로 고정해 라벨 줄 전체 높이를 맞춥니다. */
+  height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .analysisPanel .analysisControlBar {
@@ -13889,7 +13961,9 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 22px;
-  margin-top: 26px;
+  /* 헤더가 태그 한 줄로 짧아진 만큼, 헤더와 본문 사이 여백(예전엔 헤드라인·설명까지 감안한
+     26px)도 같이 줄입니다. */
+  margin-top: 0;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -14532,6 +14606,19 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   z-index: 5;
 }
 
+/* "상담 저장" 버튼 줄. 위 커맨드 바(사건 고르기 등)와 같은 배경/구분선을 쓰되, 채널 탭
+   바로 아래 단독으로 오른쪽에 붙어야 해서 오른쪽 정렬만 별도로 얹는다. */
+.transcriptSaveBar {
+  justify-content: flex-end;
+  /* .inlineControls 기본값(align-items:center)을 쓰면 "상담 저장"/"분석 실행" 중 한쪽에만
+     캡션이 붙을 때 그룹 높이가 달라져 버튼끼리 수평이 어긋납니다. 위쪽 기준으로 고정해
+     캡션 유무와 상관없이 두 버튼이 항상 같은 줄에 있게 합니다. */
+  align-items: flex-start;
+  /* .analysisCommandBar 공용 패딩(14px 0)은 위쪽 커맨드 바와 공유하는 값이라, 바로 위
+     상담 채널 박스와의 간격만 이 줄에서 따로 줄입니다. */
+  padding-top: 6px !important;
+}
+
 /* 새 상담 준비 = 보조 액션이라 toss.md의 '보조 버튼'(연한 파랑 배경 + 파란 글자)으로 */
 .analysisPanel .quickStartButton {
   background: var(--accent-soft) !important;
@@ -14564,6 +14651,15 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 }
 .analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton:active:not(:disabled) {
   transform: scale(0.98);
+}
+/* 저장 전이라 눌러도 안 되는 상태는 "상담 저장" 버튼의 비활성 회색과 같은 톤으로 맞춥니다 —
+   기본(파란)·done(초록) 배경이 !important라 :disabled 하나만으로는 안 눌려 함께 무효화합니다. */
+.analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton:disabled,
+.analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton.done:disabled {
+  background: var(--surface-muted) !important;
+  color: var(--text-sub) !important;
+  border-color: var(--border) !important;
+  cursor: not-allowed;
 }
 .analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton.done {
   background: var(--success-solid) !important;
@@ -14664,6 +14760,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   border-radius: var(--r-surface) !important;
   border: none !important;
   box-shadow: var(--shadow-soft) !important;
+  /* 카드가 realtimeSplitRow의 stretch로 늘어난 만큼, 안의 메모 입력칸(textarea)이
+     그 여유 높이를 그대로 흡수하도록 세로 flex로 바꿉니다(위 라벨·아래 입력줄은 고정 크기). */
+  display: flex;
+  flex-direction: column;
 }
 .analysisPanel .realtimeMemoTextarea {
   background: var(--surface-subtle) !important;
@@ -14673,6 +14773,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   font-size: var(--fs-md) !important;
   line-height: 1.6 !important;
   box-shadow: none !important;
+  /* 기존 220px 지정이 다른 곳의 공용 필드 초기화(min-height:42px)에 밀려 있던 것을 이 자리에서
+     다시 잡고, 기존 대비 1.5배 정도(220px → 330px)로 키운 뒤 flex:1로 남는 세로 공간까지 채웁니다. */
+  flex: 1 1 auto !important;
+  min-height: 330px !important;
 }
 .analysisPanel .realtimeMemoTextarea::placeholder {
   color: var(--text-placeholder) !important;
@@ -15140,7 +15244,9 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   padding: 0 !important;
   overflow: hidden;
   border: 1px solid var(--border) !important;
-  background: var(--surface) !important;
+  /* 헤더(회색)와 본문(흰색)이 나뉘어 보이던 것을 하나의 회색 배경으로 통일합니다.
+     안의 개별 카드(연결할 통화/녹음 컨트롤·메모·AI 추천 질문)는 각자 흰 배경을 갖고 있어 계속 구분됩니다. */
+  background: var(--surface-subtle) !important;
   box-shadow: var(--shadow-soft) !important;
 }
 
@@ -15152,19 +15258,11 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
      둘 다 위쪽 기준으로 맞춰 제목·설명이 오른쪽 상태 칩과 같은 줄에서 시작하게 합니다. */
   align-items: start !important;
   gap: 24px !important;
-  padding: 20px 22px !important;
+  /* 헤더에 태그 한 줄만 남으면서 예전(헤드라인·설명까지 있던 시절) 위아래 여백이 상대적으로
+     커 보여, 태그 한 줄 기준으로 위아래 패딩을 줄입니다. */
+  padding: 12px 22px !important;
   border-bottom: 1px solid var(--border);
   background: var(--surface-subtle) !important;
-}
-
-.analysisPanel .realtimeWorkbenchHeader > div:first-child {
-  display: grid;
-  gap: 7px;
-}
-
-.analysisPanel .realtimeWorkbenchHeader > div:first-child strong {
-  font-size: var(--fs-lg);
-  line-height: 1.4;
 }
 
 .analysisPanel .realtimeStatusChips {
@@ -15195,7 +15293,7 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 
 .analysisPanel .realtimeConsultationLayout {
   gap: 16px !important;
-  padding: 20px 22px 22px;
+  padding: 14px 22px 22px;
 }
 
 .analysisPanel .realtimeTranscriptCard,
@@ -15215,6 +15313,66 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   border-radius: var(--r-control) !important;
   background: var(--accent) !important;
   color: #fff !important;
+}
+
+/* 안내문(굵은 헤드라인·설명)과 통화/녹음 컨트롤이 헤더 밖, 왼쪽 칸으로 옮겨가면서
+   헤더에는 역할·상태 태그만 남습니다. */
+.analysisPanel .realtimeWorkbenchHeader {
+  grid-template-columns: 1fr !important;
+}
+
+/* '상담원 업무'·'실시간 상담'(또는 '대면 상담') 태그를 세로 대신 가로로 나란히 둡니다. */
+.analysisPanel .realtimeHeaderTags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysisPanel .realtimeHeaderTags .roleIdentityBadge {
+  margin-bottom: 0;
+}
+
+/* '연결할 통화'(또는 녹음 컨트롤)와 '실시간 상담 메모'를 가로 1:1로 배치합니다.
+   align-items:stretch로 둬서, 왼쪽 칸(헤드라인·컨트롤·질문/마스크 카드가 쌓여 더 긴 쪽)의
+   높이에 맞춰 오른쪽 메모 카드도 같이 늘어납니다. */
+.analysisPanel .realtimeSplitRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 16px;
+}
+
+/* 왼쪽 칸: 통화/녹음 컨트롤과 그에 딸린 카드(AI 추천 질문·개인정보 마스크 결과)를 세로로
+   쌓습니다. 메모는 오른쪽 칸에 혼자 둡니다 — 두 칸 높이가 달라지면서, 카드 두 개의 아래
+   테두리가 우연히 같은 줄에 겹쳐 보이던 가로줄도 자연히 사라집니다. */
+.analysisPanel .realtimeSplitColumn {
+  display: grid;
+  /* realtimeSplitRow가 오른쪽 메모 높이에 맞춰 이 칸 전체를 늘려도(align-items:stretch),
+     grid의 기본값(align-content/align-items: normal→stretch)은 그 남는 높이를 카드들
+     사이·안쪽에 억지로 늘려 채워 속이 텅 빈 것처럼 보이게 합니다. 내용은 위로 붙이고
+     남는 공간은 맨 아래 빈칸으로만 남게 고정합니다. */
+  align-content: start;
+  align-items: start;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 헤더에 있던 안내문(헤드라인·설명) 스타일을 그대로 왼쪽 칸으로 옮깁니다. */
+.analysisPanel .realtimeSplitColumn > strong {
+  color: var(--text-main);
+  font-size: var(--fs-lg);
+}
+
+.analysisPanel .realtimeSplitColumn > p {
+  margin: 0;
+  color: var(--text-sub);
+}
+
+@media (max-width: 900px) {
+  .analysisPanel .realtimeSplitRow {
+    grid-template-columns: 1fr;
+  }
 }
 
 .uploadPanel .uploadWorkCard {
