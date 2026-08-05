@@ -890,7 +890,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                 {transcriptButtonContent}
               </button>
               {isTranscriptConverting ? (
-                <small className="callAnalyzeCaption">변환 중... {formatElapsed(transcriptConvertingElapsedSec)}</small>
+                <small className="callAnalyzeCaption">잠시만 기다려주세요... {formatElapsed(transcriptConvertingElapsedSec)}</small>
               ) : showEmptyTranscriptCaption ? (
                 <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small>
               ) : null}

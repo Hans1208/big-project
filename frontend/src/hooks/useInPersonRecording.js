@@ -64,6 +64,21 @@ export function useInPersonRecording({ consultationId }) {
 
   useEffect(() => () => cleanupMedia(), []);
 
+  // consultationId가 바뀌면(상담원이 드롭다운으로 다른 사건을 고르면) 이전 사건의 녹음
+  // 상태·세그먼트가 그대로 남아 새 사건 화면에 비쳐 보이는 문제가 있었습니다. 전화상담의
+  // callStatus를 selectedId 변경 시 초기화하는 것과 같은 이유로, 여기서도 사건이 바뀌면
+  // 진행 중이던 녹음을 정리하고 상태를 완전히 리셋합니다.
+  const prevConsultationIdRef = useRef(consultationId);
+  useEffect(() => {
+    if (prevConsultationIdRef.current === consultationId) return;
+    prevConsultationIdRef.current = consultationId;
+    cleanupMedia();
+    stoppingRef.current = false;
+    setStatus('idle');
+    setSegments([]);
+    setErrorMessage(null);
+  }, [consultationId]);
+
   function cleanupMedia() {
     if (chunkTimerRef.current) clearTimeout(chunkTimerRef.current);
     if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();

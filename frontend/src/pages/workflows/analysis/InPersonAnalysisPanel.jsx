@@ -52,10 +52,6 @@ function buildTranscriptChunk(segments, field) {
     .trim();
 }
 
-function buildTranscript(segments, field) {
-  return buildTranscriptChunk([...segments].sort((a, b) => a.idx - b.idx), field);
-}
-
 // "녹음 시작"을 다시 눌렀는데 이전 세션 텍스트가 실시간 상담 메모에 이미 쌓여 있으면, 그걸 그냥
 // 이어붙이면 이전 상담 내용과 새 상담 내용이 뒤섞입니다. 그렇다고 묻지도 않고 지우면 실수로
 // 다시 누른 경우 되돌릴 수 없이 날아갑니다 — 그래서 확인 팝업을 거칩니다.
@@ -77,19 +73,39 @@ function RestartRecordingConfirmModal({ onConfirm, onCancel }) {
 // core-api(InPersonRecordingWebSocketHandler)가 stt-mask-api로 실제 마스킹한 결과를 원문/마스킹본
 // 토글로 보여줍니다. AnalysisWorkbench의 "개인정보는 자동으로 가려집니다" 카드와 같은 UX입니다.
 // 기본값을 마스킹본으로 두는 이유도 동일합니다 — 원문은 검증이 필요할 때만 확인합니다.
-export function InPersonSttPreview({ segments }) {
+//
+// 요구사항: (1) 기본적으로 보이고 (2) 녹음 시작/중에는 원문 토글을 막아 마스킹 전 상태가 잘못
+// 노출되지 않게 하고 (3) 녹음이 끝나면 다시 조작 가능해지고 (4) 그 시점에 아코디언이 자동으로
+// 펼쳐져야 합니다. status가 'done'인지 아닌지로 key를 바꿔 CollapsibleSection을 다시 마운트시켜
+// defaultOpen을 그때그때 새로 적용합니다(이 컴포넌트는 비제어형이라 이 방법이 가장 단순합니다).
+//
+// 표시 텍스트는 현재 세션의 segments가 아니라 selectedCase.inpersonMemo(Masked)를 받습니다 —
+// 그 값은 (a) 녹음 중에는 세그먼트가 도착할 때마다 InPersonAnalysisPanel의 useEffect가 그대로
+// 반영해 실시간성을 잃지 않고, (b) 새로고침·다른 상담으로 갔다 온 뒤에는 core-api가 돌려주는
+// inperson_input_texts(_masked) 배열의 최신 스냅샷(consultationMemosFromRow/latestSnapshot)에서
+// 복원되므로, "저장된 가장 최근 결과"가 항상 이 카드에 보입니다. segments는 이번 세션에서
+// 변환 실패 구간이 있었는지(hasError) 표시하는 용도로만 남겨둡니다.
+export function InPersonSttPreview({ maskedText, rawText, hasError, status }) {
   const [showMasked, setShowMasked] = useState(true);
-  if (!segments.length) return null;
-  const hasError = segments.some((segment) => segment.error);
-  const text = buildTranscript(segments, showMasked ? 'maskedText' : 'text');
+  const isRecordingActive = status === 'connecting' || status === 'recording';
+  const text = showMasked ? maskedText : rawText;
   return (
-    <CollapsibleSection icon={EyeOff} title="개인정보 마스크 결과">
+    <CollapsibleSection
+      key={status === 'done' ? 'inperson-stt-open' : 'inperson-stt-collapsed'}
+      icon={EyeOff}
+      title="개인정보 마스크 결과"
+      defaultOpen={status === 'done'}
+    >
       <div className="resultCard sttReferenceCard">
         <div className="segmented compactSegmented">
-          <button type="button" className={showMasked ? 'active' : ''} onClick={() => setShowMasked(true)}>개인정보 가림</button>
-          <button type="button" className={!showMasked ? 'active' : ''} onClick={() => setShowMasked(false)}>원문</button>
+          <button type="button" className={showMasked ? 'active' : ''} disabled={isRecordingActive} onClick={() => setShowMasked(true)}>개인정보 가림</button>
+          <button type="button" className={!showMasked ? 'active' : ''} disabled={isRecordingActive} onClick={() => setShowMasked(false)}>원문</button>
         </div>
-        {!showMasked ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
+        {isRecordingActive ? (
+          <p className="helperText">녹음이 끝나면 원문 확인 등 조작이 가능합니다.</p>
+        ) : !showMasked ? (
+          <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p>
+        ) : null}
         <p className="sttPreviewText">{text || '녹음 결과가 없습니다.'}</p>
         {hasError ? <p className="helperText">일부 구간은 변환에 실패해 메모에서 제외되었습니다.</p> : null}
       </div>
@@ -187,9 +203,18 @@ export function InPersonAnalysisPanel({
                 onStart={handleStartClick}
                 onStop={onStopInPersonRecording}
               />
-              {/* "개인정보 가림"/"원문" 토글은 녹음 종료 후 결과만 보여달라는 요구에 맞춰
-                  status === 'done'일 때만 렌더링합니다(위 실시간 메모와는 별개 요구사항). */}
-              {status === 'done' ? <InPersonSttPreview segments={segments} /> : null}
+              {/* 개인정보 마스크 결과는 기본적으로 보이되, 녹음 중에는 토글이 비활성화되고
+                  녹음이 끝나면 다시 조작 가능해지면서 아코디언이 자동으로 펼쳐집니다
+                  (구체적인 활성/펼침 제어는 InPersonSttPreview 내부에서 status로 처리).
+                  텍스트는 selectedCase에서 가져와 — 이 사건에 저장된 가장 최근 결과를 보여줍니다. */}
+              {hasCase ? (
+                <InPersonSttPreview
+                  maskedText={selectedCase?.inpersonMemoMasked || ''}
+                  rawText={selectedCase?.inpersonMemo || ''}
+                  hasError={segments.some((segment) => segment.error)}
+                  status={status}
+                />
+              ) : null}
             </div>
             <RealtimeMemoCard
               selectedCase={selectedCase}
