@@ -183,7 +183,7 @@ function buildLawyerDocumentCases(reviews = [], consultations = []) {
   return [...mergedReviewCases, ...remainingConsultations];
 }
 
-function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDecision, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, focusedReviewCaseNo }) {
+function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDecision, onGoToDashboard, activeView, currentUser, onUpdateProfile, notifications, onReadNotifications, onDeleteNotification, onOpenNotification, onNotify, onAnalysisSaved, focusedReviewCaseNo }) {
   const [filter, setFilter] = useState(statusAll);
   const [logs, setLogs] = useState([]);
   const [activeReview, setActiveReview] = useState(null);
@@ -296,7 +296,10 @@ function LawyerDashboard({ reviews, setReviews, consultations = [], onReviewDeci
     // 분석 검토 요청(reviews)을 거친 사건뿐 아니라, 서식만 먼저 제출된 사건까지 합쳐둔
     // documentReviewCases를 그대로 넘깁니다. 여기서 빠뜨리면 변호사 쪽 법률·판례 화면에서
     // 그 사건 자체를 CasePicker에서 고를 수 없게 됩니다.
-    return <UtilityPanel view={activeView} role="lawyer" currentUser={currentUser} onUpdateProfile={onUpdateProfile} consultations={documentReviewCases} onUpdateConsultation={() => {}} onCreateConsultation={() => {}} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} />;
+    // onAnalysisSaved: 변호사가 '법령·판례' 화면에서 담은 자료를 분석 행
+    // (recommendation_json)에 저장할 때 씁니다. 이 prop이 없으면 화면은 뜨지만
+    // 저장 버튼이 동작하지 않습니다 — 상담원 경로에만 연결돼 있었습니다.
+    return <UtilityPanel view={activeView} role="lawyer" currentUser={currentUser} onUpdateProfile={onUpdateProfile} consultations={documentReviewCases} onUpdateConsultation={() => {}} onCreateConsultation={() => {}} onGoToDashboard={onGoToDashboard} notifications={notifications} onReadNotifications={onReadNotifications} onDeleteNotification={onDeleteNotification} onOpenNotification={onOpenNotification} onNotify={onNotify} onAnalysisSaved={onAnalysisSaved} />;
   }
   // 법률구조 최종 검토는 다른 업무 화면(실시간 상담 분석·서식 생성 등)과 같은 '화면 전환' 방식입니다.
   // 예전엔 대시보드 위에 반투명 배경 모달로 덮어 띄웠지만, 상단 네비게이션 바가 그대로 보이는
@@ -937,6 +940,10 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   const selectedDecision = hitlDecisions.find((item) => item.key === decision);
   const analysis = review.analysis || {};
   const adoptedItems = formatAnalysisList(analysis.adoptedItems, '상담원이 채택한 검토 반영 항목 없음');
+  // 법령·판례 화면에서 담아 저장한 자료(recommendation_json.adopted).
+  const adoptedReferences = Array.isArray(analysis.recommendation?.adopted)
+    ? analysis.recommendation.adopted
+    : [];
   const timelineItems = analysis.timeline?.length
     ? formatAnalysisList(analysis.timeline)
     : [];
@@ -1139,6 +1146,20 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
 
         <CollapsibleSection className="hitlSection" id="hitlSectionEvidence" icon={Scale} title="검토 근거" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionEvidence'); if (nextOpen) markSectionViewed('hitlSectionEvidence'); }}>
           <div className="resultCard lawyerEvidenceBundle">
+            {/* 변호사가 '법령·판례' 화면에서 담아 저장한 자료입니다. 그 화면은 검색을
+                하러 들어가는 곳이라, 검토 중에 무엇을 근거로 삼았는지 확인하려면
+                여기 사건 화면에 같이 보여야 합니다. */}
+            <div>
+              <strong>검토한 법령·판례</strong>
+              {adoptedReferences.length
+                ? adoptedReferences.map((item) => (
+                  <span key={item.id}>
+                    [{item.type === 'precedent' ? '판례' : '법령'}] {item.title}
+                    {item.reason ? ` · ${item.reason}` : ''}
+                  </span>
+                ))
+                : <span>담아둔 법령·판례 없음</span>}
+            </div>
             <div>
               <strong>상담원 채택 항목</strong>
               {adoptedItems.map((item) => <span key={typeof item === 'string' ? item : item.text}>{typeof item === 'string' ? item : item.text}</span>)}
