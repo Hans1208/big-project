@@ -5626,6 +5626,9 @@ textarea:focus-visible,
   font-size: var(--fs-sm);
   font-weight: 800;
   line-height: 1;
+  /* 라벨 줄 높이는 사건 번호·작성 시간(아이콘/배지 없는 일반 텍스트, 13px)이 기준입니다.
+     상담받은 사람만 아이콘+배지 때문에 커지지 않도록 아래에서 그 아이콘·배지 크기를
+     줄여 맞춥니다(이 span 자체에 min-height를 걸어 다른 칸을 늘리는 방식은 쓰지 않습니다). */
 }
 
 .analysisCaseMetaEdit > input {
@@ -11325,6 +11328,18 @@ a:focus-visible,
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+/* 한글은 line-height:1이어도 글자 자체의 실제 렌더링 높이가 그보다 훨씬 크게 잡혀(flex
+   컨텍스트 안에서 특히), 라벨 텍스트가 아이콘·배지보다 훨씬 큰 줄 높이를 차지하고 있었습니다.
+   height + overflow:hidden으로 사건 번호·작성 시간과 같은 13px 줄 높이로 고정합니다. */
+.realtimeRequiredNameFieldLabelText {
+  display: inline-flex;
+  align-items: center;
+  height: 13px;
+  overflow: hidden;
+  line-height: 1;
 }
 
 .realtimeRequiredNameField em {
@@ -11332,12 +11347,18 @@ a:focus-visible,
      주의 표시에 쓰는 warn(주황) 톤으로 맞춰 전체 색감과 자연스럽게 어울리게 합니다. */
   display: inline-flex;
   align-items: center;
-  min-height: 20px;
+  /* 사건 번호·작성 시간의 라벨 줄(13px)에 맞추려고 낮췄습니다 — 이 배지가 라벨 줄 중 가장
+     키가 커서 전체 줄 높이를 밀어올리고 있었습니다. min-height는 한글 폰트의 실제 줄 높이가
+     line-height:1 지정보다 커서 안 먹혔고(24px로 그대로 유지됨), height + overflow:hidden으로
+     강제해야 실제로 13px로 줄어듭니다. */
+  height: 13px;
+  overflow: hidden;
   padding: 0 8px;
   border-radius: var(--r-pill);
   background: var(--warn-soft);
   color: var(--warn-text);
   font-size: 11px;
+  line-height: 1;
   font-style: normal;
   font-weight: 800;
 }
@@ -13041,7 +13062,9 @@ table.dataTable td .reviewActionButton {
 }
 
 .analysisPanel .analysisCaseMeta {
-  grid-template-columns: minmax(150px, 0.9fr) minmax(260px, 1.45fr) minmax(230px, 1.2fr) minmax(170px, 0.9fr);
+  /* 사건번호 0.9→0.45fr(절반), 상담받은 사람 1.45→1.16fr(4/5), 작성 시간 0.9→0.6fr(2/3)로
+     줄이고, 상담 제목은 그대로 1.2fr로 둬서 나머지 세 칸이 내준 폭을 자연히 흡수합니다. */
+  grid-template-columns: minmax(150px, 0.45fr) minmax(260px, 1.16fr) minmax(230px, 1.2fr) minmax(170px, 0.6fr);
   align-items: stretch;
 }
 
@@ -13051,9 +13074,57 @@ table.dataTable td .reviewActionButton {
   min-height: 74px;
 }
 
+/* 네 칸 중 하나(상담받은 사람)가 안내 문구 때문에 더 길어지면 align-items:stretch로
+   나머지 칸도 같은 높이로 늘어납니다. .analysisCaseMetaEdit(상담 제목 등 입력칸)는 이미
+   align-content:start라 내용이 위에 붙지만, 사건 번호·작성 시간이 쓰는 일반 span은
+   grid 기본값(normal→stretch)이 남는 높이를 값(strong) 쪽에 그대로 늘려버려 라벨-값
+   간격이 입력칸 쪽과 달라 보였습니다. 여기도 위쪽 기준으로 맞춥니다. */
+.analysisPanel .analysisCaseMeta > span {
+  align-content: start;
+  align-items: start;
+  /* 라벨 줄이 <span>이 아니라 그냥 텍스트 노드(예: "작성 시간 ")라 .analysisCaseMetaEdit > span의
+     line-height:1 같은 압축 지정을 받지 못해, 같은 gap:5px인데도 실제로는 상담 제목 쪽보다
+     더 벌어져 보였습니다. 첫 줄(라벨) 텍스트 노드에 같은 line-height를 적용합니다. */
+  line-height: 1;
+}
+
 .analysisPanel .analysisCaseMetaEdit > input,
 .analysisPanel .analysisCaseMetaEdit > textarea {
   max-width: 100%;
+}
+
+/* 입력칸이 박스 배경(--surface-subtle)과 같은 투명색이라 경계가 잘 안 보였습니다.
+   박스보다 아주 살짝 진하게 넣어 입력 영역이 눈에 띄게 합니다(10%는 너무 진해서 4%로
+   낮춤 — 진할수록 입력칸 위 여백이 실제로는 같은데도 더 좁아 보이는 착시가 생겼습니다).
+   상담받은 사람이 비어있을 때(.missing)는 별도의 경고색 배경을 쓰므로 여기서는 건드리지 않습니다. */
+.analysisPanel .analysisCaseMetaEdit:not(.missing) > input {
+  background: color-mix(in srgb, var(--surface-subtle) 96%, black 4%);
+  border-radius: var(--r-control);
+}
+
+/* 상담받은 사람이 비어있을 때 안내 문구를 입력칸 placeholder 대신 '필수 입력' 배지 옆에
+   작게 붙여 보여줍니다. .realtimeRequiredNameField small(경고색·줄바꿈·margin-top 8px,
+   AI가 채운 이름 확인 문구용)이 이 small에도 걸려 색이 바뀌고 아래로 밀려 보였던 것을
+   조상 클래스까지 포함해 specificity를 올려 바로잡습니다. */
+.realtimeRequiredNameField .analysisCaseMetaHint {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1;
+  /* '필수 입력' 옆 한 줄에 붙는 짧은 안내라, 줄바꿈되면 높이가 늘어나 badge와 세로 위치가
+     어긋나 보입니다. 한 줄로 고정하되, 폭이 좁아 다 못 들어가면(옆 칸을 침범하는 대신)
+     줄임표로 자연스럽게 잘리게 합니다. min-width:0은 flex 아이템 기본값(auto)이 줄어들지
+     못하게 막는 것을 풀어줘야 overflow:hidden이 실제로 동작합니다. 높이도 아이콘·배지와
+     같은 13px로 고정해 라벨 줄 전체 높이를 맞춥니다. */
+  height: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .analysisPanel .analysisControlBar {

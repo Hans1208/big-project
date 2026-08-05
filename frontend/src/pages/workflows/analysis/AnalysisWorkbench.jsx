@@ -822,10 +822,15 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
             <label className={`analysisCaseMetaEdit realtimeRequiredNameField${selectedCase.name ? '' : ' missing'}`}>
               <span>
                 {!selectedCase.name ? <AlertTriangle size={13} strokeWidth={2.4} className="realtimeRequiredNameFieldIcon" aria-hidden="true" /> : null}
-                상담받은 사람
+                <span className="realtimeRequiredNameFieldLabelText">상담받은 사람</span>
                 {selectedCase.name
                   ? (selectedCase.nameSource === 'ai' ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em> : null)
-                  : <em>필수 입력</em>}
+                  : (
+                    <>
+                      <em>필수 입력</em>
+                      <small className="analysisCaseMetaHint">이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요</small>
+                    </>
+                  )}
               </span>
               <input
                 value={selectedCase.name || ''}
@@ -833,7 +838,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                   name: event.target.value,
                   nameSource: 'counselor',
                 })}
-                placeholder="이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요"
+                placeholder="이름 입력"
               />
               {selectedCase.name && selectedCase.nameSource === 'ai'
                 ? <small>통화 내용에서 찾은 이름입니다. 잘못 들었을 수 있으니 맞는지 봐주세요.</small>
