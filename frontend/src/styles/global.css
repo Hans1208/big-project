@@ -15394,11 +15394,20 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 
 .uploadPanel .uploadWorkCard {
   display: grid;
-  gap: 18px;
+  gap: 12px;
   border: 1px solid var(--border) !important;
   border-radius: var(--r-panel-lg) !important;
   background: var(--surface) !important;
   box-shadow: var(--shadow-soft) !important;
+}
+
+/* 탭·사건 선택·사건 정보·상태 줄·법률구조 확인·파일 영역 각각이 다른 화면에서 쓰던
+   margin-top/bottom(18~22px)을 그대로 들고 와서, 위 grid gap(12px)에 그 여백까지 더해져
+   구획 사이가 28~58px씩 벌어져 보였습니다. 이 카드 안에서는 grid gap만으로 간격을
+   맞추도록 직계 자식의 세로 margin을 모두 지웁니다. */
+.uploadPanel .uploadWorkCard > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 /* 실시간 상담의 사건 정보 박스와 같은 규칙(기본 .analysisCaseMeta의 auto-fit)을 그대로
