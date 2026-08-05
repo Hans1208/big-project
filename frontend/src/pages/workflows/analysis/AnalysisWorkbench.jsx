@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck, ClipboardList, Info, Check, PhoneCall, FileSearch, Paperclip, EyeOff, BadgeCheck,
-  Scale, ListChecks, Sparkles, Clock, Inbox, CheckCircle2, AlertTriangle,
+  Scale, ListChecks, Sparkles, Clock, Inbox, CheckCircle2, FolderOpen,
 } from 'lucide-react';
 import { today } from '../../../constants.jsx';
 import { useToast } from '../../../components/feedback.jsx';
@@ -37,6 +37,8 @@ import { reviewActionTone, checklistItemNote, checklistItemFlag } from '../share
 import { extractionStatusLabel, buildAttachmentLinkMetadata } from '../shared/attachmentHelpers.js';
 import { CasePicker } from '../components/CasePicker.jsx';
 import { ConsultationChannelTabs } from '../components/ConsultationChannelTabs.jsx';
+import { CounselorFlowStage } from '../components/CounselorFlowStage.jsx';
+import { ConsultationCaseMeta } from '../components/ConsultationCaseMeta.jsx';
 import { SummaryBulletList } from '../components/SummaryBulletList.jsx';
 import { RecommendedFormsPanel } from './RecommendedFormsPanel.jsx';
 import { ReliefReviewDetailTabs } from '../relief/ReliefReviewDetailTabs.jsx';
@@ -134,7 +136,7 @@ async function requestMissingDataCandidate(selectedCase, analysis, options = {})
     },
   }, 'missing');
 }
-export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, onSaveTranscript, currentUser, onGoToDashboard, onOpenDraft, focusedConsultationId, analysisRuns = {}, onStartAnalysis }) {
+export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, onSaveTranscript, currentUser, onGoToDashboard, onOpenDraft, onGoToUpload, focusedConsultationId, analysisRuns = {}, onStartAnalysis }) {
   const [selectedId, setSelectedId] = useState(focusedConsultationId || caseOptions(consultations)[0].id);
   const [analyzed, setAnalyzed] = useState(false);
   const selectedCase = consultations.find((item) => String(item.id) === String(selectedId));
@@ -809,52 +811,18 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         <WorkPageHeader
           title="실시간 상담"
           description="통화를 시작하고 메모한 뒤, 상담이 끝나면 분석하세요."
+          meta={<CounselorFlowStage current="realtime" onNavigate={onGoToUpload ? () => onGoToUpload() : undefined} />}
         />
         <div className="inlineControls analysisCommandBar">
-          <CasePicker consultations={consultations} value={selectedId} onChange={selectCase} />
+          <label className="field uploadCaseSelector">
+            <span><span className="fieldLabelWithIcon"><FolderOpen size={14} strokeWidth={2.4} aria-hidden="true" /> 상담 선택</span></span>
+            <CasePicker consultations={consultations} value={selectedId} onChange={selectCase} />
+          </label>
           <button type="button" className="quickStartButton" onClick={startQuickRealtimeSession} disabled={isStartingQuickSession}>
             <PhoneCall size={15} strokeWidth={2.4} /> {isStartingQuickSession ? '준비하는 중...' : '새 상담 준비'}
           </button>
         </div>
-        {selectedCase ? (
-          <div className="analysisCaseMeta">
-            <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
-            <label className={`analysisCaseMetaEdit realtimeRequiredNameField${selectedCase.name ? '' : ' missing'}`}>
-              <span>
-                {!selectedCase.name ? <AlertTriangle size={13} strokeWidth={2.4} className="realtimeRequiredNameFieldIcon" aria-hidden="true" /> : null}
-                <span className="realtimeRequiredNameFieldLabelText">상담받은 사람</span>
-                {selectedCase.name
-                  ? (selectedCase.nameSource === 'ai' ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em> : null)
-                  : (
-                    <>
-                      <em>필수 입력</em>
-                      <small className="analysisCaseMetaHint">이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요</small>
-                    </>
-                  )}
-              </span>
-              <input
-                value={selectedCase.name || ''}
-                onChange={(event) => onUpdateConsultation(selectedCase.id, {
-                  name: event.target.value,
-                  nameSource: 'counselor',
-                })}
-                placeholder="이름 입력"
-              />
-              {selectedCase.name && selectedCase.nameSource === 'ai'
-                ? <small>통화 내용에서 찾은 이름입니다. 잘못 들었을 수 있으니 맞는지 봐주세요.</small>
-                : null}
-            </label>
-            <label className="analysisCaseMetaEdit">
-              <span>상담 제목</span>
-              <input
-                value={selectedCase.title || ''}
-                onChange={(event) => onUpdateConsultation(selectedCase.id, { title: event.target.value })}
-                placeholder="상담 제목 입력"
-              />
-            </label>
-            <span>작성 시간 <strong>{selectedCase.date || '-'}{selectedCase.registeredTime ? ` ${selectedCase.registeredTime}` : ''}</strong></span>
-          </div>
-        ) : null}
+        <ConsultationCaseMeta selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
         <ConsultationChannelTabs
           selectedCase={selectedCase}
           onUpdateConsultation={onUpdateConsultation}
@@ -890,7 +858,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                 {transcriptButtonContent}
               </button>
               {isTranscriptConverting ? (
-                <small className="callAnalyzeCaption">변환 중... {formatElapsed(transcriptConvertingElapsedSec)}</small>
+                <small className="callAnalyzeCaption">잠시만 기다려주세요... {formatElapsed(transcriptConvertingElapsedSec)}</small>
               ) : showEmptyTranscriptCaption ? (
                 <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small>
               ) : null}

@@ -24,7 +24,9 @@ export function CounselorFlowStage({ current = 'realtime', onNavigate }) {
 
   return (
     <section className="flowStageBanner" aria-label="상담원 업무 단계">
-      <div className="flowStageCopy">
+      {/* 상담 자료 올리기 안내 카드 옆으로 옮기면서 자리가 좁아져, 왼쪽 안내 문구 박스는
+          잠시 주석 처리합니다(단계 카드만으로도 지금 위치를 알 수 있어 없어도 됨). */}
+      {/* <div className="flowStageCopy">
         <span className="flowStageEyebrow">상담원 업무 흐름</span>
         <strong>{current === 'upload' ? '통화 후 자료를 정리합니다.' : '통화 중 바로 기록합니다.'}</strong>
         <p>
@@ -32,7 +34,7 @@ export function CounselorFlowStage({ current = 'realtime', onNavigate }) {
             ? '녹취·이미지·문서를 추가하고 저장하면, 오른쪽 2단계에서 바로 변호사 검토로 전달할 수 있어요.'
             : '통화를 시작하고 메모를 남기면, 상담이 끝난 뒤 다음 단계(자료 올리기)로 이어집니다.'}
         </p>
-      </div>
+      </div> */}
       <div className="flowStageSteps">
         {stages.map((stage, index) => {
           const Icon = stage.icon;
