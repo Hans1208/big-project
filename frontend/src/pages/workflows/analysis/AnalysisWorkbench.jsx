@@ -421,7 +421,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   // 옮겨도 끝까지 진행되고, 끝나면 알림이 뜹니다. 이 화면은 시작만 시키고, 결과는 상담 객체에
   // 실려 돌아오는 것을 아래 effect가 받아 그립니다.
   const startAnalysis = async () => {
-    if (!selectedCase || isAnalyzing) return;
+    if (!selectedCase || isAnalyzing || !isTranscriptSaved) return;
     setAiTaskMessage('');
     const result = await onStartAnalysis(selectedCase);
     if (result?.ok || result?.alreadyRunning) return;
@@ -807,7 +807,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
               type="button"
               className={`callAnalyzeButton${analyzed ? ' done' : ''}`}
               onClick={startAnalysis}
-              disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing'}
+              disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing' || !isTranscriptSaved}
             >
               {isAnalyzing ? (
                 // 몇 분씩 걸리는 작업이라 경과 시간을 같이 보여줍니다 — 없으면 멈춘 것처럼 보입니다.
@@ -817,7 +817,13 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
               ) : '분석 시작'}
             </button>
             {/* 툴팁이 아니라 항상 보이는 캡션으로 둬서, 왜 눌리지 않는지 바로 알 수 있게 합니다. */}
-            {callStatus === 'ongoing' ? <small className="callAnalyzeCaption">통화 종료 후 분석 가능</small> : null}
+            {/* 분석은 DB에 저장된 상담 내용을 대상으로 돌기 때문에, 저장 전 상태(내용 없음/미저장/저장 중)에서는
+                막아둡니다 — 방금 입력했지만 저장 안 한 메모가 분석에 반영되지 않아 헷갈리는 상황을 막기 위함입니다. */}
+            {callStatus === 'ongoing' ? (
+              <small className="callAnalyzeCaption">통화 종료 후 분석 가능</small>
+            ) : !isTranscriptSaved && !isAnalyzing ? (
+              <small className="callAnalyzeCaption">상담 내용을 저장한 뒤 분석할 수 있습니다</small>
+            ) : null}
           </div>
         </div>
         <ConsultationChannelTabs
@@ -1035,9 +1041,22 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         {!analyzed ? (
           <div className="emptyState">
             <ClipboardList size={22} strokeWidth={2.2} aria-hidden="true" />
-            <p>{callStatus === 'ongoing' ? '통화가 끝나면 분석을 시작할 수 있습니다.' : ((selectedCase?.memo || '').trim() || (selectedCase?.inpersonMemo || '').trim()) ? '메모 작성 완료 · 분석을 시작하세요.' : '메모를 작성하면 분석을 시작할 수 있습니다.'}</p>
+            <p>
+              {callStatus === 'ongoing'
+                ? '통화가 끝나면 분석을 시작할 수 있습니다.'
+                : !hasTranscriptContent
+                  ? '메모를 작성하면 분석을 시작할 수 있습니다.'
+                  : !isTranscriptSaved
+                    ? '상담 내용을 저장한 뒤 분석을 시작하세요.'
+                    : '메모 작성 완료 · 분석을 시작하세요.'}
+            </p>
             <span className="emptyStateHint">현재 메모를 바탕으로 사건 유형과 확인할 자료를 정리합니다.</span>
-            <button type="button" className="emptyStateAction callAnalyzeButton" onClick={startAnalysis} disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing'}>
+            <button
+              type="button"
+              className="emptyStateAction callAnalyzeButton"
+              onClick={startAnalysis}
+              disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing' || !isTranscriptSaved}
+            >
               {isAnalyzing ? `분석 중... ${formatElapsed(analysisElapsedSec)}` : '분석 시작'}
             </button>
           </div>

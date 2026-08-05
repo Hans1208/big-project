@@ -14571,6 +14571,15 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 .analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton:active:not(:disabled) {
   transform: scale(0.98);
 }
+/* 저장 전이라 눌러도 안 되는 상태는 "상담 저장" 버튼의 비활성 회색과 같은 톤으로 맞춥니다 —
+   기본(파란)·done(초록) 배경이 !important라 :disabled 하나만으로는 안 눌려 함께 무효화합니다. */
+.analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton:disabled,
+.analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton.done:disabled {
+  background: var(--surface-muted) !important;
+  color: var(--text-sub) !important;
+  border-color: var(--border) !important;
+  cursor: not-allowed;
+}
 .analysisPanel .callAnalyzeButtonGroup .callAnalyzeButton.done {
   background: var(--success-solid) !important;
 }
