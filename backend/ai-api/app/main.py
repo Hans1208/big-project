@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai.stt.multimodal import get_whisper_model
-from app.routers import consult, forms, statutes
+from app.routers import consult, forms, precedents, statutes
 
 app = FastAPI(title="AI API")
 
@@ -35,6 +35,7 @@ app.add_middleware(
 app.include_router(consult.router)
 app.include_router(forms.router)
 app.include_router(statutes.router)
+app.include_router(precedents.router)
 
 
 @app.get("/health")
