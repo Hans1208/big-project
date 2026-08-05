@@ -2,22 +2,54 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ClipboardList, CheckCircle2, Gavel, BookOpen } from 'lucide-react';
 import { WorkPageHeader, InlineEmptyNotice, friendlyErrorMessage } from '../../../components/common.jsx';
 import { searchReferenceCandidates } from '../../../services/legalAidApi.js';
-import { recommendStatutes, searchStatutes } from '../../../services/aiApiClient.js';
+import {
+  recommendPrecedents, recommendStatutes, searchPrecedents, searchStatutes,
+} from '../../../services/aiApiClient.js';
 import { caseOptions } from '../shared/caseHelpers.js';
 import { CasePicker } from '../components/CasePicker.jsx';
 
-// 법령 검색을 한 번에 몇 건씩 받아올지. 추천은 상위 몇 건만 의미가 있어 서버가
-// 따로 정하고(RECOMMEND_TOP_K), 이 값은 '직접 검색'에만 씁니다.
-const STATUTE_PAGE_SIZE = 20;
+// 한 번에 몇 건씩 받아올지. 추천은 상위 몇 건만 의미가 있어 서버가 따로
+// 정하고(RECOMMEND_TOP_K), 이 값은 '직접 검색'에만 씁니다.
+const RAG_PAGE_SIZE = 20;
 
-// 법령 API의 시행일은 '20260317' 형태입니다. 그대로 두면 날짜로 안 읽힙니다.
-function formatStatuteDate(value) {
+// 법령 API의 시행일은 '20260317', 판례 API의 선고일도 같은 8자리 형태입니다.
+// 그대로 두면 날짜로 안 읽힙니다.
+function formatLegalDate(value) {
   const digits = String(value || '').replace(/\D/g, '');
   if (digits.length !== 8) return value || '';
   return `${digits.slice(0, 4)}. ${Number(digits.slice(4, 6))}. ${Number(digits.slice(6, 8))}.`;
 }
 
-export function SearchWorkbench({ consultations }) {
+// 탭별로 다른 것은 '어느 API를 부르는가'와 화면 문구뿐입니다. 나머지 흐름
+// (추천 자동 실행, 더 보기, 카드 그리기)은 같아서 한 벌로 씁니다.
+const RAG_TABS = {
+  statute: {
+    label: '법령',
+    search: ({ query, topK }) => searchStatutes({ query, topK }),
+    recommend: (analysis, options) => recommendStatutes(analysis, options),
+    dateLabel: '시행',
+    bodyToggleLabel: '조문 전문 보기',
+    moreLabel: `조문 ${RAG_PAGE_SIZE}건 더 보기`,
+    countMessage: (n) => `조문 ${n}건 · 국가법령정보센터`,
+    emptyRecommend: '이 상담에 바로 쓸 조문을 찾지 못했습니다 · 직접 검색으로 찾아보세요',
+    emptySearch: '해당하는 조문을 찾지 못했습니다 · 검색어를 바꿔보세요',
+    errorMessage: '법령을 불러오지 못했습니다',
+  },
+  precedent: {
+    label: '판례',
+    search: ({ query, topK }) => searchPrecedents({ query, topK }),
+    recommend: (analysis, options) => recommendPrecedents(analysis, options),
+    dateLabel: '선고',
+    bodyToggleLabel: '판시사항 전문 보기',
+    moreLabel: `판례 ${RAG_PAGE_SIZE}건 더 보기`,
+    countMessage: (n) => `판례 ${n}건 · 국가법령정보센터`,
+    emptyRecommend: '이 상담에 참고할 판례를 찾지 못했습니다 · 직접 검색으로 찾아보세요',
+    emptySearch: '해당하는 판례를 찾지 못했습니다 · 검색어를 바꿔보세요',
+    errorMessage: '판례를 불러오지 못했습니다',
+  },
+};
+
+export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
   const [caseId, setCaseId] = useState(caseOptions(consultations)[0].id);
   const [referenceType, setReferenceType] = useState('precedent');
   const [mode, setMode] = useState('추천');
@@ -25,28 +57,33 @@ export function SearchWorkbench({ consultations }) {
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState([]);
   const [referenceMessage, setReferenceMessage] = useState('');
+  const [saving, setSaving] = useState(false);
   const label = referenceType === 'precedent' ? '판례' : referenceType === 'similar' ? '유사 상담사례' : '법령';
   const selectedCase = consultations.find((item) => String(item.id) === String(caseId));
 
-  // 법령 탭만 실제 검색에 연결돼 있습니다. 판례·유사 상담사례는 아직 색인이 없어
+  // 법령·판례 탭은 실제 색인을 검색합니다. 유사 상담사례는 아직 색인이 없어
   // 예시 목록을 그대로 씁니다 — 어느 쪽을 보고 있는지 화면에 밝혀둡니다.
-  const [statuteResults, setStatuteResults] = useState([]);
-  const [statuteLoading, setStatuteLoading] = useState(false);
+  const [ragResults, setRagResults] = useState([]);
+  const [ragLoading, setRagLoading] = useState(false);
   // 전문을 펼쳐 둔 조문. 조문은 항이 여러 개라 접힌 채로는 요건을 확인할 수 없고,
   // 그렇다고 전부 펼쳐두면 목록에서 훑어보며 고를 수가 없습니다.
   const [expandedIds, setExpandedIds] = useState([]);
   // 한 번에 받아올 조문 수. '더 보기'로 늘립니다 — 5건만 보여주면 찾는 조문이
   // 6위였을 때 상담원이 "없다"고 결론내게 됩니다.
-  const [statuteTopK, setStatuteTopK] = useState(STATUTE_PAGE_SIZE);
-  const [statuteExhausted, setStatuteExhausted] = useState(false);
-  const isStatuteTab = referenceType === 'statute';
+  const [ragTopK, setRagTopK] = useState(RAG_PAGE_SIZE);
+  const [ragExhausted, setRagExhausted] = useState(false);
+  const ragTab = RAG_TABS[referenceType] || null;
+  const isRagTab = Boolean(ragTab);
 
-  const results = isStatuteTab
-    ? statuteResults
+  const results = isRagTab
+    ? ragResults
     : (searched || mode === '추천'
       ? searchReferenceCandidates({ type: referenceType, query, caseType: selectedCase?.analysis?.caseType || selectedCase?.type })
       : []);
-  const selectedTitles = selected.map((item) => item.title);
+  // 제목이 아니라 id로 비교합니다. 판례는 사건명이 "양육비"처럼 청구 종류만
+  // 적혀 있어 서로 다른 사건이 같은 제목을 갖는데, 제목으로 비교하면 하나를
+  // 고를 때 같은 이름의 다른 판례까지 전부 '선택됨'으로 표시됩니다.
+  const selectedIds = selected.map((item) => item.id);
 
   // 검색 결과 한 건을 화면 카드가 기대하는 모양({id, title, source})으로 맞춥니다.
   // 조문 본문과 유사도는 추가 필드로 얹어, 카드가 쓸 수 있으면 쓰도록 합니다.
@@ -59,43 +96,54 @@ export function SearchWorkbench({ consultations }) {
     similarityPercent: row.similarity_percent ?? null,
     reason: row.reason || '',
     effectiveDate: row.effective_date || '',
+    // AI가 골라준 것인지(llm) 유사도 순으로 올라온 것인지(similarity). 담아서
+    // 저장할 때 함께 남겨, 나중에 'AI 추천을 채택한 것'과 '직접 찾은 것'을
+    // 구분할 수 있게 합니다.
+    selectedBy: row.selected_by || '',
   });
 
   // isCurrent: 응답이 도착했을 때도 이 요청이 여전히 최신인지 묻습니다. 상담을
   // 빠르게 넘기면 앞선 요청이 뒤늦게 도착해 새 상담의 결과를 덮어씁니다.
-  const runStatuteQuery = async (kind, topK = STATUTE_PAGE_SIZE, isCurrent = () => true) => {
-    setStatuteLoading(true);
+  const runRagQuery = async (kind, topK = RAG_PAGE_SIZE, isCurrent = () => true) => {
+    if (!ragTab) return;
+    setRagLoading(true);
     setSearched(true);
     try {
       const payload = kind === '추천'
-        ? await recommendStatutes({
+        ? await ragTab.recommend({
           caseType: selectedCase?.analysis?.caseType || selectedCase?.type || '',
           caseSubtype: selectedCase?.analysis?.caseSubtype || '',
           summary: selectedCase?.analysis?.summary || '',
           extractedJson: selectedCase?.analysis?.extractedJson || {},
         })
-        : await searchStatutes({ query, topK });
+        : await ragTab.search({ query, topK });
       if (!isCurrent()) return;
       const rows = (payload?.results || []).map(toReferenceItem);
-      setStatuteResults(rows);
-      setStatuteTopK(topK);
+      setRagResults(rows);
+      // 저장해 둔 자료를 되살릴 때는 원문이 없을 수 있습니다(원문을 함께 저장하기
+      // 전에 담아둔 것). 그 상태로 다시 저장하면 빈 원문이 그대로 다시 저장되므로,
+      // 검색 결과에 같은 항목이 있으면 원문을 채워 넣습니다.
+      setSelected((current) => current.map((item) => {
+        if (item.content) return item;
+        const found = rows.find((row) => row.id === item.id);
+        return found?.content ? { ...item, content: found.content } : item;
+      }));
+      setRagTopK(topK);
       setExpandedIds([]);   // 결과가 바뀌면 펼쳐둔 상태도 의미가 없습니다.
       // 더 청한 만큼 안 왔으면 색인에 더 없다는 뜻이라 '더 보기'를 감춥니다.
-      setStatuteExhausted(kind === '추천' || rows.length < topK);
+      setRagExhausted(kind === '추천' || rows.length < topK);
       // 추천이 0건인 것은 검색어 문제가 아닙니다. AI가 후보 30건을 훑고도 이
-      // 상담에 쓸 조문이 없다고 판단한 것이라, 억지로 채우지 않은 결과입니다.
+      // 상담에 쓸 것이 없다고 판단한 것이라, 억지로 채우지 않은 결과입니다.
       // (상담 내용이 아직 안 적힌 상담에서 실제로 이렇게 나옵니다.)
       setReferenceMessage(rows.length
-        ? `조문 ${rows.length}건 · 국가법령정보센터`
-        : kind === '추천'
-          ? '이 상담에 바로 쓸 조문을 찾지 못했습니다 · 직접 검색으로 찾아보세요'
-          : '해당하는 조문을 찾지 못했습니다 · 검색어를 바꿔보세요');
+        ? ragTab.countMessage(rows.length)
+        : kind === '추천' ? ragTab.emptyRecommend : ragTab.emptySearch);
     } catch (error) {
       if (!isCurrent()) return;
-      setStatuteResults([]);
-      setReferenceMessage(friendlyErrorMessage(error, '법령을 불러오지 못했습니다'));
+      setRagResults([]);
+      setReferenceMessage(friendlyErrorMessage(error, ragTab.errorMessage));
     } finally {
-      if (isCurrent()) setStatuteLoading(false);
+      if (isCurrent()) setRagLoading(false);
     }
   };
 
@@ -108,36 +156,111 @@ export function SearchWorkbench({ consultations }) {
   // 맞으면 다시 부르고, 아니면 남은 결과를 지웁니다.
   const latestRequest = useRef(0);
   useEffect(() => {
-    if (!isStatuteTab) {
-      setStatuteResults([]);
+    if (!isRagTab) {
+      setRagResults([]);
       return;
     }
     // 직접 검색 모드에서는 상담원이 넣은 검색어가 기준이라 상담을 바꿔도
     // 결과를 건드리지 않습니다. 지우면 방금 찾아둔 조문이 사라집니다.
     if (mode !== '추천') return;
     if (!selectedCase?.analysis?.summary) {
-      setStatuteResults([]);
+      setRagResults([]);
       setReferenceMessage('이 상담은 아직 분석 전입니다 · 실시간 분석을 먼저 실행해 주세요');
       return;
     }
     // 상담을 빠르게 넘기면 앞선 요청이 뒤늦게 도착해 새 상담 화면에 옛 결과를
     // 덮어쓸 수 있습니다. 가장 마지막 요청만 반영합니다.
     const ticket = ++latestRequest.current;
-    runStatuteQuery('추천', undefined, () => ticket === latestRequest.current);
-    // runStatuteQuery는 매 렌더마다 새로 만들어지므로 의존성에 넣지 않습니다.
+    runRagQuery('추천', undefined, () => ticket === latestRequest.current);
+    // runRagQuery는 매 렌더마다 새로 만들어지므로 의존성에 넣지 않습니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId, referenceType, mode]);
 
+  // 이 상담에 이미 저장해 둔 자료를 담은 목록에 되살립니다. 저장했는데 화면을
+  // 다시 열면 비어 있으면, 상담원은 저장이 안 된 줄 알고 다시 고르게 됩니다.
+  useEffect(() => {
+    const adopted = selectedCase?.analysis?.recommendation?.adopted;
+    setSelected(Array.isArray(adopted)
+      ? adopted.map((item) => ({
+        id: item.id,
+        title: item.title,
+        source: item.source || '',
+        effectiveDate: item.date || '',
+        reason: item.reason || '',
+        content: item.content || '',
+        referenceType: item.type || 'statute',
+        referenceLabel: item.type === 'precedent' ? '판례' : '법령',
+        selectedBy: item.selected_by || 'manual',
+      }))
+      : []);
+    // 상담이 바뀔 때만 되살립니다. selected를 의존성에 넣으면 고르는 즉시 되돌아갑니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId]);
+
   const runAiReferenceSearch = () => {
-    if (isStatuteTab) {
-      runStatuteQuery('추천');
+    if (isRagTab) {
+      runRagQuery('추천');
       return;
     }
     setSearched(true);
-    setReferenceMessage('추천 후보 표시 · 판례·유사사례는 아직 예시 목록입니다');
+    setReferenceMessage('추천 후보 표시 · 유사 상담사례는 아직 예시 목록입니다');
   };
+  // 담은 자료에는 어느 탭에서 왔는지를 함께 남깁니다. 나중에 서식 작성 화면이
+  // 법령과 판례를 구분해 쓸 수 있어야 하고, 저장된 뒤에는 화면 상태가 없어서
+  // 항목만 보고는 구분할 방법이 없습니다.
   const adoptReference = (item) => {
-    setSelected((current) => current.some((value) => value.id === item.id) ? current : [...current, item]);
+    const tagged = { ...item, referenceType, referenceLabel: label };
+    setSelected((current) => (current.some((value) => value.id === item.id)
+      ? current.filter((value) => value.id !== item.id)   // 다시 누르면 뺍니다
+      : [...current, tagged]));
+  };
+
+  // 담은 자료를 분석 행(recommendation_json)에 저장합니다. 여기 저장해야 화면을
+  // 나가거나 다른 PC에서 열어도 남습니다 — 예전에는 이 화면 상태에만 있어서
+  // 탭만 바꿔도 사라졌습니다.
+  //
+  // selected_by를 같이 남깁니다. AI가 골라준 것을 그대로 채택했는지, 상담원이
+  // 직접 검색해 찾은 것인지가 HITL 근거로 남아야 하기 때문입니다.
+  const saveSelected = async () => {
+    if (!selectedCase) return;
+    if (!onAnalysisSaved) {
+      setReferenceMessage('저장 경로가 연결되지 않았습니다 · 관리자에게 알려주세요');
+      return;
+    }
+    setSaving(true);
+    try {
+      const adopted = selected.map((item) => ({
+        type: item.referenceType || 'statute',
+        id: item.id,
+        title: item.title,
+        source: item.source || '',
+        date: item.effectiveDate || '',
+        reason: item.reason || '',
+        // 본문도 같이 저장합니다. 제목과 근거만 남기면 나중에 '담은 자료'에서
+        // 조문·판시사항을 다시 읽을 수 없고, 읽으려면 검색 화면으로 돌아가
+        // 같은 것을 다시 찾아야 합니다. 상담 한 건에 담는 양이 많아야 열 건
+        // 안팎이라 저장 크기는 문제되지 않습니다.
+        content: item.content || '',
+        selected_by: item.selectedBy || 'manual',
+      }));
+      const analysis = {
+        ...selectedCase.analysis,
+        recommendation: { ...(selectedCase.analysis?.recommendation || {}), adopted },
+      };
+      const result = await onAnalysisSaved(selectedCase, analysis);
+      if (result?.ok) {
+        setReferenceMessage(result.synced === false
+          ? `${adopted.length}건 담음 · 이 브라우저에만 저장됐습니다`
+          : `${adopted.length}건을 이 상담에 저장했습니다`);
+        onNotify?.({ title: '검토 자료 저장', body: `${selectedCase.name || '상담'} · 법령·판례 ${adopted.length}건` });
+      } else {
+        setReferenceMessage(result?.message || '저장하지 못했습니다');
+      }
+    } catch (error) {
+      setReferenceMessage(friendlyErrorMessage(error, '저장하지 못했습니다'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -156,6 +279,8 @@ export function SearchWorkbench({ consultations }) {
             value={caseId}
             onChange={(nextCaseId) => {
               setCaseId(nextCaseId);
+              // 상담이 바뀌면 담은 자료도 그 상담 것으로 갈아끼웁니다.
+              // (아래 useEffect가 저장된 값을 다시 불러옵니다.)
               setSelected([]);
               setReferenceMessage('');
             }}
@@ -182,9 +307,10 @@ export function SearchWorkbench({ consultations }) {
                 key={item.key}
                 onClick={() => {
                   setReferenceType(item.key);
-                  setSelected([]);
+                  // 담은 자료는 지우지 않습니다. 법령과 판례를 함께 골라
+                  // 한 번에 저장해야 하는데, 탭을 옮길 때 비우면 그게 불가능합니다.
                   setSearched(mode === '추천');
-                  setStatuteResults([]);
+                  setRagResults([]);
                   setReferenceMessage('');
                 }}
               >
@@ -193,22 +319,29 @@ export function SearchWorkbench({ consultations }) {
             ))}
           </div>
           <div className="segmented referenceModeTabs">
-            {['추천', '직접 검색'].map((item) => <button className={mode === item ? 'active' : ''} type="button" key={item} onClick={() => { setMode(item); setSearched(item === '추천'); setStatuteResults([]); setReferenceMessage(''); }}>{item}</button>)}
+            {['추천', '직접 검색'].map((item) => <button className={mode === item ? 'active' : ''} type="button" key={item} onClick={() => { setMode(item); setSearched(item === '추천'); setRagResults([]); setReferenceMessage(''); }}>{item}</button>)}
           </div>
         </div>
         {mode === '직접 검색' ? (
           <div className="referenceSearchBox">
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`${label} 검색어`} />
-            <button type="button" disabled={statuteLoading}
-              onClick={() => (isStatuteTab ? runStatuteQuery('직접 검색') : setSearched(true))}>
-              {statuteLoading ? '검색 중…' : '검색'}
+            <button type="button" disabled={ragLoading}
+              onClick={() => (isRagTab ? runRagQuery('직접 검색') : setSearched(true))}>
+              {ragLoading ? '검색 중…' : '검색'}
             </button>
           </div>
         ) : null}
         <div className="referenceActionBar">
           <div>
             <strong>{mode === '추천' ? '상담 분석 기반 추천' : '직접 검색 결과 검토'}</strong>
-            <span>{selected.length ? `${selected.length}개 선택됨` : '검토에 쓸 후보 선택'}</span>
+            {/* 법령과 판례를 나눠 셉니다. 탭을 옮겨가며 담기 때문에, 지금 보고
+                있지 않은 탭에서 몇 건을 담았는지가 합계로만 보이면 알 수 없습니다. */}
+            <span>{selected.length
+              ? Object.entries(selected.reduce((acc, item) => {
+                const key = item.referenceLabel || '자료';
+                return { ...acc, [key]: (acc[key] || 0) + 1 };
+              }, {})).map(([key, n]) => `${key} ${n}건`).join(' · ')
+              : '검토에 쓸 후보 선택'}</span>
           </div>
           <div className="referenceActionButtons">
             {/* '추천' 모드에서는 사건을 고르는 순간 results가 이미 자동으로 채워져 있어
@@ -220,13 +353,10 @@ export function SearchWorkbench({ consultations }) {
             <button
               className="primaryButton compactAction"
               type="button"
-              // '반영 완료'라고 말했지만 실제로는 저장 없이 이 화면 상태에만 남아, 화면을
-              // 나가면 선택이 사라졌습니다(코치 피드백). 저장하지 않는다는 사실을 문구로
-              // 정확히 알립니다.
-              onClick={() => setReferenceMessage('이 화면에 임시로 담아뒀어요 · 서식 작성 화면으로 이동하면 사라져요')}
-              disabled={!selected.length}
+              onClick={saveSelected}
+              disabled={!selected.length || saving}
             >
-              선택 항목 담기
+              {saving ? '저장 중…' : '이 상담에 저장'}
             </button>
           </div>
         </div>
@@ -236,7 +366,7 @@ export function SearchWorkbench({ consultations }) {
             <h3><BookOpen size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> {label} 목록</h3>
             <div className="referenceList">
               {results.length ? results.map((item) => {
-                const isSelected = selectedTitles.includes(item.title);
+                const isSelected = selectedIds.includes(item.id);
                 // 예전에는 카드 전체가 button이라 안에 '전문 보기'를 넣을 수 없었습니다
                 // (button 안의 button은 유효하지 않은 마크업입니다). 조문은 항이 여러 개라
                 // 접힌 상태로는 요건을 확인할 수 없으므로, 카드를 div로 바꾸고 '선택'과
@@ -257,12 +387,14 @@ export function SearchWorkbench({ consultations }) {
                           ? current.filter((value) => value !== item.id)
                           : [...current, item.id]))}
                       >
-                        {isOpen ? '접기' : '조문 전문 보기'}
+                        {isOpen ? '접기' : (ragTab?.bodyToggleLabel || '전문 보기')}
                       </button>
                     ) : null}
                     <span className="referenceCardMeta">
                       {item.source}
-                      {item.effectiveDate ? ` · 시행 ${formatStatuteDate(item.effectiveDate)}` : ''}
+                      {item.effectiveDate
+                        ? ` · ${ragTab?.dateLabel || '시행'} ${formatLegalDate(item.effectiveDate)}`
+                        : ''}
                       {/* 유사도 %는 일부러 감춥니다. 상담원은 90%를 '90% 확신'으로 읽는데,
                           실제로는 색인 2,258개가 78.7~90.6%의 12%p 안에 뭉쳐 있고 아무
                           상관 없는 조문도 78.7%를 받습니다. 순위를 정하는 것도 이제
@@ -279,12 +411,12 @@ export function SearchWorkbench({ consultations }) {
                   </div>
                 );
               }) : <InlineEmptyNotice>조건 일치 {label} 없음</InlineEmptyNotice>}
-              {isStatuteTab && results.length && !statuteExhausted ? (
+              {isRagTab && results.length && !ragExhausted ? (
                 <button className="secondaryActionButton referenceMoreButton" type="button"
-                  disabled={statuteLoading}
-                  onClick={() => runStatuteQuery('직접 검색', statuteTopK + STATUTE_PAGE_SIZE)}
+                  disabled={ragLoading}
+                  onClick={() => runRagQuery('직접 검색', ragTopK + RAG_PAGE_SIZE)}
                 >
-                  {statuteLoading ? '불러오는 중…' : `조문 ${STATUTE_PAGE_SIZE}건 더 보기`}
+                  {ragLoading ? '불러오는 중…' : ragTab.moreLabel}
                 </button>
               ) : null}
             </div>
@@ -300,7 +432,7 @@ export function SearchWorkbench({ consultations }) {
                   title={`${item.title} · 누르면 뺍니다`}
                   onClick={() => setSelected(selected.filter((value) => value.id !== item.id))}
                 >
-                  <span>{item.title}</span>
+                  <span>{item.referenceLabel ? `[${item.referenceLabel}] ` : ''}{item.title}</span>
                   <strong aria-label="빼기">×</strong>
                 </button>
               )) : <p>선택된 자료가 없습니다.</p>}

@@ -2,6 +2,7 @@ import React from 'react';
 import { UploadWorkbench } from './upload/UploadWorkbench.jsx';
 import { ProfilePanel } from './profile/ProfilePanel.jsx';
 import { SearchWorkbench } from './search/SearchWorkbench.jsx';
+import { AdoptedReferencePanel } from './search/AdoptedReferencePanel.jsx';
 import { DraftWorkbench } from './draft/DraftWorkbench.jsx';
 import { NotificationPanel } from './notifications/NotificationPanel.jsx';
 import { AnalysisWorkbench } from './analysis/AnalysisWorkbench.jsx';
@@ -26,7 +27,17 @@ export function UtilityPanel({ view, role, consultations, onCreateConsultation, 
   ) : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
   // 법령·판례 검색은 변호사 전용입니다. 메뉴에서 이미 뺐지만, 상담원 role로 이 화면에
   // 들어오는 경로가 남아있을 수 있어 한 번 더 막습니다. (상담 등록과 같은 이중 방어 규칙)
-  if (view === '법률, 판례') return role === 'lawyer' ? <SearchWorkbench consultations={consultations} /> : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
+  if (view === '법률, 판례') return role === 'lawyer' ? (
+    <SearchWorkbench
+      consultations={consultations}
+      onAnalysisSaved={onAnalysisSaved}
+      onNotify={onNotify}
+    />
+  ) : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
+  // 담아둔 자료 확인도 법령·판례와 같은 변호사 업무라 같은 방식으로 막습니다.
+  if (view === '담은 자료') return role === 'lawyer'
+    ? <AdoptedReferencePanel consultations={consultations} />
+    : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
   if (view === '서식 생성') return (
     <DraftWorkbench
       consultations={consultations}

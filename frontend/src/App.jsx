@@ -590,9 +590,17 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       // 서식 추천/초안 생성 API(recommend-forms, generate-draft)는 상담 id뿐 아니라 이 분석 id도
       // 함께 있어야 호출할 수 있습니다. 응답은 AiAnalysisResponse라 snake_case(analysis_id)로 옵니다.
       const analysisId = savedAnalysis?.analysis_id || existingAnalysisId;
-      if (analysisId && analysisId !== existingAnalysisId) {
-        setConsultations((items) => items.map((item) => item.id === consultation.id ? { ...item, coreAnalysisId: analysisId } : item));
-      }
+      // 저장한 내용을 화면이 들고 있는 상담에도 반영합니다. 예전에는 analysisId가
+      // 새로 생겼을 때만 갱신해서, 서버에는 저장됐는데 다른 화면은 저장 전 값을
+      // 계속 보여줬습니다 — 변호사가 담은 법령·판례를 저장해도 '담은 자료'
+      // 화면이 비어 있던 것이 이 때문입니다(저장은 됐다고 뜨는데 안 보임).
+      setConsultations((items) => items.map((item) => (item.id === consultation.id
+        ? {
+          ...item,
+          analysis: { ...(item.analysis || {}), ...analysis },
+          coreAnalysisId: analysisId || item.coreAnalysisId,
+        }
+        : item)));
       return { ok: true, synced: true, message: '분석 결과가 저장되었습니다.' };
     } catch (error) {
       return {
@@ -749,7 +757,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         }}
       />
       {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onSaveTranscript={saveConsultationTranscript} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id, templateName) => { setFocusedConsultationId(id); setFocusedTemplateName(templateName || null); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
-      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
+      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} onAnalysisSaved={notifyAnalysisSaved} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} focusedAdminView={focusedAdminView} /> : null}
     </div>
   );
