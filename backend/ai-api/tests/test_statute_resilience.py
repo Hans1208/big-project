@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 
 from app.ai.statutes.service import (
@@ -12,26 +10,9 @@ from rag.build_statute_index import (
 from rag.statute_api import LawApiError
 
 
-def empty_analysis():
-    return SimpleNamespace(
-        summary=None,
-        case_type=None,
-        case_subtype=None,
-        extracted=None,
-    )
-
-
-def test_empty_consult_section_labels_do_not_trigger_search():
-    fallback_text = (
-        "[\uc694\uc57d]\n\n"
-        "[\uc0c1\uc138]\n\n"
-        "[\ucd94\ucd9c\ub41c "
-        "\ucca8\ubd80\ub0b4\uc6a9]\n"
-    )
-
+def test_blank_anonymized_text_does_not_trigger_search():
     query = build_statute_query(
-        analysis=empty_analysis(),
-        fallback_text=fallback_text,
+        "  \n\n  "
     )
 
     assert query == ""
@@ -48,14 +29,24 @@ def test_find_related_statutes_returns_empty_when_index_unavailable():
             "does not exist."
         )
 
+    anonymized_text = (
+        "[PERSON]\uacfc \uc774\ud63c\ud558\uba70 "
+        "\uc7ac\uc0b0\ubd84\ud560\uc744 "
+        "\uccad\uad6c\ud569\ub2c8\ub2e4."
+    )
+
     results = find_related_statutes(
-        analysis=empty_analysis(),
-        fallback_text="\uc7ac\uc0b0\ubd84\ud560",
+        anonymized_text=anonymized_text,
         top_n=3,
         search=failing_search,
     )
 
-    assert len(calls) == 1
+    assert calls == [
+        {
+            "query_text": anonymized_text,
+            "top_n": 3,
+        }
+    ]
     assert results == []
 
 

@@ -1,4 +1,4 @@
-"""Search statutes using anonymized consultation text only."""
+"""Search precedents using anonymized consultation text only."""
 
 from __future__ import annotations
 
@@ -7,21 +7,21 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from app.ai.statutes.rag_results import (
-    search_statute_rag,
+from app.ai.precedents.rag_results import (
+    search_precedent_rag,
 )
 
 
 logger = logging.getLogger(__name__)
 
 
-def build_statute_query(
-    anonymized_text: str,
+def _clean_anonymized_text(
+    value: object,
 ) -> str:
     return "\n".join(
         line
         for raw_line in str(
-            anonymized_text or ""
+            value or ""
         ).splitlines()
         if (
             line := raw_line.strip()
@@ -29,20 +29,20 @@ def build_statute_query(
     )
 
 
-def find_related_statutes(
+def find_related_precedents(
     anonymized_text: str,
     top_n: int = 5,
     search: Callable[
         ...,
         list[dict[str, Any]],
-    ] = search_statute_rag,
+    ] = search_precedent_rag,
 ) -> list[dict[str, Any]]:
     if top_n < 1:
         raise ValueError(
             "top_n must be at least 1."
         )
 
-    query_text = build_statute_query(
+    query_text = _clean_anonymized_text(
         anonymized_text
     )
 
@@ -56,7 +56,7 @@ def find_related_statutes(
         )
     except Exception:
         logger.exception(
-            "Related statute search failed; "
-            "continuing without statute results."
+            "Related precedent search failed; "
+            "continuing without precedent results."
         )
         return []
