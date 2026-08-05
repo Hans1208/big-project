@@ -104,4 +104,37 @@ export function recommendStatutes(analysis, { topK = 5 } = {}) {
   }, STATUTE_TIMEOUT_MS);
 }
 
+// 판례 검색·추천 (ai-api /precedents). 색인은 2016년 이후 가사·이혼·상속·친족
+// 판례를 담고, 한 사건을 판시사항·요약·전문으로 쪼개 넣습니다. 응답은 사건 단위로
+// 중복을 걷어낸 뒤 나오므로 같은 사건이 여러 줄로 나오지 않습니다.
+//
+// 카드 키(id/title/content/effective_date/similarity_percent/source)는 법령과
+// 같습니다. 화면이 탭마다 다른 키를 알 필요가 없게 맞춰 둔 것입니다 —
+// effective_date 자리에는 선고일이, source 자리에는 법원명이 들어옵니다.
+const PRECEDENT_TIMEOUT_MS = 60_000;
+
+// 상담원이 직접 넣은 검색어로 판례를 찾습니다.
+export function searchPrecedents({ query, courtLevel = '', topK = 5 }) {
+  return requestJson('/precedents/search', {
+    method: 'POST',
+    body: JSON.stringify({ query, court_level: courtLevel || null, top_k: topK }),
+  }, PRECEDENT_TIMEOUT_MS);
+}
+
+// 상담 분석 결과로 관련 판례를 추천합니다. 조문과 마찬가지로 후보 제시일 뿐이라
+// 근거(reason)를 함께 받습니다. 판례는 사실관계가 조금만 달라도 결론이 뒤집혀서,
+// 근거 없이 목록만 보면 상담원이 반대 결론의 판례를 골라 쓸 수 있습니다.
+export function recommendPrecedents(analysis, { topK = 5 } = {}) {
+  return requestJson('/precedents/recommend', {
+    method: 'POST',
+    body: JSON.stringify({
+      case_type: analysis?.caseType || analysis?.case_type || '',
+      case_subtype: analysis?.caseSubtype || analysis?.case_subtype || '',
+      summary: analysis?.summary || '',
+      extracted_json: analysis?.extractedJson || analysis?.extracted_json || {},
+      top_k: topK,
+    }),
+  }, PRECEDENT_TIMEOUT_MS);
+}
+
 export { AI_API_BASE_URL };
