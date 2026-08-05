@@ -83,6 +83,13 @@ export function mergeContractAnalysisResponse(baseAnalysis, contractResult, extr
     extractedJson: {
       ...(baseAnalysis.extractedJson || {}),
       ...(mapped.extractedJson || {}),
+      // ai-api의 구조화 분석 결과(당사자/금액/날짜/사건개요)를 최상위로 올립니다.
+      // 이게 없으면 extracted_json에 사건분류와 STT 원문만 남아서, 서식 초안을
+      // 만들 때 LLM이 요약문에서 이름을 눈치로 뽑아 쓰게 됩니다 — 실제로 유언에
+      // 반대하는 형이 유언자 자리에 들어간 적이 있습니다. 분석 층은 그 형을
+      // '상대방(형)', 피상속인은 '미상'으로 정확히 구분해 주는데, 그 값이 여기서
+      // 버려지고 있었습니다. pickClientName()도 이 당사자 목록을 읽습니다.
+      ...(contractResult?.consult_extracted || {}),
       aiAnalysisResponse: contractResult,
       ...(extra.extractedJson || {}),
     },
@@ -191,7 +198,12 @@ export function pickClientName(analysis) {
 }
 
 export function buildAnalysisResult(selectedCase) {
-  const text = selectedCase?.memo || selectedCase?.title || '';
+  // 전화상담(memo)과 대면상담(inpersonMemo)은 화면에서는 분리해서 보여주지만, 분석 대상 텍스트는
+  // 상담원이 어느 채널로 들었든 상담 내용 전체를 반영해야 하므로 여기서 합칩니다
+  // (App.jsx notifyAnalysisSaved가 실제 저장 시 core-api에 보내는 값과 같은 방식).
+  const text = [selectedCase?.memo, selectedCase?.inpersonMemo]
+    .filter((value) => value && value.trim())
+    .join('\n\n') || selectedCase?.title || '';
   const attachments = selectedCase?.attachments || [];
   const attachmentLinks = buildAttachmentLinkMetadata(attachments);
   const submittedFileLinks = attachmentLinkValues(attachments);

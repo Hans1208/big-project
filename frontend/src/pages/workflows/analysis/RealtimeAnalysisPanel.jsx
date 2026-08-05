@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PhoneCall, Check, Mic, Clock, Info, Sparkles, MessageSquareText, Headphones, Radio } from 'lucide-react';
 import { buildSuggestedQuestions, formatCallDuration } from '../shared/formatters.js';
 import { CallLiveIndicator } from '../components/CallLiveIndicator.jsx';
+import { CallAudioVisualizer } from '../components/CallAudioVisualizer.jsx';
 
 export function RealtimeCallControl({
   hasCase,
@@ -76,18 +77,22 @@ export function RealtimeCallControl({
   );
 }
 
-// 통화 중 곧바로 타이핑할 수 있는 실제 입력창입니다. 여기 적은 내용이 selectedCase.memo로 저장되고,
+// 통화 중 곧바로 타이핑할 수 있는 실제 입력창입니다. 여기 적은 내용이 selectedCase[field]로 저장되고,
 // 아래 'AI 분석 결과'가 그대로 이 텍스트를 분석 대상으로 씁니다 — 즉 이 칸을 채우는 것이
 // 실시간 분석을 정확하게 만드는 가장 중요한 행동입니다.
-export function RealtimeMemoCard({ selectedCase, onUpdateConsultation }) {
+//
+// field: 전화상담과 대면상담이 같은 상담(case)의 서로 다른 필드에 각자 기록해야 해서
+// (전화상담과 대면상담 결과가 섞여 보이면 안 된다는 요구) 대상 필드를 파라미터로 받습니다.
+// 기본값 'memo'는 전화상담(RealtimeAnalysisPanel) 쪽 기존 동작 그대로입니다.
+export function RealtimeMemoCard({ selectedCase, onUpdateConsultation, field = 'memo', composerPlaceholder = '통화 내용을 바로 적어주세요.' }) {
   const hasCase = Boolean(selectedCase);
-  const memo = selectedCase?.memo || '';
+  const memo = selectedCase?.[field] || '';
   const charCount = memo.trim().length;
   const [pendingMemo, setPendingMemo] = useState('');
   const addMemo = () => {
     const nextLine = pendingMemo.trim();
     if (!hasCase || !nextLine) return;
-    onUpdateConsultation(selectedCase.id, { memo: memo ? `${memo}\n${nextLine}` : nextLine });
+    onUpdateConsultation(selectedCase.id, { [field]: memo ? `${memo}\n${nextLine}` : nextLine });
     setPendingMemo('');
   };
   return (
@@ -122,7 +127,7 @@ export function RealtimeMemoCard({ selectedCase, onUpdateConsultation }) {
               addMemo();
             }
           }}
-          placeholder="통화 내용을 바로 적어주세요."
+          placeholder={composerPlaceholder}
         />
         <button type="button" className="callAnalyzeButton" onClick={addMemo} disabled={!hasCase || !pendingMemo.trim()}>메모 추가</button>
       </div>
@@ -196,7 +201,7 @@ export function LiveCaptionCard({ callStatus, audioStatus, captions }) {
   );
 }
 
-export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, liveCaptions, availableAudioCalls, selectedAudioCallId, isLoadingAudioCalls, onSelectAudioCall, onRefreshAudioCalls, onStartCall, onEndCall, caseMeta }) {
+export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, liveCaptions, availableAudioCalls, selectedAudioCallId, isLoadingAudioCalls, onSelectAudioCall, onRefreshAudioCalls, onStartCall, onEndCall, caseMeta, audioStreamRef }) {
   const hasCase = Boolean(selectedCase);
   const headline = callStatus === 'ongoing'
     ? '통화 중입니다. 들은 내용을 바로 적으면서 진행하세요.'
@@ -228,6 +233,9 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
+          {callStatus === 'ongoing' && audioStreamRef ? (
+            <CallAudioVisualizer audioStreamRef={audioStreamRef} active={audioStatus === 'streaming'} />
+          ) : null}
           <LiveCaptionCard callStatus={callStatus} audioStatus={audioStatus} captions={liveCaptions} />
           <RealtimeMemoCard selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
           {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}

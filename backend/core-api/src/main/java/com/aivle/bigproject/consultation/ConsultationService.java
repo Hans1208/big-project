@@ -8,12 +8,14 @@ import com.aivle.bigproject.audit.AuditLogService;
 import com.aivle.bigproject.common.exception.NotFoundException;
 import com.aivle.bigproject.consultation.dto.ConsultationRequest;
 import com.aivle.bigproject.consultation.dto.ConsultationResponse;
+import com.aivle.bigproject.consultation.dto.TranscriptSaveRequest;
 import com.aivle.bigproject.storage.S3FileStorageService;
 import com.aivle.bigproject.document.GeneratedDocumentRepository;
 import com.aivle.bigproject.user.User;
 import com.aivle.bigproject.user.UserRepository;
 import com.aivle.bigproject.user.UserRole;
 import com.aivle.bigproject.user.UserService;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
@@ -161,6 +163,34 @@ public class ConsultationService {
         }
         // consultation은 이미 영속 상태(DB와 연결된 상태)라 setter만 호출해도
         // 트랜잭션이 끝날 때 JPA가 알아서 UPDATE 쿼리를 날림 (별도 save() 호출 불필요)
+        return ConsultationResponse.from(consultation);
+    }
+
+    // "상담 저장" 버튼 전용: 실시간 상담(전화/대면) 채널별 현재 메모를 Consultation에 반영한다.
+    // "분석 내용 저장"(AiAnalysisService.create/update)은 ai_analysis 테이블만 건드리고
+    // Consultation은 전혀 건드리지 않는다 — 상담 원문 저장은 이 메서드가 전담한다(사용자 확인,
+    // 2026-08-04: "분석 내용 저장에서는 db의 ai_analysis에만 데이터 저장을 원함").
+    //
+    // inputText(AI 분석 입력용 단일 값)는 두 채널을 합쳐서 갱신하고, call_input_texts/
+    // inperson_input_texts(_masked)에는 채널별로 각자 스냅샷을 append한다.
+    @Transactional
+    public ConsultationResponse saveTranscript(Long id, TranscriptSaveRequest request) {
+        Consultation consultation = findById(id);
+        consultation.addCallInputText(request.callInputText());
+        consultation.addCallInputTextMasked(request.callInputTextMasked());
+        consultation.addInpersonInputText(request.inpersonInputText());
+        consultation.addInpersonInputTextMasked(request.inpersonInputTextMasked());
+
+        List<String> parts = new ArrayList<>();
+        if (request.callInputText() != null && !request.callInputText().isBlank()) {
+            parts.add(request.callInputText());
+        }
+        if (request.inpersonInputText() != null && !request.inpersonInputText().isBlank()) {
+            parts.add(request.inpersonInputText());
+        }
+        if (!parts.isEmpty()) {
+            consultation.setInputText(String.join("\n\n", parts));
+        }
         return ConsultationResponse.from(consultation);
     }
 

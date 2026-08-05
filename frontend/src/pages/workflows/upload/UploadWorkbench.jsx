@@ -19,6 +19,7 @@ import {
   buildAutoUploadTitle,
   buildEligibilityDraftFromCase,
   uploadCategoryOptions,
+  uploadStatusTone,
 } from '../shared/attachmentHelpers.js';
 
 // 법률구조 대상 확인 + 파일 업로드는 '새 상담 만들기'와 '기존 상담에 자료 추가' 두 경로에서

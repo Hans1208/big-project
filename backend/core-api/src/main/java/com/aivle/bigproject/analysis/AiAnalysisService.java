@@ -20,7 +20,9 @@ import com.aivle.bigproject.user.UserRepository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -107,9 +109,9 @@ public class AiAnalysisService {
         String caseSubtype = aiResponse.consultCaseSubtype();
         String timelineJson = toJsonText(aiResponse.consultTimeline());
 
-        // extracted_json은 아직 analysis 층 결과(당사자·금액·날짜)로 바꾸지 않는다.
-        // 프론트가 이 필드에서 case_emergency_ratio / case_list[0].case_type_reason을 읽고 있어서
-        // (coreApiClientV2.js) 지금 교체하면 화면이 깨진다. 프론트와 같이 옮겨야 하는 항목.
+        // extracted_json은 그래프 결과 위에 analysis 층 결과(당사자·금액·날짜·사건개요)를
+        // 얹어서 담는다(buildExtractedJson). 교체가 아니라 병합이라 프론트가 읽던 키는
+        // 그대로 남는다.
         // checklist_status_json은 분석 직후엔 채우지 않는다. 프론트가 checklist_json(4개 평가블록
         // 객체)에서 5개 체크박스 상태를 파생시켜 보여주고(mapCoreChecklist), 상담원이 "분석 내용
         // 저장"을 누를 때 그 시점의 체크 상태를 이 컬럼에 담아 보낸다.
@@ -120,7 +122,8 @@ public class AiAnalysisService {
         // 화면에서 고친 뒤 '구조대상 판정'이나 '누락자료 점검'을 누르면, 저장 버튼을 누르지도
         // 않았는데 그 행이 AI 값으로 되돌아간다.
         AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, caseSubtype, urgencyLevel, eligible,
-                caseAnalysis.toString(), aiResponse.missingItems().toString(), checklist.toString(),
+                buildExtractedJson(caseAnalysis, aiResponse.consultExtracted()),
+                aiResponse.missingItems().toString(), checklist.toString(),
                 null, null, timelineJson, null, null, aiResponse.rawInput().toString());
 
         consultation.setStatus(ConsultationStatus.COMPLETED);
@@ -129,7 +132,11 @@ public class AiAnalysisService {
         return toResponse(analysis);
     }
 
-    // Consultation -> ai-api RawInput 변환. title/inputText는 그대로, 첨부파일은 storageKey(S3 key) 목록으로.
+    // Consultation -> ai-api RawInput 변환. 첨부파일은 storageKey(S3 key) 목록으로.
+    // inputText는 "지금 라이브 메모"가 아니라 call_input_texts/inperson_input_texts 이력 전체를
+    // 종합한 값을 쓴다 — "재분석 실행"이 직전 저장(inputText)만 보면 재녹음으로 지워진 이전
+    // 세션 내용이 분석에서 빠지는 문제가 있어서(사용자 확인 후 결정, 2026-08-04). 재녹음을
+    // 반복할수록 입력이 계속 커지는 트레이드오프는 감수하기로 함.
     private RawInputRequest buildRawInput(Consultation consultation) {
         List<String> fileLinks = consultation.getAttachments().stream()
                 .map(Attachment::getStorageKey)
@@ -140,10 +147,33 @@ public class AiAnalysisService {
                 : null;
         return new RawInputRequest(new RawInputRequest.RawInputContent(
                 consultation.getTitle(),
-                consultation.getInputText(),
+                buildCombinedInputText(consultation),
                 fileLinks,
                 consultDay
         ));
+    }
+
+    private String buildCombinedInputText(Consultation consultation) {
+        String callText = String.join("\n\n", nullSafe(consultation.getCallInputTexts()));
+        String inpersonText = String.join("\n\n", nullSafe(consultation.getInpersonInputTexts()));
+
+        List<String> sections = new ArrayList<>();
+        if (!callText.isBlank()) {
+            sections.add("[전화상담]\n" + callText);
+        }
+        if (!inpersonText.isBlank()) {
+            sections.add("[대면상담]\n" + inpersonText);
+        }
+        if (!sections.isEmpty()) {
+            return String.join("\n\n", sections);
+        }
+        // 아직 "분석 내용 저장"을 한 번도 하지 않은 최초 "분석 시작"이면 채널별 이력 배열이
+        // 비어 있다 — 이때는 현재 inputText(수기 입력 등)를 그대로 폴백으로 보낸다.
+        return consultation.getInputText();
+    }
+
+    private static List<String> nullSafe(List<String> list) {
+        return list == null ? List.of() : list;
     }
 
     // ai-api analysis 층이 만든 상담 요약을 우선 쓰고, 없으면 기존 조합 문자열로 폴백한다.
@@ -343,6 +373,31 @@ public class AiAnalysisService {
     // 요청으로 받은 JsonNode -> DB(jsonb 컬럼)에 넣을 원본 JSON 텍스트
     private String toJsonText(JsonNode node) {
         return node == null ? null : node.toString();
+    }
+
+    // extracted_json에 담을 값을 만든다. 그래프 결과(case_analysis) 위에 analysis 층의
+    // 구조화 결과(consult_extracted: 당사자·금액·날짜·사건개요)를 얹는다.
+    //
+    // 교체가 아니라 병합인 이유: 프론트가 이 필드에서 case_emergency_ratio와
+    // case_list[0].case_type_reason을 읽고 있어(coreApiClientV2.js) 갈아끼우면 화면이 깨진다.
+    // 두 층의 키가 겹치지 않으므로 함께 담아도 서로 방해하지 않는다.
+    //
+    // 이걸 안 담으면 서식 초안이 당사자를 못 받는다. 그러면 extracted_json에 남는 건
+    // 사건분류와 STT 원문뿐이라, 초안 생성 LLM이 오타 섞인 대화록에서 이름을 눈치로
+    // 뽑아 쓰게 된다 — 실제로 유언에 반대하는 형이 유언자 자리에 들어간 적이 있다.
+    // analysis 층은 그 형을 '상대방(형)', 피상속인은 '미상'으로 정확히 구분해 준다.
+    private String buildExtractedJson(JsonNode caseAnalysis, JsonNode consultExtracted) {
+        boolean hasStructured = consultExtracted != null && consultExtracted.isObject();
+        if (!hasStructured) {
+            // 구조화 분석이 실패(503 등)하면 그래프 결과만이라도 남긴다.
+            return toJsonText(caseAnalysis);
+        }
+        ObjectNode merged = objectMapper.createObjectNode();
+        if (caseAnalysis != null && caseAnalysis.isObject()) {
+            merged.setAll((ObjectNode) caseAnalysis);
+        }
+        merged.setAll((ObjectNode) consultExtracted);
+        return merged.toString();
     }
 
     // 엔티티 -> 응답 DTO. DTO 변환을 컨트롤러가 아니라 여기(서비스, 트랜잭션 안)에서 하는 이유는

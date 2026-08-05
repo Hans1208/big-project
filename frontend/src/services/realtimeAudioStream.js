@@ -3,7 +3,8 @@
 // μ-law 바이너리 프레임으로 변환해 보냅니다. 백엔드는 이 오퍼레이터 레그를 같은 callId로 붙은
 // 외부 통화 레그(ExternalCallWebSocketHandler)와 서로 중계하는 교환대 역할을 하며, 소켓으로
 // 들어오는 바이너리 메시지도 같은 8비트 μ-law 프레임이므로 디코딩해서 스피커로 내보냅니다.
-// 어떤 통화에 붙을지는 GET /api/audio/calls로 받은 목록의 첫 번째 항목으로 정합니다.
+// 어떤 통화에 붙을지는 호출자가 start({ callId })로 넘긴 값을 그대로 씁니다
+// (연결할 통화 선택은 GET /api/audio/calls 목록에서 상담원이 직접 고릅니다).
 
 import { CORE_API_BASE_URL, coreAuthHeader } from './coreApiClientV2.js';
 
@@ -65,30 +66,6 @@ async function requestAudioTicket() {
   const body = await response.json();
   if (!body?.ticket) throw new Error('통화 연결 티켓을 받지 못했습니다.');
   return body.ticket;
-}
-
-// 붙을 통화를 고르기 전에 현재 연결되어 있는 통화 목록을 조회합니다.
-// 여러 건이 와 있어도 지금은 목록의 첫 번째 통화에 자동으로 붙습니다.
-async function requestFirstCallId() {
-  let response;
-  try {
-    response = await fetch(`${CORE_API_BASE_URL}/api/audio/calls`, {
-      headers: { ...coreAuthHeader() },
-    });
-  } catch {
-    throw new Error('통화 서버에 연결할 수 없습니다. Core API 서버가 켜져 있는지 확인해주세요.');
-  }
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('통화 목록을 조회할 권한이 없습니다. 다시 로그인해주세요.');
-  }
-  if (!response.ok) {
-    throw new Error(`통화 목록을 가져오지 못했습니다 (HTTP ${response.status})`);
-  }
-  const calls = await response.json();
-  if (!Array.isArray(calls) || calls.length === 0) {
-    throw new Error('현재 연결된 통화가 없습니다.');
-  }
-  return calls[0].callId;
 }
 
 function downsample(buffer, inputSampleRate, outputSampleRate = 8000) {
@@ -162,6 +139,19 @@ function parseTranscriptFrame(raw) {
   return { text: parsed.text, isFinal: Boolean(parsed.isFinal) };
 }
 
+// analyser의 현재 파형에서 RMS(진폭의 제곱평균제곱근)를 구해 0~1 근처 값으로 돌려줍니다.
+// analyser나 버퍼가 아직 없으면(통화 시작 전/종료 후) 0을 돌려줍니다.
+function rmsLevel(analyser, buffer) {
+  if (!analyser || !buffer) return 0;
+  analyser.getByteTimeDomainData(buffer);
+  let sumSquares = 0;
+  for (let index = 0; index < buffer.length; index += 1) {
+    const normalized = (buffer[index] - 128) / 128;
+    sumSquares += normalized * normalized;
+  }
+  return Math.sqrt(sumSquares / buffer.length);
+}
+
 export class RealtimeAudioStream {
   constructor({ onStatus, onError, onTranscript } = {}) {
     this.onStatus = onStatus || (() => {});
@@ -174,6 +164,12 @@ export class RealtimeAudioStream {
     this.processor = null;
     this.silentGain = null;
     this.playbackCursor = 0;
+    // 내 음성(마이크)·상대방 음성(재생) 크기를 화면에 보여주기 위한 분석 노드. 오디오 자체를
+    // 바꾸지 않고 지나가는 값만 읽는 패스스루라, 기존 마이크 전송·재생 경로 중간에 그대로 끼워 넣습니다.
+    this.micAnalyser = null;
+    this.remoteAnalyser = null;
+    this.micLevelBuffer = null;
+    this.remoteLevelBuffer = null;
   }
 
   async start({ callId } = {}) {
@@ -188,22 +184,21 @@ export class RealtimeAudioStream {
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
     try {
-      const callId = await requestFirstCallId();
       // 티켓은 30초짜리라 연결할 때마다 새로 받습니다(재사용도 막혀 있습니다).
       const ticket = await requestAudioTicket();
-      const url = `${audioWebSocketUrl()}?callId=${encodeURIComponent(callId)}&ticket=${encodeURIComponent(ticket)}`;
+      const url = audioWebSocketUrl({ callId, ticket });
       this.socket = new WebSocket(url);
       this.socket.binaryType = 'arraybuffer';
       await new Promise((resolve, reject) => {
         this.socket.addEventListener('open', resolve, { once: true });
-        this.socket.addEventListener('error', () => reject(new Error('오디오 스트림 서버에 연결할 수 없습니다.')), { once: true });
+        this.socket.addEventListener('error', (e) => reject(new Error('오디오 스트림 서버에 연결할 수 없습니다.' + e)), { once: true });
       });
 
       // 핸드셰이크가 성공해도, 백엔드가 그 직후 이 통화에 이미 다른 오퍼레이터가 붙어 있거나
       // 통화가 끝나버린 걸 알게 되면 곧바로 소켓을 닫습니다(정책 위반 close). stop()이 보내는
       // 정상 종료(코드 1000)가 아니면 오류로 알립니다.
       this.socket.addEventListener('close', (event) => {
-        this.onStatus('idle');
+        this.onStatus('ended');
         if (event.code !== 1000) {
           this.onError(new Error(event.reason || '통화 연결이 종료되었습니다.'));
         }
@@ -233,9 +228,21 @@ export class RealtimeAudioStream {
         samples.forEach((sample, index) => { payload[index] = linearToMuLaw(sample); });
         this.socket.send(payload.buffer);
       };
-      this.source.connect(this.processor);
+      // 마이크 신호는 source -> micAnalyser -> processor 순서로 그대로 흘려보내(내용은 안 바꿈),
+      // micAnalyser가 destination까지 이어진 능동 그래프의 일부가 되어 매 프레임 값을 갱신하게 합니다.
+      this.micAnalyser = this.audioContext.createAnalyser();
+      this.micAnalyser.fftSize = 256;
+      this.micLevelBuffer = new Uint8Array(this.micAnalyser.fftSize);
+      this.source.connect(this.micAnalyser);
+      this.micAnalyser.connect(this.processor);
       this.processor.connect(this.silentGain);
       this.silentGain.connect(this.audioContext.destination);
+      // 상대방 오디오는 각 프레임마다 새 AudioBufferSourceNode로 재생되므로(playIncomingAudio),
+      // 여기서는 재생 경로에 상시 끼워둘 analyser 하나만 만들어 destination 앞에 둡니다.
+      this.remoteAnalyser = this.audioContext.createAnalyser();
+      this.remoteAnalyser.fftSize = 256;
+      this.remoteLevelBuffer = new Uint8Array(this.remoteAnalyser.fftSize);
+      this.remoteAnalyser.connect(this.audioContext.destination);
       this.onStatus('streaming');
     } catch (error) {
       this.stop();
@@ -253,22 +260,38 @@ export class RealtimeAudioStream {
     buffer.copyToChannel(samples, 0);
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.audioContext.destination);
+    source.connect(this.remoteAnalyser || this.audioContext.destination);
     const startAt = Math.max(this.audioContext.currentTime, this.playbackCursor);
     source.start(startAt);
     this.playbackCursor = startAt + buffer.duration;
+  }
+
+  // 마이크(mic)·상대방(remote) 음성의 지금 이 순간 크기를 0~1 사이 값으로 돌려줍니다.
+  // 파형(time-domain) 데이터의 RMS를 씁니다 — 주파수 분해까지는 필요 없고, "지금 얼마나
+  // 크게 들리는지"만 있으면 되는 막대 표시용이라 계산이 가장 단순한 방식을 골랐습니다.
+  getLevels() {
+    return {
+      mic: rmsLevel(this.micAnalyser, this.micLevelBuffer),
+      remote: rmsLevel(this.remoteAnalyser, this.remoteLevelBuffer),
+    };
   }
 
   stop() {
     if (this.processor) this.processor.disconnect();
     if (this.source) this.source.disconnect();
     if (this.silentGain) this.silentGain.disconnect();
+    if (this.micAnalyser) this.micAnalyser.disconnect();
+    if (this.remoteAnalyser) this.remoteAnalyser.disconnect();
     if (this.audioContext && this.audioContext.state !== 'closed') this.audioContext.close();
     if (this.socket && this.socket.readyState === WebSocket.OPEN) this.socket.close(1000, 'call-ended');
     if (this.mediaStream) this.mediaStream.getTracks().forEach((track) => track.stop());
     this.processor = null;
     this.source = null;
     this.silentGain = null;
+    this.micAnalyser = null;
+    this.remoteAnalyser = null;
+    this.micLevelBuffer = null;
+    this.remoteLevelBuffer = null;
     this.audioContext = null;
     this.socket = null;
     this.mediaStream = null;

@@ -4800,6 +4800,51 @@ textarea:focus-visible,
   color: var(--text-main);
 }
 
+/* 통화 중 내 음성/상대방 음성 레벨 막대. transform:scaleX만 매 프레임 바꾸므로(레이아웃 재계산 없음)
+   requestAnimationFrame으로 갱신해도 가볍습니다. */
+.callAudioVisualizer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+
+.callAudioVisualizerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-sub);
+}
+
+.callAudioVisualizerLabel {
+  min-width: 64px;
+  font-size: var(--fs-sm);
+}
+
+.callAudioVisualizerTrack {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+.callAudioVisualizerFill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  border-radius: inherit;
+  transition: transform .08s linear;
+}
+
+.callAudioVisualizerFill.mic { background: var(--accent-strong); }
+.callAudioVisualizerFill.remote { background: var(--success-solid); }
+
 /* '분석 시작' 전용 버튼. 활성=성공 그린, 비활성=회색 + 버튼 바로 아래 상시 캡션
    (툴팁이 아니라 항상 보이는 문구로 왜 눌리지 않는지 알려줍니다). */
 .callAnalyzeButtonGroup {
@@ -7023,6 +7068,13 @@ textarea:focus-visible,
   box-shadow: 0 4px 12px rgba(47, 52, 56, 0.05);
 }
 
+/* 카드 안에 '선택'과 '조문 전문 보기' 두 동작이 생겨 카드 자체는 더 이상
+   누르는 요소가 아닙니다. 커서가 손가락이면 아무데나 눌러도 될 것처럼 보입니다. */
+.referenceCard {
+  cursor: default;
+  align-items: start;
+}
+
 .referenceCardTitle {
   grid-column: 1;
   font-size: var(--fs-md);
@@ -7033,6 +7085,119 @@ textarea:focus-visible,
 .referenceSelectedPanel small {
   grid-column: 1;
   color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* 조문 본문. 항이 여러 개인 조문은 길어서 카드가 화면을 다 잡아먹으므로
+   네 줄까지만 보여주고 자릅니다 — 목록에서는 훑어보고 고르는 게 목적입니다. */
+.referenceCardBody {
+  grid-column: 1;
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 펼친 상태 — 항이 몇 개든 조문 전체를 보여줍니다. 목록 안에서 다 읽을 수
+   있어야 상담원이 법령정보센터를 따로 열지 않습니다. */
+.referenceCardBody.open {
+  -webkit-line-clamp: unset;
+  display: block;
+  overflow: visible;
+}
+
+.referenceCardToggle {
+  grid-column: 1;
+  justify-self: start;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--brand-strong, var(--text-sub));
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 선택 칩이 button이 되면서 브라우저 기본 테두리·배경이 붙습니다. */
+.referenceCardPick {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+/* 담은 자료 목록 — 한 줄짜리로 쌓입니다.
+   검색 결과 카드와 같은 크기로 그리면 한 건만 담아도 오른쪽 칸이 꽉 차서,
+   지금 몇 건을 담았는지가 한눈에 안 들어옵니다. 여기 있는 항목은 읽는
+   대상이 아니라 '무엇을 담았는지' 확인하는 대상이라 제목 한 줄이면 됩니다. */
+.referenceSelectedPanel.compactList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.searchPanel .referenceSelectedPanel.compactList button,
+.referenceSelectedPanel.compactList button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 0;
+  padding: 8px 12px;
+  border-radius: var(--r-chip);
+  box-shadow: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.referenceSelectedPanel.compactList button span {
+  grid-column: auto;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* '빼기'라는 글자 대신 ×. 목록이 쌓일수록 같은 단어가 반복돼 제목보다
+   눈에 먼저 들어옵니다. */
+.referenceSelectedPanel.compactList button strong {
+  grid-column: auto;
+  grid-row: auto;
+  min-width: 0;
+  padding: 0 2px;
+  color: var(--text-sub);
+  font-size: var(--fs-md);
+  line-height: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .searchPanel .referenceSelectedPanel.compactList button:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--accent-strong, var(--border));
+  }
+}
+
+.referenceMoreButton {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* AI 추천 근거. 순위만 주는 추천은 상담원이 검토에 쓸 수 없습니다. */
+.referenceCardReason {
+  grid-column: 1;
+  color: var(--brand-strong, var(--text-sub));
   font-size: var(--fs-sm);
   font-weight: 700;
 }
@@ -7565,6 +7730,34 @@ textarea:focus-visible,
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+/* 대면 상담 "녹음 재시작" 확인 팝업의 네/아니오 버튼. statusConfirmActions(오른쪽 정렬,
+   "확인"/"취소" 두 버튼 크기가 서로 다름)를 그대로 쓰면 요청받은 모양(가운데 정렬, 두 버튼
+   크기·색이 동일)이 안 나와서 이 모달 전용으로 별도 클래스를 둔다. */
+.restartConfirmActions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.restartConfirmButton {
+  width: 96px;
+  height: var(--h-control-sm);
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--accent-strong);
+  color: #fff;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.restartConfirmButton:hover {
+  background: var(--accent-press);
+  box-shadow: var(--shadow-soft);
 }
 
 .modalHeader h2 {

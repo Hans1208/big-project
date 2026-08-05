@@ -74,4 +74,34 @@ export function acknowledgeFormRevisions() {
   return requestJson('/forms/revisions/acknowledge', { method: 'POST' }, FORM_REVISION_TIMEOUT_MS);
 }
 
+// 법령 검색·추천 (ai-api /statutes). 색인은 민법·가사소송법·가족관계등록법·
+// 민사소송법·민사집행법의 조문 2,258개를 담고 있어, 결과는 법령 단위가 아니라
+// 조문 단위(예: "민법 제1091조(유언증서, 녹음의 검인)")로 나옵니다.
+//
+// 임베딩 모델을 처음 부를 때 로딩이 있어 첫 요청만 느립니다.
+const STATUTE_TIMEOUT_MS = 60_000;
+
+// 상담원이 직접 넣은 검색어로 조문을 찾습니다.
+export function searchStatutes({ query, lawId = '', topK = 5 }) {
+  return requestJson('/statutes/search', {
+    method: 'POST',
+    body: JSON.stringify({ query, law_id: lawId || null, top_k: topK }),
+  }, STATUTE_TIMEOUT_MS);
+}
+
+// 상담 분석 결과로 관련 조문을 추천합니다. 추천은 후보일 뿐이고 어떤 조문을
+// 근거로 쓸지는 상담원·변호사가 정합니다(HITL) — 그래서 유사도와 근거를 함께 받습니다.
+export function recommendStatutes(analysis, { topK = 5 } = {}) {
+  return requestJson('/statutes/recommend', {
+    method: 'POST',
+    body: JSON.stringify({
+      case_type: analysis?.caseType || analysis?.case_type || '',
+      case_subtype: analysis?.caseSubtype || analysis?.case_subtype || '',
+      summary: analysis?.summary || '',
+      extracted_json: analysis?.extractedJson || analysis?.extracted_json || {},
+      top_k: topK,
+    }),
+  }, STATUTE_TIMEOUT_MS);
+}
+
 export { AI_API_BASE_URL };

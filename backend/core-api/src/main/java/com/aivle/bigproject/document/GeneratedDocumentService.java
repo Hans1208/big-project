@@ -97,7 +97,7 @@ public class GeneratedDocumentService {
         AiAnalysis analysis = findAnalysis(consultationId, analysisId);
         Consultation consultation = consultationService.findById(consultationId);
 
-        JsonNode result = callAiApiDraft(request.formName(), analysis);
+        JsonNode result = callAiApiDraft(request.formName(), analysis, consultation);
 
         GeneratedDocument document = new GeneratedDocument(
                 consultation,
@@ -123,7 +123,7 @@ public class GeneratedDocumentService {
         boolean isResubmission = document.getStatus() == DocumentReviewStatus.REVISION_REQUESTED;
         if (isResubmission) {
             AiAnalysis analysis = findLatestAnalysis(consultationId);
-            JsonNode result = callAiApiDraft(document.getFormName(), analysis);
+            JsonNode result = callAiApiDraft(document.getFormName(), analysis, document.getConsultation());
             document.setDraftFilePath(result.path("file").isMissingNode() ? null : result.path("file").stringValue());
             document.setDraftResultJson(result.toString());
             document.setRevisionCount(document.getRevisionCount() + 1);
@@ -174,8 +174,12 @@ public class GeneratedDocumentService {
     // 그 경우 프론트는 클라이언트 HWPX 생성 폴백으로 대체한다.
     public Resource loadDraftFile(Long consultationId, Long documentId) {
         GeneratedDocument document = findDocument(consultationId, documentId);
-        Path file = findTemplateFile(document.getFormName())
-                .or(() -> findStoredDraftFile(document.getDraftFilePath()))
+        // 찾는 순서가 중요하다. 예전에는 findTemplateFile을 먼저 봤는데, 원본 서식은
+        // 서식_hwpx/에 항상 있으므로 매번 그게 잡혔고 ai-api가 채운 초안은 한 번도
+        // 쓰이지 않았다 — 상담원이 받는 파일이 늘 값이 하나도 없는 빈 서식이었다.
+        // 위 주석의 의도(초안을 스트리밍하고, 없을 때만 폴백)대로 순서를 바로잡는다.
+        Path file = findStoredDraftFile(document.getDraftFilePath())
+                .or(() -> findTemplateFile(document.getFormName()))
                 .orElseThrow(() -> new NotFoundException("다운로드할 HWPX 파일을 찾을 수 없습니다: " + document.getFormName()));
         return new FileSystemResource(file);
     }
@@ -310,8 +314,12 @@ public class GeneratedDocumentService {
         return analyses.get(analyses.size() - 1);
     }
 
-    private JsonNode callAiApiDraft(String formName, AiAnalysis analysis) {
-        JsonNode result = aiApiClient.generateDraft(formName, parseJson(analysis.getExtractedJson()), analysis.getSummary());
+    // 상담에 적힌 당사자 이름을 함께 넘긴다. 상담원이 화면에서 확인하고 고친 값이라
+    // 요약문에서 뽑아낸 이름보다 정확하다 — 이걸 안 넘기면 상담원이 이름을 고쳐도
+    // 초안에는 AI가 뽑은 이름이 그대로 들어간다.
+    private JsonNode callAiApiDraft(String formName, AiAnalysis analysis, Consultation consultation) {
+        JsonNode result = aiApiClient.generateDraft(formName, parseJson(analysis.getExtractedJson()), analysis.getSummary(),
+                consultation.getClientName(), consultation.getOpponentName());
         JsonNode errorNode = result.path("error");
         if (!errorNode.isMissingNode() && !errorNode.isNull()) {
             throw new IllegalStateException("초안 생성 실패: " + errorNode.stringValue());

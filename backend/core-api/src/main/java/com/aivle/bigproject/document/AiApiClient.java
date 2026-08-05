@@ -42,14 +42,23 @@ public class AiApiClient {
                 .body(JsonNode.class);
     }
 
-    public JsonNode generateDraft(String formName, JsonNode extractedJson, String summary) {
+    // applicantName/opponentName은 상담원이 화면에서 확인하고 고친 이름이다.
+    // ai-api는 이 값을 주면 이름칸을 직접 채우고, 없으면 요약문에서 뽑아낸 이름을 쓴다.
+    // 사람이 고친 값이 있는데도 안 보내면 상담원이 고친 이름이 초안에 반영되지 않는다.
+    //
+    // Map.of는 null을 넣으면 NPE가 나므로 빈 문자열로 바꿔 보낸다. 이름을 아직
+    // 안 적은 상담이 흔해서(통화 중 접수) null이 실제로 자주 들어온다.
+    public JsonNode generateDraft(String formName, JsonNode extractedJson, String summary,
+                                  String applicantName, String opponentName) {
         return restClient.post()
                 .uri("/forms/draft")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of(
                         "form_name", formName,
                         "extracted", extractedJson,
-                        "summary", summary
+                        "summary", summary,
+                        "applicant_name", applicantName == null ? "" : applicantName,
+                        "opponent_name", opponentName == null ? "" : opponentName
                 ))
                 .retrieve()
                 .body(JsonNode.class);

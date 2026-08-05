@@ -173,7 +173,15 @@ def llm_judge(draft_path, extracted: dict, summary: str = "") -> dict:
         "사건 등)이 초안에 등장하는 것. 긴 서술 문단뿐 아니라 \"국적 : 중화민국\", "
         "\"직업 : 회사원\"처럼 \"라벨 : 값\" 형태로 된 짧은 필드에 들어간 값도 "
         "반드시 같은 기준으로 검사한다 — 짧다고, 필드처럼 생겼다고 건너뛰지 마라.\n"
-        "   서식 자체의 안내문구·법률용어(예: 관할법원 안내, 제출서류 설명)만 제외한다.\n"
+        "   찾는 것은 '지어낸 값'이지 '빈 칸'이 아니다. 다음은 신고하지 마라:\n"
+        "     · 자리표시자가 그대로 남은 칸 — \"주소 : ○○시 ○○구 ○○길 ○○\",\n"
+        "       \"전화 : ○○○-○○○○\", \"20○○. ○. ○.\", \"□□□\", \"△△△\"\n"
+        "     · \"미상\", \"[예시:확인필요]\", \"상담원 작성\" 같은 미확인 표시\n"
+        "     · 서식 자체의 안내문구·법률용어(관할법원 안내, 제출서류 설명 등)\n"
+        "   이것들은 상담에서 값을 확인하지 못해 시스템이 일부러 비워둔 자리다.\n"
+        "   빈 칸을 환각으로 신고하면 정작 지어낸 값이 그 속에 묻혀 안 보이게 된다.\n"
+        "   목록에는 '환각이 맞는 것'만 넣는다. 검토했지만 문제없다고 판단한 항목을\n"
+        "   \"~라 환각 아님\" 같은 설명과 함께 넣지 마라 — 그것도 신고로 세어진다.\n"
         "2) role_swap: 당사자가 뒤바뀐 곳(청구인 자리에 상대방 값 등).\n"
         "없으면 빈 배열.\n\n"
         f"[추출정보]\n{json.dumps(extracted, ensure_ascii=False)}\n\n"
@@ -182,7 +190,8 @@ def llm_judge(draft_path, extracted: dict, summary: str = "") -> dict:
     )
     try:
         resp = client.chat.completions.create(
-            model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
+            # 기본값 사유는 drafter.MODEL 주석 참고.
+            model=os.getenv("LLM_MODEL", "gpt-5.4-mini"),
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=0,
