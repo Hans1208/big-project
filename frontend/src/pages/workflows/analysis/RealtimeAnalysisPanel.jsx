@@ -201,7 +201,7 @@ export function LiveCaptionCard({ callStatus, audioStatus, captions }) {
   );
 }
 
-export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, liveCaptions, availableAudioCalls, selectedAudioCallId, isLoadingAudioCalls, onSelectAudioCall, onRefreshAudioCalls, onStartCall, onEndCall, caseMeta, audioStreamRef }) {
+export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, callStatus, callSeconds, audioStatus, liveCaptions, availableAudioCalls, selectedAudioCallId, isLoadingAudioCalls, onSelectAudioCall, onRefreshAudioCalls, onStartCall, onEndCall, audioStreamRef }) {
   const hasCase = Boolean(selectedCase);
   const headline = callStatus === 'ongoing'
     ? '통화 중입니다. 들은 내용을 바로 적으면서 진행하세요.'
@@ -211,25 +211,10 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
   return (
     <section className="realtimeWorkbenchPanel roleAccent-counselor" aria-label="실시간 상담 메모">
       <div className="realtimeWorkbenchHeader">
-        <div>
+        <div className="realtimeHeaderTags">
           <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
           <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
-          <strong>{headline}</strong>
-          <p>통화 내용 자동 받아쓰기를 준비 중입니다. 현재는 메모를 기준으로 분석합니다.</p>
         </div>
-        <RealtimeCallControl
-          hasCase={hasCase}
-          callStatus={callStatus}
-          callSeconds={callSeconds}
-          audioStatus={audioStatus}
-          availableAudioCalls={availableAudioCalls}
-          selectedAudioCallId={selectedAudioCallId}
-          isLoadingAudioCalls={isLoadingAudioCalls}
-          onSelectAudioCall={onSelectAudioCall}
-          onRefreshAudioCalls={onRefreshAudioCalls}
-          onStartCall={onStartCall}
-          onEndCall={onEndCall}
-        />
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
@@ -237,12 +222,28 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
             <CallAudioVisualizer audioStreamRef={audioStreamRef} active={audioStatus === 'streaming'} />
           ) : null}
           <LiveCaptionCard callStatus={callStatus} audioStatus={audioStatus} captions={liveCaptions} />
-          <RealtimeMemoCard selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
-          {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}
+          <div className="realtimeSplitRow">
+            <div className="realtimeSplitColumn">
+              <strong>{headline}</strong>
+              <p>통화 내용 자동 받아쓰기를 준비 중입니다. 현재는 메모를 기준으로 분석합니다.</p>
+              <RealtimeCallControl
+                hasCase={hasCase}
+                callStatus={callStatus}
+                callSeconds={callSeconds}
+                audioStatus={audioStatus}
+                availableAudioCalls={availableAudioCalls}
+                selectedAudioCallId={selectedAudioCallId}
+                isLoadingAudioCalls={isLoadingAudioCalls}
+                onSelectAudioCall={onSelectAudioCall}
+                onRefreshAudioCalls={onRefreshAudioCalls}
+                onStartCall={onStartCall}
+                onEndCall={onEndCall}
+              />
+              {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}
+            </div>
+            <RealtimeMemoCard selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
+          </div>
         </div>
-        <aside className="realtimeConsultationSide">
-          {caseMeta}
-        </aside>
       </div>
     </section>
   );
