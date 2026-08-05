@@ -1220,11 +1220,18 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
         {/* 최종 결정 전 반드시 체크해야 하는 섹션이라 항상 펼쳐둡니다(pinned). 아코디언
             그룹 다음, 맨 마지막에 둬서 검토를 다 훑은 뒤 확인하는 흐름에 맞춥니다. */}
         <CollapsibleSection className="hitlSection" id="hitlSectionFinalCheck" icon={ShieldCheck} title="제출 확인" pinned onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionFinalCheck'); if (nextOpen) markSectionViewed('hitlSectionFinalCheck'); }}>
+          {/* 세 번째 항목은 원래 "법령·판례 근거의 실재 여부를 확인했습니다"였다.
+              LLM이 없는 판례를 지어내는 것을 막으려는 문구인데, 우리 시스템에는
+              맞지 않는다 - 법령·판례는 실제 색인(조문 2,258개, 판례 342건)에서
+              검색해 온 것만 내보내므로 존재는 검색 단계에서 이미 보장된다.
+              남는 위험은 다른 쪽이다. 판례는 진짜인데 AI가 붙인 근거 문구가 그
+              판례 내용과 다를 수 있다. 변호사가 실제로 봐야 할 것이 그것이라,
+              확인할 수 없는 것 대신 확인해야 할 것을 묻는다. */}
           <div className="resultCard checklistBox hitlFinalChecklist">
             {[
               { key: 'eligibility', text: '법률구조 대상 요건을 확인했습니다.' },
               { key: 'evidence', text: '제출된 자료·증빙을 확인했습니다.' },
-              { key: 'hallucination', text: 'AI가 제시한 법령·판례 근거의 실재 여부를 확인했습니다.' },
+              { key: 'hallucination', text: 'AI가 붙인 근거 설명이 법령·판례 내용과 맞는지 확인했습니다.' },
             ].map((row) => (
               <label key={row.key} className={`hitlFinalCheckItem${checks[row.key] ? ' is-checked' : ''}`}>
                 <input type="checkbox" checked={checks[row.key]} onChange={() => setChecks((c) => ({ ...c, [row.key]: !c[row.key] }))} />
