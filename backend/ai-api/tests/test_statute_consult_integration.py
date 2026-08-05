@@ -35,20 +35,27 @@ class FakeAnalysis:
         }
 
 
-def test_consult_response_schema_has_related_statutes():
-    assert "related_statutes" in (
+def test_consult_response_schema_has_legal_sources():
+    fields = (
         ConsultAnalyzeResponse.model_fields
     )
 
-    field = (
-        ConsultAnalyzeResponse
-        .model_fields["related_statutes"]
+    assert "related_statutes" in fields
+    assert "related_precedents" in fields
+
+    assert (
+        fields["related_statutes"]
+        .default_factory
+        is list
+    )
+    assert (
+        fields["related_precedents"]
+        .default_factory
+        is list
     )
 
-    assert field.default_factory is list
 
-
-def test_analyze_consult_attaches_related_statutes(
+def test_analyze_consult_attaches_anonymized_legal_sources(
     monkeypatch,
 ):
     monkeypatch.setenv(
@@ -103,43 +110,60 @@ def test_analyze_consult_attaches_related_statutes(
         fake_run_consult_analysis,
     )
 
-    def fake_find_related_statutes(
+    def fake_collect_related_legal_sources(
         *,
-        analysis,
-        fallback_text,
+        content,
         top_n,
     ):
-        calls["analysis"] = analysis
-        calls["fallback_text"] = fallback_text
+        calls["anonymized_text"] = (
+            content.get("anonymized_text")
+        )
         calls["top_n"] = top_n
 
-        return [
-            {
-                "citation": (
-                    "\ubbfc\ubc95 "
-                    "\uc81c839\uc870\uc7582"
-                    "(\uc7ac\uc0b0\ubd84\ud560"
-                    "\uccad\uad6c\uad8c)"
-                ),
-            }
-        ]
+        return {
+            "related_statutes": [
+                {
+                    "citation": (
+                        "\ubbfc\ubc95 "
+                        "\uc81c839\uc870\uc7582"
+                        "(\uc7ac\uc0b0\ubd84\ud560"
+                        "\uccad\uad6c\uad8c)"
+                    ),
+                }
+            ],
+            "related_precedents": [
+                {
+                    "precedent_id": "100",
+                    "case_name": (
+                        "\uc774\ud63c\ubc0f"
+                        "\uc7ac\uc0b0\ubd84\ud560"
+                    ),
+                }
+            ],
+        }
 
     monkeypatch.setattr(
         consult,
-        "find_related_statutes",
-        fake_find_related_statutes,
+        "collect_related_legal_sources",
+        fake_collect_related_legal_sources,
+    )
+
+    anonymized_text = (
+        "[PERSON]\uacfc \uc774\ud63c\ud558\uba70 "
+        "\uc7ac\uc0b0\ubd84\ud560\uc744 "
+        "\uccad\uad6c\ud569\ub2c8\ub2e4."
     )
 
     payload = RawInput(
         content={
             "summary": (
-                "\uc774\ud63c \ud6c4 "
-                "\uc7ac\uc0b0\ubd84\ud560"
+                "RAW-SUMMARY-SECRET"
             ),
             "details": (
-                "\uc0c1\ub300\ubc29\uacfc "
-                "\ud611\uc758\uac00 \ub418\uc9c0 "
-                "\uc54a\uc2b5\ub2c8\ub2e4."
+                "RAW-DETAIL-SECRET"
+            ),
+            "anonymized_text": (
+                anonymized_text
             ),
             "summited_file_link": [],
         }
@@ -150,10 +174,7 @@ def test_analyze_consult_attaches_related_statutes(
     )
 
     assert calls == {
-        "analysis": analysis,
-        "fallback_text": (
-            "COMBINED CONSULT TEXT"
-        ),
+        "anonymized_text": anonymized_text,
         "top_n": 5,
     }
 
@@ -164,6 +185,16 @@ def test_analyze_consult_attaches_related_statutes(
                 "\uc81c839\uc870\uc7582"
                 "(\uc7ac\uc0b0\ubd84\ud560"
                 "\uccad\uad6c\uad8c)"
+            ),
+        }
+    ]
+
+    assert result["related_precedents"] == [
+        {
+            "precedent_id": "100",
+            "case_name": (
+                "\uc774\ud63c\ubc0f"
+                "\uc7ac\uc0b0\ubd84\ud560"
             ),
         }
     ]

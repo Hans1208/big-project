@@ -15,7 +15,8 @@ public record RawInputRequest(RawInputContent content) {
             String summary,
             String details,
             List<String> summitedFileLink,
-            String consultDay
+            String consultDay,
+            String anonymizedText
     ) {
     }
 }

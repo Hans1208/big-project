@@ -149,7 +149,8 @@ public class AiAnalysisService {
                 consultation.getTitle(),
                 buildCombinedInputText(consultation),
                 fileLinks,
-                consultDay
+                consultDay,
+                buildCombinedAnonymizedText(consultation)
         ));
     }
 
@@ -170,6 +171,45 @@ public class AiAnalysisService {
         // 아직 "분석 내용 저장"을 한 번도 하지 않은 최초 "분석 시작"이면 채널별 이력 배열이
         // 비어 있다 — 이때는 현재 inputText(수기 입력 등)를 그대로 폴백으로 보낸다.
         return consultation.getInputText();
+    }
+
+    private String buildCombinedAnonymizedText(
+            Consultation consultation) {
+        String callText = String.join(
+                "\n\n",
+                nullSafe(
+                        consultation.getCallInputTextsMasked()
+                )
+        );
+        String inpersonText = String.join(
+                "\n\n",
+                nullSafe(
+                        consultation.getInpersonInputTextsMasked()
+                )
+        );
+
+        List<String> sections = new ArrayList<>();
+
+        if (!callText.isBlank()) {
+            sections.add(
+                    "[????]\n" + callText
+            );
+        }
+
+        if (!inpersonText.isBlank()) {
+            sections.add(
+                    "[????]\n" + inpersonText
+            );
+        }
+
+        if (sections.isEmpty()) {
+            return null;
+        }
+
+        return String.join(
+                "\n\n",
+                sections
+        );
     }
 
     private static List<String> nullSafe(List<String> list) {

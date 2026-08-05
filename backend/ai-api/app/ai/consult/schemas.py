@@ -253,6 +253,7 @@ class DocumentMappedList(BaseModel):
 class RawInputContent(BaseModel):
     summary: str
     details: str
+    anonymized_text: Optional[str] = None
     summited_file_link: List[str] = Field(default_factory=list)
     consult_day: Optional[str] = None
 
@@ -298,6 +299,9 @@ class ConsultAnalyzeResponse(BaseModel):
     consult_extracted: Optional[dict] = None
     consult_timeline: Optional[list] = None
     related_statutes: List[dict] = Field(
+        default_factory=list
+    )
+    related_precedents: List[dict] = Field(
         default_factory=list
     )
     case_analysis: CaseAnalysisPayload
