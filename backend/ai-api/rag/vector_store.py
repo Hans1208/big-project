@@ -333,3 +333,75 @@ class ChromaVectorStore:
         return results
 
 
+
+    def fetch_document_chunks(
+        self,
+        document_id: str,
+    ) -> list[dict[str, Any]]:
+        """한 문서(조문 하나 / 판례의 한 구획)의 청크를 순서대로 모두 가져온다.
+
+        검색(search)은 질의와 가까운 청크 하나씩만 돌려준다. 조문·판례가 길면
+        여러 청크로 쪼개져 들어가 있어서, 화면에 뜬 것은 그중 한 조각이다.
+        실측에서 판례 2022느단5199가 chunk-0002만 걸려, 본문이 "비율에 따라"라는
+        문장 중간부터 시작했다. 앞이 잘렸다는 표시가 어디에도 없어 전체를 다 본
+        것처럼 읽힌다 - 법률 문서에서는 이대로 두면 안 된다.
+
+        그래서 문서 단위로 청크를 다시 모으는 길을 연다. 유사도 검색이 아니라
+        metadata의 document_id로 정확히 일치하는 것만 가져오므로, 다른 사건의
+        본문이 섞일 수 없다.
+        """
+        clean_id = (document_id or "").strip()
+
+        if not clean_id:
+            raise ValueError(
+                "document_id는 비어 있을 수 없습니다."
+            )
+
+        raw = self.collection.get(
+            where={"document_id": clean_id},
+            include=["documents", "metadatas"],
+        )
+
+        ids = raw.get("ids") or []
+        documents = raw.get("documents") or []
+        metadatas = raw.get("metadatas") or []
+
+        chunks: list[dict[str, Any]] = []
+
+        for index, record_id in enumerate(ids):
+            metadata = (
+                metadatas[index]
+                if index < len(metadatas)
+                else {}
+            ) or {}
+            content = (
+                documents[index]
+                if index < len(documents)
+                else ""
+            ) or ""
+
+            # chunk_index는 문자열로 저장돼 있을 수 있다(_metadata_value가
+            # 모든 값을 문자열로 바꾼다). 숫자로 못 바꾸면 맨 뒤로 보낸다 -
+            # 순서를 모르는 조각 때문에 전체 순서가 흐트러지면 안 된다.
+            try:
+                order = int(metadata.get("chunk_index"))
+            except (TypeError, ValueError):
+                order = 10**9
+
+            chunks.append(
+                {
+                    "id": record_id,
+                    "chunk_index": order,
+                    "content": content,
+                    "metadata": metadata,
+                }
+            )
+
+        chunks.sort(
+            key=lambda item: (
+                item["chunk_index"],
+                item["id"],
+            )
+        )
+
+        return chunks

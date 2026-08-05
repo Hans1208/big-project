@@ -5005,7 +5005,9 @@ textarea:focus-visible,
   font: inherit;
   font-size: var(--fs-md);
   line-height: 1.7;
-  resize: none;
+  /* 받아쓰기 결과를 상담원이 직접 고치는 칸입니다. 통화가 길면 내용이 220px을 넘는데,
+     늘릴 수 없으면 고칠 곳을 찾느라 좁은 창을 계속 굴려야 합니다. 세로만 늘립니다. */
+  resize: vertical;
 }
 
 .realtimeMemoTextarea::placeholder {
@@ -13740,11 +13742,20 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   min-height: 0;
 }
 
+/* 두 칸(목록·담은 자료)이 같은 높이로 늘어나도록 flex로 두되, 화면 밖으로는
+   넘기지 않습니다. 직접 검색은 색인이 주는 만큼(최대 100건) 한 번에 받아오므로
+   max-height를 풀어두면 페이지가 끝없이 길어져, 아래 '이 상담에 저장' 버튼까지
+   한참을 스크롤해야 합니다. 목록 안에서 훑도록 상한을 둡니다. */
 .searchPanel .workflowColumns > div > .referenceList,
 .searchPanel .workflowColumns > div > .referenceSelectedPanel {
   flex: 1 1 auto;
   min-height: 420px;
-  max-height: none;
+  max-height: 70vh;
+  /* 높이를 묶으면 격자가 남은 높이에 행을 맞추려 들어, 카드가 제 내용보다 낮게
+     눌리면서 다음 카드와 글자가 겹칩니다. 행은 항상 내용 높이 그대로 두고,
+     넘치는 만큼은 위 overflow: auto가 스크롤로 처리하게 합니다. */
+  grid-auto-rows: max-content;
+  align-content: start;
 }
 
 @media (max-width: 760px) {
@@ -16782,4 +16793,80 @@ body:has(.analysisPanel) {
   white-space: pre-wrap;
   max-height: 320px;
   overflow-y: auto;
+}
+
+/* 조문·판례 원문 창.
+ * 목록 카드는 색인이 쪼개 둔 조각 하나만 싣기 때문에, 끝까지 읽으려면 문서 전체를
+ * 따로 받아 와야 합니다(FullTextModal). 판결문은 수천 자라 기존 .modal(440px)로는
+ * 읽을 수 없어, 폭을 넓히고 본문만 스크롤되게 합니다 — 제목과 닫기는 늘 보입니다. */
+.modal.fullTextModal {
+  width: min(100%, 860px);
+  max-height: 86vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  text-align: left;
+}
+
+.fullTextModalHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.fullTextModalHead h2 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.fullTextModalHead p {
+  margin: 4px 0 0;
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+}
+
+.fullTextModalClose {
+  border: 0;
+  background: none;
+  color: var(--text-sub);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 0;
+  border-radius: var(--r-chip);
+}
+
+.fullTextModalClose:hover {
+  background: var(--surface-subtle);
+  color: var(--text-main);
+}
+
+.fullTextModalBody {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-surface);
+  background: var(--surface-subtle);
+  padding: 16px;
+}
+
+/* 조문의 항 번호(①②③)와 판결문의 들여쓰기가 의미를 갖기 때문에 원문 그대로
+ * 둡니다. pre지만 가로 스크롤이 생기지 않게 줄바꿈은 허용합니다. */
+.fullTextModalText {
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-main);
+}
+
+.fullTextModalFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }

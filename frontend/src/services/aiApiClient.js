@@ -137,4 +137,26 @@ export function recommendPrecedents(analysis, { topK = 5 } = {}) {
   }, PRECEDENT_TIMEOUT_MS);
 }
 
+// 카드에 실린 본문은 검색에 걸린 '조각 하나'입니다. 색인이 조문은 800자씩,
+// 판례는 판시사항/판결요지/판례내용으로 쪼개 담기 때문입니다. 조각이 문장 중간에서
+// 시작하거나 끝나는 일이 흔한데 화면에는 잘렸다는 표시가 없어서, 끝까지 읽고
+// "이 조문엔 그런 내용 없다"고 결론내면 틀릴 수 있습니다.
+//
+// '전문 보기'는 이 두 함수로 문서 전체를 다시 받아 옵니다.
+export function fetchStatuteFullText(id) {
+  return requestJson('/statutes/full-text', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  }, STATUTE_TIMEOUT_MS);
+}
+
+// 판례는 사건 단위로 잡아야 합니다. 카드가 판시사항에서 걸렸으면 그 조각의
+// 문서 id로는 판시사항밖에 못 모으는데, 상담원이 기대하는 '전문'은 판례내용입니다.
+export function fetchPrecedentFullText({ id, precedentId = '' }) {
+  return requestJson('/precedents/full-text', {
+    method: 'POST',
+    body: JSON.stringify({ id, precedent_id: precedentId || null }),
+  }, PRECEDENT_TIMEOUT_MS);
+}
+
 export { AI_API_BASE_URL };
