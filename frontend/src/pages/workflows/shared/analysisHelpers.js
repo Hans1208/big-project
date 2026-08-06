@@ -35,7 +35,12 @@ export async function runConsultationAnalysis(consultation, options = {}) {
 
   // 분석 결과 자체를 상담에 실어 보관합니다 — 화면 상태에만 두면 페이지를 옮길 때 사라집니다.
   // 서버 저장과는 무관합니다: ai_analysis 행은 상담원이 "분석 내용 저장"을 눌러야 생깁니다.
-  const patch = { analysis };
+  //
+  // pendingServerSave는 '화면에는 있지만 아직 서버에 저장 안 된 분석'이라는 표시입니다.
+  // 이게 없으면 App의 서버 동기화(hydrateConsultationsWithCoreAnalyses)가 예전에 저장해 둔
+  // 분석을 이 상담에 다시 실어주고, 그 순간 방금 받은 결과가 옛 값으로 되돌아갑니다 —
+  // 재분석을 눌러도 구조대상·체크리스트·누락자료가 그대로였던 것이 이것입니다.
+  const patch = { analysis: { ...analysis, pendingServerSave: true } };
   if (analysis.analysisId && analysis.analysisId !== consultation.coreAnalysisId) {
     patch.coreAnalysisId = analysis.analysisId;
   }

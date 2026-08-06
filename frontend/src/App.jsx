@@ -275,6 +275,15 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
     setConsultations((items) => items.map((item) => {
       const hydrated = analysisByCoreId.get(item.coreId);
       if (!hydrated) return item;
+      // 방금 돌린 분석이 아직 저장 전이면 서버 값으로 덮지 않습니다.
+      //
+      // 이 함수는 "서버에 있는데 브라우저에 없는" 분석을 되살리려고 있습니다. 그런데
+      // 상담원이 재분석을 막 돌린 상태에서 이게 돌면, 화면에 뜬 새 결과가 예전에 저장한
+      // 분석으로 되돌아갑니다 — 재분석을 해도 구조대상·체크리스트·누락자료가 그대로였던
+      // 것이 이것입니다(실측: eligibility 대상 -> 판단보류, 누락자료 3건 -> 1건).
+      //
+      // 저장하면 이 표시가 지워지므로(notifyAnalysisSaved) 그 뒤로는 정상 동기화됩니다.
+      if (item.analysis?.pendingServerSave) return item;
       const sameAnalysis = item.coreAnalysisId && String(item.coreAnalysisId) === String(hydrated.coreAnalysisId);
       if (sameAnalysis && item.analysis?.summary === hydrated.analysis.summary) return item;
       return {
@@ -617,7 +626,9 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       setConsultations((items) => items.map((item) => (item.id === consultation.id
         ? {
           ...item,
-          analysis: { ...(item.analysis || {}), ...analysis },
+          // 서버에 들어갔으니 '저장 전' 표시를 지웁니다. 안 지우면 그 뒤로 서버
+          // 동기화가 이 상담을 영원히 건너뜁니다(hydrateConsultationsWithCoreAnalyses).
+          analysis: { ...(item.analysis || {}), ...analysis, pendingServerSave: false },
           coreAnalysisId: analysisId || item.coreAnalysisId,
         }
         : item)));
