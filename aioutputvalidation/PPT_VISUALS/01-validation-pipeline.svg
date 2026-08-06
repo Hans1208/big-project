@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#f7f9fc"/>
+  <text x="800" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" font-weight="700" fill="#152238">AI Output Validation Pipeline</text>
+  <text x="800" y="122" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#5f6b7a">JSON 구조 · 검색 근거 · 환각 위험을 순차 검증</text>
+  <g font-family="Arial, sans-serif" text-anchor="middle">
+    <rect x="70" y="315" width="230" height="200" rx="22" fill="#243b64"/>
+    <text x="185" y="382" font-size="27" font-weight="700" fill="white">LLM Output</text><text x="185" y="425" font-size="20" fill="#dbe7ff">구조화 상담 JSON</text>
+    <rect x="390" y="250" width="260" height="330" rx="22" fill="#e6f0ff" stroke="#3974c4" stroke-width="3"/>
+    <text x="520" y="320" font-size="28" font-weight="700" fill="#173961">01 JSON Schema</text><text x="520" y="363" font-size="21" fill="#34495e">필수 필드 · 타입</text><text x="520" y="398" font-size="21" fill="#34495e">열거값 · 추가 필드</text><text x="520" y="470" font-size="24" font-weight="700" fill="#218058">PASS / BLOCK</text>
+    <rect x="730" y="250" width="260" height="330" rx="22" fill="#eaf8f1" stroke="#299c69" stroke-width="3"/>
+    <text x="860" y="320" font-size="28" font-weight="700" fill="#176141">02 Evidence</text><text x="860" y="363" font-size="21" fill="#34495e">주장 ↔ RAG 근거</text><text x="860" y="398" font-size="21" fill="#34495e">Contrastive Similarity</text><text x="860" y="470" font-size="24" font-weight="700" fill="#218058">evidence score</text>
+    <rect x="1070" y="250" width="260" height="330" rx="22" fill="#fff2e1" stroke="#dd8b2a" stroke-width="3"/>
+    <text x="1200" y="320" font-size="28" font-weight="700" fill="#8b4a02">03 Hallucination</text><text x="1200" y="363" font-size="21" fill="#34495e">5개 위험 특성</text><text x="1200" y="398" font-size="21" fill="#34495e">MLP 5 → 8 → 1</text><text x="1200" y="470" font-size="24" font-weight="700" fill="#b45a00">risk probability</text>
+    <rect x="1390" y="315" width="150" height="200" rx="22" fill="#2c3444"/>
+    <text x="1465" y="374" font-size="23" font-weight="700" fill="white">Decision</text><text x="1465" y="418" font-size="18" fill="#d9e2f0">Safe</text><text x="1465" y="447" font-size="18" fill="#ffd08a">Review</text><text x="1465" y="476" font-size="18" fill="#ff9d9d">High risk</text>
+  </g>
+  <g stroke="#64748b" stroke-width="5" fill="none"><path d="M300 415H370"/><path d="M650 415H710"/><path d="M990 415H1050"/><path d="M1330 415H1370"/></g>
+  <g fill="#64748b"><path d="M370 405l20 10-20 10z"/><path d="M710 405l20 10-20 10z"/><path d="M1050 405l20 10-20 10z"/><path d="M1370 405l20 10-20 10z"/></g>
+  <rect x="250" y="680" width="1100" height="90" rx="15" fill="#fff" stroke="#d9e0ea"/><text x="800" y="735" text-anchor="middle" font-family="Arial, sans-serif" font-size="25" fill="#334155">운영 원칙: 법률 판단을 자동 확정하지 않고, 위험 결과는 사람 검토로 전환</text>
+  <text x="80" y="850" font-family="Arial, sans-serif" font-size="20" fill="#536174">Round 71 최종 독립 검증 반영 · 위험 답변 safe 통과 0건</text>
+</svg>

@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.ai.analysis import service as analysis_service
 from app.ai.consult.graph import run_consult_analysis
+from app.ai.output_validation.service import validate_consultation_output
 from app.ai.consult.rag_service import (
     collect_related_legal_sources,
 )
@@ -84,9 +85,11 @@ async def analyze_consult(
             top_n=5,
         )
     )
+    output_validation = validate_consultation_output(analysis_output=analysis.output, consultation_text=consult_text)
 
     return {
         **result,
         **analysis.to_dict(),
         **legal_sources,
+        "output_validation": output_validation,
     }

@@ -93,12 +93,14 @@ class ConsultAnalysis:
         case_subtype: Optional[str] = None,
         extracted: Optional[dict] = None,
         timeline: Optional[list] = None,
+        output: Optional[dict] = None,
     ):
         self.summary = summary
         self.case_type = case_type
         self.case_subtype = case_subtype
         self.extracted = extracted
         self.timeline = timeline
+        self.output = output
 
     def to_dict(self) -> dict:
         return {
@@ -152,6 +154,7 @@ def analyze(consult_text: str) -> ConsultAnalysis:
         case_subtype=data.get("case_subtype"),
         extracted=extracted,
         timeline=data.get("timeline_json"),
+        output=data,
     )
 
 

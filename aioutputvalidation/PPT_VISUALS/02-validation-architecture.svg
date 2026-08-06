@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720" role="img" aria-labelledby="title desc">
+  <title id="title">AI 출력 검증 아키텍처</title><desc id="desc">AI 출력과 전사 및 RAG 근거가 세 단계 검증을 거쳐 위험 판정과 사람 검토로 이어지는 구조</desc>
+  <rect width="1400" height="720" fill="#0f172a"/>
+  <text x="80" y="88" fill="#f8fafc" font-family="Arial, sans-serif" font-size="40" font-weight="700">AI 출력 검증 아키텍처</text><text x="80" y="132" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="21">구조 오류 · 근거 공백 · 명시 사실충돌을 분리해 감사 가능한 판정으로 연결</text>
+  <rect x="80" y="245" width="230" height="190" rx="18" fill="#1e3a8a"/><text x="115" y="305" fill="#dbeafe" font-family="Arial, sans-serif" font-size="25" font-weight="700">입력</text><text x="115" y="350" fill="#dbeafe" font-family="Arial, sans-serif" font-size="19">AI 구조화 출력</text><text x="115" y="382" fill="#dbeafe" font-family="Arial, sans-serif" font-size="19">전사 · RAG 근거</text>
+  <path d="M335 340 H420" stroke="#38bdf8" stroke-width="6" marker-end="url(#a)"/>
+  <rect x="445" y="205" width="225" height="270" rx="18" fill="#0f766e"/><text x="480" y="270" fill="#ccfbf1" font-family="Arial, sans-serif" font-size="24" font-weight="700">1. Schema</text><text x="480" y="315" fill="#ccfbf1" font-family="Arial, sans-serif" font-size="18">필수 필드</text><text x="480" y="345" fill="#ccfbf1" font-family="Arial, sans-serif" font-size="18">자료형 · 추가 필드</text><text x="480" y="375" fill="#ccfbf1" font-family="Arial, sans-serif" font-size="18">사건 분류 일치</text>
+  <path d="M695 340 H780" stroke="#38bdf8" stroke-width="6" marker-end="url(#a)"/>
+  <rect x="805" y="205" width="225" height="270" rx="18" fill="#854d0e"/><text x="840" y="270" fill="#fef3c7" font-family="Arial, sans-serif" font-size="24" font-weight="700">2. 근거 대조</text><text x="840" y="315" fill="#fef3c7" font-family="Arial, sans-serif" font-size="18">발화 단위 E5</text><text x="840" y="345" fill="#fef3c7" font-family="Arial, sans-serif" font-size="18">근거 유사도</text><text x="840" y="375" fill="#fef3c7" font-family="Arial, sans-serif" font-size="18">인용 누락</text>
+  <path d="M1055 340 H1140" stroke="#38bdf8" stroke-width="6" marker-end="url(#a)"/>
+  <rect x="1165" y="205" width="160" height="270" rx="18" fill="#7f1d1d"/><text x="1195" y="270" fill="#fee2e2" font-family="Arial, sans-serif" font-size="24" font-weight="700">3. 위험</text><text x="1195" y="315" fill="#fee2e2" font-family="Arial, sans-serif" font-size="18">MLP + 규칙</text><text x="1195" y="345" fill="#fee2e2" font-family="Arial, sans-serif" font-size="18">사실충돌</text><text x="1195" y="375" fill="#fee2e2" font-family="Arial, sans-serif" font-size="18">3단계 판정</text>
+  <rect x="315" y="545" width="770" height="75" rx="16" fill="#1e293b"/><text x="357" y="592" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="23">safe · review_required · high_risk → 사람 블라인드 검토 → 감사 기록</text>
+  <defs><marker id="a" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#38bdf8"/></marker></defs>
+  <text x="80" y="850" font-family="Arial, sans-serif" font-size="20" fill="#536174">Round 71: review_required·high_risk는 사람 검토 큐 유지</text>
+</svg>

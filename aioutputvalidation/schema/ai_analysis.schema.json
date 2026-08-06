@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI Analysis Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "case_type", "case_subtype", "urgency_level", "eligibility", "extracted_json", "missing_info_json", "checklist_json", "timeline_json"],
+  "properties": {
+    "analysis_id": {"type": "string"},
+    "consultation_id": {"type": "string"},
+    "summary": {"type": "string", "minLength": 1},
+    "case_type": {"enum": ["친족", "상속", "가사소송", "가족관계등록"]},
+    "case_subtype": {"enum": ["약혼", "혼인의 성립, 무효, 취소", "협의이혼", "재판상이혼 등", "이혼 및 위자료", "이혼 및 재산분할청구권", "양육비", "면접교섭권", "입양, 파양, 친양자", "친권", "후견인", "부양", "상속일반", "상속분", "상속재산분할", "유언", "유류분", "가사소송일반", "가,나,다류 가사소송", "라,마류 가사비송", "양육비직접지급명령", "이행명령", "과태료와 감치", "기타", "신고", "국적의 취득과 상실", "성본창설과 개명", "가족관계등록창설", "가족관계등록부정정"]},
+    "urgency_level": {"enum": ["상", "중", "하"]},
+    "eligibility": {"enum": ["대상후보", "비대상후보", "확인필요"]},
+    "extracted_json": {
+      "type": "object", "additionalProperties": false,
+      "required": ["당사자", "금액", "날짜", "사건개요"],
+      "properties": {
+        "당사자": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["역할", "이름"], "properties": {"역할": {"type": "string"}, "이름": {"type": "string"}}}},
+        "금액": {"type": ["integer", "null"]},
+        "날짜": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["항목", "값"], "properties": {"항목": {"type": "string"}, "값": {"type": "string"}}}},
+        "사건개요": {"type": "string"}
+      }
+    },
+    "missing_info_json": {"type": "array", "items": {"type": "string"}},
+    "checklist_json": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["항목", "결과"], "properties": {"항목": {"type": "string"}, "결과": {"enum": ["충족", "미충족", "확인필요"]}}}},
+    "timeline_json": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["날짜", "내용"], "properties": {"날짜": {"type": "string"}, "내용": {"type": "string"}}}}
+    ,"recommendation_json": {"type": "object"}
+    ,"cluster_result_json": {"type": "array"}
+    ,"estimated_time": {"type": ["string", "null"]}
+    ,"created_at": {"type": "string"}
+  },
+  "allOf": [
+    {"if": {"properties": {"case_type": {"const": "친족"}}}, "then": {"properties": {"case_subtype": {"enum": ["약혼", "혼인의 성립, 무효, 취소", "협의이혼", "재판상이혼 등", "이혼 및 위자료", "이혼 및 재산분할청구권", "양육비", "면접교섭권", "입양, 파양, 친양자", "친권", "후견인", "부양"]}}}},
+    {"if": {"properties": {"case_type": {"const": "상속"}}}, "then": {"properties": {"case_subtype": {"enum": ["상속일반", "상속분", "상속재산분할", "유언", "유류분"]}}}},
+    {"if": {"properties": {"case_type": {"const": "가사소송"}}}, "then": {"properties": {"case_subtype": {"enum": ["가사소송일반", "가,나,다류 가사소송", "라,마류 가사비송", "양육비직접지급명령", "이행명령", "과태료와 감치", "기타"]}}}},
+    {"if": {"properties": {"case_type": {"const": "가족관계등록"}}}, "then": {"properties": {"case_subtype": {"enum": ["신고", "국적의 취득과 상실", "성본창설과 개명", "가족관계등록창설", "가족관계등록부정정"]}}}}
+  ]
+}

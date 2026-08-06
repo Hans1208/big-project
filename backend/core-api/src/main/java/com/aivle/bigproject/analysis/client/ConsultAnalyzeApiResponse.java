@@ -23,6 +23,9 @@ public record ConsultAnalyzeApiResponse(
         JsonNode relatedStatutes,
         JsonNode relatedPrecedents,
         JsonNode relatedConsultations,
+        // ai-api의 JSON Schema·근거·환각 위험 검증 결과. core-api가 이 값을
+        // extracted_json에 보존해 상담원·변호사 화면이 실제 판정을 표시한다.
+        JsonNode outputValidation,
         JsonNode caseAnalysis,
         JsonNode reliefReviewChecklist,
         JsonNode missingItems
@@ -45,6 +48,7 @@ public record ConsultAnalyzeApiResponse(
                 consultCaseSubtype,
                 consultExtracted,
                 consultTimeline,
+                null,
                 null,
                 null,
                 null,

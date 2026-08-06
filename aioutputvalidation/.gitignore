@@ -1,0 +1,46 @@
+# Python/runtime cache
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments and model-download caches
+.venv/
+venv/
+env/
+.cache/
+hf_cache/
+huggingface/
+
+# API secrets placed inside this module
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials/
+
+# Reproducible, non-promoted contrastive candidate checkpoints
+# Evaluation reports in data/61_* and data/62_* remain tracked.
+models/candidates/contrastive_e5_*/
+*.safetensors
+*.onnx
+*.pt
+*.pth
+
+# Never commit real or personally identifiable consultation material.
+data/private/
+data/real_consultations/
+data/raw_audio/
+data/uploads/
+*.wav
+*.mp3
+*.m4a
+
+# Local editor/OS files
+.DS_Store
+Thumbs.db

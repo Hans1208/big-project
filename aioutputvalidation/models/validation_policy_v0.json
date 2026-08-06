@@ -1,0 +1,8 @@
+{
+  "policy_name": "ai_output_validation",
+  "policy_version": "0.1.0",
+  "evidence_support_threshold": 0.72,
+  "review_probability_threshold": 0.35,
+  "high_risk_probability_threshold": 0.70,
+  "minimum_recall_target": 0.80
+}

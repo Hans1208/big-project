@@ -1,0 +1,22 @@
+{
+  "active_model_version": "mlp_weights_v1",
+  "runtime_mode": "shadow",
+  "model_path": "models/active/mlp_weights_v1.json",
+  "decision_threshold": 0.034,
+  "promotion_gate": {
+    "minimum_validation_recall": 0.8,
+    "validation_recall": 1.0,
+    "validation_f1": 0.6667
+  },
+  "evaluation_version": "fixed_split_v1",
+  "activation_requirement": "Validate identical feature extraction against the backend RAG request before changing runtime_mode to active.",
+  "threshold_recalibration": {
+    "reason": "Round 44-50 diagnostics found the safe/review_required boundary too permissive: a 10-case M그룹 boundary group scored hallucination_probability ~0.0375-0.0386 every round (S그룹 safe cases ~0.0306-0.0313) and was always safe under the previous 0.043977644207680223 threshold plus a separate hardcoded-0.12 bug in output_validation_runner.py.",
+    "previous_decision_threshold": 0.043977644207680223,
+    "calibration_source": "data/52_round44_diagnostic .. data/58_round50_diagnostic validation_results (used only as calibration data, per ACCURACY_GOVERNANCE.md; not reused as the independent verification set)",
+    "calibration_best_f1_threshold": 0.0371,
+    "selected_threshold": 0.034,
+    "selection_note": "Chosen near the midpoint between calibration S그룹 max (0.0313) and M/H그룹 min (~0.0371-0.0375) rather than the tight best-F1 fit, to leave a safety margin against overfitting to the calibration rounds.",
+    "independent_verification": "data/59_round51_holdout (new synthetic cases, not reused from Round 1-50)"
+  }
+}
