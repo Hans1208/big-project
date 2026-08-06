@@ -49,6 +49,31 @@ class ExtractedInfo(BaseModel):
     금액: Optional[int] = Field(description="재산분할·양육비·위자료 등 금액(원). 없으면 null")
     날짜: List[DateEntry] = Field(description="주요 날짜 목록. 없으면 빈 배열")
     사건개요: str = Field(description="상담 내용 기반 1~2문장 핵심 사건 요약")
+    # 아래 셋은 서식 초안에 그대로 들어가는 값이다. 법원 서식의 당사자 주소는 송달을
+    # 위한 법정 필수 기재사항이라, 비어 있으면 상담원이 초안을 받아 손으로 채워야 한다.
+    #
+    # extra="forbid"라서 프롬프트에만 적으면 모델이 만들어도 버려진다 — 여기에 필드를
+    # 두어야 실제로 넘어온다.
+    #
+    # 주민등록번호는 여기에 두지 않는다. 개인정보 보호법 제24조의2가 동의가 아니라
+    # 법령 근거를 요구해서, 상담에서 말했더라도 이 시스템은 보관하지 않는다.
+    # default를 주면 안 된다. 기본값이 있으면 JSON 스키마에서 required가 빠지고,
+    # Gemini는 필수가 아닌 필드를 아예 안 내보낸다 — 실측에서 이 셋만 응답에서
+    # 통째로 사라졌다(당사자·금액·날짜·사건개요는 그대로 왔다).
+    # 위 '금액'이 같은 방식이다. default 없는 Optional이라 필수이면서 null을 허용해서,
+    # 모르는 사건에서는 "금액": null로 온다.
+    주소: Optional[str] = Field(
+        description="상담자 본인의 주소. 상대방·사망자의 주소나 등록기준지는 제외. "
+                    "들은 만큼만 적고 없으면 null",
+    )
+    전화번호: Optional[str] = Field(
+        description="상담자 본인의 연락처. 자릿수가 안 맞거나 중간이 끊겼으면 null "
+                    "— 틀린 번호는 송달 실패로 이어지므로 비워 두는 편이 낫다",
+    )
+    개인정보동의: Optional[bool] = Field(
+        description="상담원이 주소·전화번호 수집을 안내하고 상담자가 동의했으면 true. "
+                    "안내가 없었거나 거절했으면 false, 애매하면 false",
+    )
     model_config = {"extra": "forbid"}
 
 
