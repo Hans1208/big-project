@@ -615,9 +615,14 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
     return {
       ...analysis,
       sourceAttachments,
-      recommendation: cachedRecommendations?.length
-        ? { recommendations: cachedRecommendations }
-        : (analysis?.recommendation || {}),
+      // recommendation 한 칸에 서로 다른 두 가지가 같이 삽니다 — 서식 추천
+      // (recommendations)과 법령·판례 화면에서 담은 자료(adopted). 예전에는 서식
+      // 추천이 있으면 이 칸을 통째로 갈아끼워서, 담아둔 법령·판례가 저장할 때마다
+      // 지워졌습니다. 덮어쓰지 말고 서식 추천만 얹습니다.
+      recommendation: {
+        ...(analysis?.recommendation || {}),
+        ...(cachedRecommendations?.length ? { recommendations: cachedRecommendations } : {}),
+      },
       extractedJson: {
         ...(analysis?.extractedJson || {}),
         attachment_links: sourceAttachments,

@@ -781,14 +781,49 @@ def _verify_rewrite(text, years, money):
     return v
 
 
+# hwpx 문단 안의 글자 노드. run 안에 여러 개 있을 수 있다.
+_HP_TEXT_TAG = "{http://www.hancom.co.kr/hwpml/2011/paragraph}t"
+
+
+def _purge_run_text(run) -> None:
+    """run에 남아 있는 글자를 모두 지운다. 탭 같은 자식 요소는 남긴다.
+
+    python-hwpx의 run.text 세터는 '자식 요소가 없는 <hp:t>'에만 글을 쓴다
+    (_plain_text_nodes). 그런데 서식은 칸을 맞추려고 글자 사이에 <hp:tab/>을
+    넣고, 그러면 그 <hp:t>는 자식이 있는 노드가 된다 — 세터는 거기에 못 쓰고
+    새 <hp:t>를 뒤에 만들어 붙인다. 원래 글자는 <hp:tab/>의 tail에 그대로
+    남아 지워지지 않는다(세터가 지우는 건 node.text뿐이다).
+
+    그래서 상속재산포기 심판청구서의 서명란이
+
+        원본   청 구 인 <탭>1. ○  ○  ○   (인감도장)
+        결과   청 구 인 1. ○  ○  ○   (인감도장)      ← 원본이 안 지워짐
+               청 구 인 1. ○  ○  ○   (인감도장)      ← C단계가 다시 읽어 되쓴 것
+               청 구 인 1. 문가영   (인감도장)         ← 실제로 채운 값
+
+    처럼 한 줄에 세 번 찍혔다. 남은 ○ ○ ○ 때문에 C단계가 [예시:확인필요]까지
+    붙이면서 두 번이 세 번이 됐다. 291개 서식 중 178개가 이런 <hp:t>를 갖고
+    있어, 글자를 새로 써넣는 줄이면 어디서든 같은 일이 난다.
+
+    탭 요소 자체는 지우지 않는다 — 지우면 서식의 들여쓰기가 무너진다."""
+    element = getattr(run, "element", None)
+    if element is None:
+        return
+    for node in element.findall(_HP_TEXT_TAG):
+        node.text = ""
+        for child in node:
+            child.tail = ""
+
+
 def _set_paragraph_text(p, text: str):
     """문단 객체의 첫 run에 text, 나머지 run 비움."""
     runs = getattr(p, "runs", [])
     if not runs:
         return False
+    # 세터에 맡기면 탭 뒤에 숨은 원본 글자가 안 지워진다 — 먼저 비우고 쓴다.
+    for r in runs:
+        _purge_run_text(r)
     runs[0].text = text
-    for r in runs[1:]:
-        r.text = ""
     return True
 
 
@@ -801,7 +836,11 @@ PARA_EXAMPLE_TAG = " [예시:확인필요]"
 
 
 def _tag_paragraph(runs) -> None:
-    runs[-1].text = (runs[-1].text or "") + PARA_EXAMPLE_TAG
+    # 읽은 글자를 그대로 되쓰는 자리라, 탭 뒤에 숨은 글자가 안 지워지면 줄이
+    # 통째로 한 번 더 찍힌다(_purge_run_text 주석 참고).
+    tagged = (runs[-1].text or "") + PARA_EXAMPLE_TAG
+    _purge_run_text(runs[-1])
+    runs[-1].text = tagged
 
 
 # 재서술이 불가능한 서술문단 자리에 남기는 문구. 원본(남의 사연)을 그대로 두는
@@ -993,6 +1032,17 @@ def _replace_first_in_runs(doc, target, value):
             for run in getattr(p, "runs", []):
                 t = getattr(run, "text", None)
                 if t and target in t:
+                    # 라이브러리의 replace_text는 탭 같은 자식 요소를 넘나들며
+                    # 제자리 치환을 한다 — run.text 세터와 달리 탭 뒤에 숨은
+                    # 글자도 지운다(_purge_run_text 주석 참고). 탭 위치도 그대로
+                    # 남아 서식의 칸 맞춤이 안 밀린다.
+                    try:
+                        if run.replace_text(target, value, count=1):
+                            return 1
+                    except Exception:
+                        pass
+                    # 치환기가 못 잡으면 줄 전체를 다시 쓴다(탭은 앞으로 밀린다).
+                    _purge_run_text(run)
                     run.text = t.replace(target, value, 1)
                     return 1
     return 0
@@ -1549,6 +1599,83 @@ def _fill_names_in_narrative(doc, replacements: list) -> tuple:
                     return head + _n
 
                 new_text = pat.sub(_sub, new_text)
+            if new_text != text and _set_paragraph_text(p, new_text):
+                filled += 1
+                written.add(new_text)
+    return filled, written
+
+
+# 사망 표시와 이름 자리표시자 사이에 낄 수 있는 글자. 공백·괄호·콜론과 '망'
+# 한 글자만 허용한다("피상속인 망 △△△"). 여기에 다른 한글이 끼면 그건 서식
+# 제작자가 넣은 예시 인물의 성씨다 — "소외 망 김□□"의 '김'. 그대로 채우면
+# "망 김백승현"처럼 성이 둘인 없는 사람이 만들어진다(실측: 친생자관계부존재확인
+# 청구의 소에서 11곳이 그렇게 나왔다). 성씨가 붙어 있으면 그 자리는 우리
+# 사망자가 아니라 서식의 등장인물이므로 아예 건드리지 않는다.
+_DECEASED_SLOT_GAP_RE = re.compile(r"^[\s망:：()（）]{0,4}$")
+
+# 자리표시자 바로 뒤에 이런 글자가 오면 사람 이름칸이 아니라 주소칸이다 —
+# "유언자 ○○시 ○○구 ○○길"을 채우면 "유언자 백승현시"가 된다(실측).
+# 조사로도 쓰이는 '가'·'로'는 넣지 않는다("망 ○○○가 사망하여"를 막게 된다).
+_ADDRESS_UNIT_RE = re.compile(r"^(시|도|군|구|읍|면|동|리|길|번지|아파트|호)")
+
+
+def _fill_deceased_name_slots(doc, extracted: dict) -> tuple:
+    """"망 △△△"처럼 사망 표시 바로 뒤에 남은 이름칸을 사망자 이름으로 채운다.
+
+    상속재산포기 심판청구서에서 사건본인(사망자) 칸에는 백승현이 들어갔는데
+    청구취지·청구원인의
+
+        청구인들의 망 △△△에 대한 재산상속포기 신고는 이를 수리한다.
+        청구인들은 피상속인 망 △△△의 재산상속인으로서 …
+
+    는 비어 있었다. 두 갈래가 다 막혀 있어서다 —
+      · _fill_names_in_narrative는 라벨이 PERSON_LABELS에 있어야 채우는데
+        이 줄의 라벨은 '청구인들의망'으로 잡혀 목록에 없다.
+      · _fill_known_role_names는 '망'이 앞에 붙으면 청구인·상대방을 넣지 않고
+        (그게 맞다 — 산 청구인이 자기 상속을 포기하는 문서가 된다),
+        사망자 이름을 넣으려면 줄에 '사건본인'이라는 글자가 있어야 하는데 없다.
+
+    여기서는 사망 표시 바로 뒤에 붙은 자리표시자만 본다. 그 자리의 주인은
+    정의상 사망자라, 사람이 뒤바뀔 여지가 없다. 사이에 예시 성씨가 끼었거나
+    (_DECEASED_SLOT_GAP_RE) 뒤가 주소칸이면(_ADDRESS_UNIT_RE) 건너뛴다.
+
+    추측이 아니라 옮겨 적기다 — 추출정보에 사망자로 명시된 이름만 쓰고,
+    후보가 둘 이상이면 누구인지 못 고르므로 아예 손대지 않는다.
+
+    반환: (채운 자리 수, 바뀐 문단 텍스트 집합)"""
+    names = _known_names_by_role(extracted, DECEASED_KEY_RE)
+    if len(names) != 1:
+        return 0, set()
+    name = next(iter(names))
+
+    filled, written = 0, set()
+    for sec in doc.sections:
+        for p in sec.paragraphs:
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(x, "text", "") or "" for x in runs)
+            # 이미 그 이름이 있는 줄은 건드리지 않는다(사건본인란 등).
+            if name in text or not NAME_PLACEHOLDER_RE.search(text):
+                continue
+            parts, cursor = [], 0
+            for label in DECEASED_LABEL_RE.finditer(text):
+                if label.end() < cursor:
+                    continue
+                slot = NAME_PLACEHOLDER_RE.search(text, max(cursor, label.end()))
+                if not slot:
+                    continue
+                if not _DECEASED_SLOT_GAP_RE.match(text[label.end():slot.start()]):
+                    continue
+                if _ADDRESS_UNIT_RE.match(text[slot.end():]):
+                    continue
+                parts.append(text[cursor:slot.start()])
+                parts.append(name)
+                cursor = slot.end()
+            if not parts:
+                continue
+            parts.append(text[cursor:])
+            new_text = "".join(parts)
             if new_text != text and _set_paragraph_text(p, new_text):
                 filled += 1
                 written.add(new_text)
@@ -2345,6 +2472,12 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     narr_filled, narr_texts = _fill_names_in_narrative(doc, reps)
     applied += narr_filled
 
+    # 청구취지·청구원인의 "망 △△△"처럼 사망 표시 뒤에 남은 이름칸을 채운다.
+    # 문장은 건드리지 않는다 — 청구취지는 정형 문구라 다시 쓰면 청구가 사라진다.
+    deceased_filled, deceased_texts = _fill_deceased_name_slots(doc, extracted)
+    applied += deceased_filled
+    narr_texts = set(narr_texts) | deceased_texts
+
     # 값이 다 들어간 뒤, 사람 수보다 칸이 적으면 마지막 칸을 복제해 늘린다.
     # (상속인 4명인데 성명칸·배분항목이 3벌뿐인 협의서 등)
     grown_texts, grown_slots = _grow_name_slot_groups(doc, people)
@@ -2452,6 +2585,8 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
             # 역할별 이름으로 코드가 직접 채운 칸 수(서명란 등)와,
             # 역할을 몰라 채우지 않고 비워둔 이름칸 수.
             "role_filled": role_filled,
+            # 사망 표시 뒤 이름칸("망 △△△")에 사망자 이름을 채운 횟수.
+            "deceased_filled": deceased_filled,
             # 상담원이 확인한 이름으로 분석값을 고친 횟수.
             # 0이 계속 나오면 core-api가 이름을 안 보내고 있다는 신호다.
             "name_corrections": name_corrections,
