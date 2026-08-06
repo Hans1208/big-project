@@ -12,6 +12,7 @@ from typing import Any, Iterable, Sequence
 from jsonschema import Draft202012Validator
 
 from policy import load_policy
+from training import FEATURE_NAMES
 
 
 SUPPORT_THRESHOLD = load_policy().evidence_support_threshold
@@ -66,7 +67,9 @@ def evidence_scores(claim_embeddings: Iterable[Sequence[float]], evidence_embedd
 def _load_model_at(path_text: str) -> dict[str, Any]:
     path = Path(path_text)
     model = json.loads(path.read_text(encoding="utf-8"))
-    if model.get("architecture") != [5, 8, 1]:
+    feature_names = model.get("feature_names", FEATURE_NAMES)
+    architecture = model.get("architecture")
+    if architecture is None or architecture[0] != len(feature_names) or architecture[-1] != 1:
         raise ValueError("unsupported hallucination model architecture")
     return model
 
@@ -89,10 +92,12 @@ def load_model_weights() -> dict[str, Any]:
     return load_runtime()[0]
 
 
-def _mlp_probability(features: Sequence[float]) -> float:
-    """Run versioned 5→8→1 MLP weights against the five auditable features."""
+def _mlp_probability(features: dict[str, float]) -> float:
+    """Run the versioned MLP weights, ordering inputs by the model's own feature_names."""
     model = load_model_weights()
-    hidden = [max(0.0, sum(w * x for w, x in zip(row, features)) + bias) for row, bias in zip(model["weights_1"], model["bias_1"])]
+    names = tuple(model.get("feature_names", FEATURE_NAMES))
+    values = [float(features[name]) for name in names]
+    hidden = [max(0.0, sum(w * x for w, x in zip(row, values)) + bias) for row, bias in zip(model["weights_1"], model["bias_1"])]
     logit = sum(w * x for w, x in zip(model["weights_2"], hidden)) + model["bias_2"]
     return 1.0 / (1.0 + math.exp(-logit))
 
@@ -105,7 +110,13 @@ def validate(payload: Any, claim_embeddings: Iterable[Sequence[float]], evidence
     evidence_score = sum(scores) / len(scores) if scores else 0.0
     low_support_ratio = sum(score < SUPPORT_THRESHOLD for score in scores) / len(scores) if scores else 1.0
     citation_missing_ratio = max(0, len(claim_vectors) - cited_claim_count) / len(claim_vectors) if claim_vectors else 1.0
-    features = (float(bool(errors)), 1 - evidence_score, low_support_ratio, citation_missing_ratio, float(low_support_ratio > 0 and not uncertainty_disclosed))
+    features = {
+        "schema_error": float(bool(errors)),
+        "evidence_gap": 1 - evidence_score,
+        "low_support_ratio": low_support_ratio,
+        "citation_missing_ratio": citation_missing_ratio,
+        "uncertainty_absent": float(low_support_ratio > 0 and not uncertainty_disclosed),
+    }
     probability = _mlp_probability(features)
     policy = load_policy()
     _, calibrated_threshold = load_runtime()

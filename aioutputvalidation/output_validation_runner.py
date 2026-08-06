@@ -36,7 +36,9 @@ def validate_observation(observation: dict, model: dict, threshold: float, model
     evidence_score = sum(float(item["evidence_score"]) for item in scores) / len(scores) if scores else 0.0
     features = {
         "schema_error": float(observation["schema_error"]),
-        "evidence_gap": 1 - evidence_score,
+        # Rounded to match the precision output_feedback_training.py bakes into
+        # training rows, so the MLP is scored on the same feature contract it was trained on.
+        "evidence_gap": round(1 - evidence_score, 4),
         "low_support_ratio": float(observation["low_support_ratio"]),
         "citation_missing_ratio": float(observation["citation_missing_ratio"]),
         "uncertainty_absent": float(not observation["uncertainty_disclosed"]),

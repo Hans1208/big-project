@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from validator import SUPPORT_THRESHOLD, ValidationResult, load_model_weights
+from validator import SUPPORT_THRESHOLD, ValidationResult, load_model_weights, load_runtime
 from policy import load_policy
 
 
@@ -16,7 +16,12 @@ def build_audit_record(result: ValidationResult) -> dict[str, Any]:
     weak_claims = [index + 1 for index, score in enumerate(result.claim_evidence_scores) if score < SUPPORT_THRESHOLD]
     if weak_claims:
         reasons.append(f"weak evidence for claim indexes: {weak_claims}")
-    if result.hallucination_probability >= 0.70:
+    # Mirror validate()'s own threshold selection so this explanation can never disagree
+    # with the decision it is describing (a promoted model's calibrated threshold
+    # overrides the static policy threshold there too).
+    _, calibrated_threshold = load_runtime()
+    high_risk_threshold = calibrated_threshold if calibrated_threshold is not None else load_policy().high_risk_probability_threshold
+    if result.hallucination_probability >= high_risk_threshold:
         reasons.append("hallucination probability exceeded high-risk threshold")
     elif result.decision == "review_required":
         reasons.append("manual review threshold triggered")

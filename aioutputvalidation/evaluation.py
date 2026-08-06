@@ -66,11 +66,8 @@ def select_threshold_by_f1(
     if not 0 <= minimum_recall <= 1:
         raise ValueError("minimum_recall must be between 0 and 1")
     candidates = sorted(set(probabilities) | {0.0, 1.0})
-    eligible = [
-        evaluate_hallucination_predictions(labels, probabilities, threshold)
-        for threshold in candidates
-        if evaluate_hallucination_predictions(labels, probabilities, threshold).recall >= minimum_recall
-    ]
+    metrics_by_threshold = [evaluate_hallucination_predictions(labels, probabilities, threshold) for threshold in candidates]
+    eligible = [metrics for metrics in metrics_by_threshold if metrics.recall >= minimum_recall]
     if not eligible:
         raise ValueError("no threshold meets minimum_recall")
     best = max(eligible, key=lambda metric: (metric.f1, metric.precision, metric.threshold))

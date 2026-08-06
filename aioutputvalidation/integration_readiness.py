@@ -28,8 +28,7 @@ def find_consult_response_gaps(response: dict[str, Any]) -> list[str]:
             errors.append(f"consult response missing RAG sources: {field}")
     # The response projection exposes only five analysis fields. The remaining
     # four must be preserved from the original Pydantic result for schema validation.
-    errors.extend(
-        f"full analysis projection required before validation: {field}"
-        for field in ("urgency_level", "eligibility", "missing_info_json", "checklist_json")
-    )
+    for field in ("urgency_level", "eligibility", "missing_info_json", "checklist_json"):
+        if field not in response:
+            errors.append(f"full analysis projection required before validation: {field}")
     return errors

@@ -46,8 +46,13 @@ def expand(data_root: Path, target_per_difficulty: int = 15) -> list[dict]:
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     for difficulty, code in (("easy", "E"), ("medium", "M"), ("hard", "H")):
         existing = [item for item in catalog if item["difficulty"] == difficulty]
-        for number in range(len(existing) + 1, target_per_difficulty + 1):
-            case_type, subtype, topic = BLUEPRINTS[difficulty][(number - 4) % len(BLUEPRINTS[difficulty])]
+        # Indexed from 0 for the first newly-generated case (not from the hardcoded
+        # assumption that exactly 3 seed cases already exist), so this stays correct
+        # regardless of how many cases are already in the catalog. Note: with only
+        # len(BLUEPRINTS[difficulty]) unique blueprints, generating more than that many
+        # new cases necessarily repeats case_type/subtype/topic across case_ids.
+        for offset, number in enumerate(range(len(existing) + 1, target_per_difficulty + 1)):
+            case_type, subtype, topic = BLUEPRINTS[difficulty][offset % len(BLUEPRINTS[difficulty])]
             case_id = f"SYN-{code}-{number:03d}"
             transcript_rel = f"02_transcripts/{case_id}.txt"
             spec_rel = f"01_case_specs/{case_id}.md"
