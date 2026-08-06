@@ -1,3 +1,12 @@
+"""NOTE: despite the filename, this generates rounds 51-54 (range(51, 55) below),
+not rounds 31-50 — the real round-31-to-50 diagnostic data already lives in
+data/39_round31_diagnostic .. data/58_round50_diagnostic, produced some other way.
+Nothing in this project imports or reads this module's output
+(data/59_round51_diagnostic), so it is orphaned; round51_holdout_builder.py is the
+script that actually feeds Round 51 (into data/59_round51_holdout instead). Kept
+as-is rather than deleted or renamed since no downstream code depends on it either
+way, but do not assume this is where Round 31-50 or Round 51 data comes from.
+"""
 from pathlib import Path
 import json
 

@@ -47,3 +47,22 @@ class FactConflictTests(unittest.TestCase):
         claim = "외삼촌의 학교 업무 대리 권한은 위임 근거 확인이 필요합니다."
         self.assertNotIn("unmatched_relationship_or_representation_fact", explicit_conflicts([claim], "외삼촌이 학교 상담에 동행했습니다."))
         self.assertIn("unmatched_uncertain_relation_or_finality_claim", unsupported_assertions([claim], "외삼촌이 학교 상담에 동행했습니다."))
+
+    def test_negated_finality_statement_is_not_flagged(self):
+        claim = "상속인들이 서류를 검토 중이며 정정이 완료되지 않았습니다."
+        transcript = "상속인들이 서류를 준비하고 있습니다."
+        self.assertNotIn("unmatched_finality_statement", explicit_conflicts([claim], transcript))
+
+    def test_unnegated_finality_statement_is_still_flagged(self):
+        claim = "상속인들의 정정이 완료돼 새 증명서가 발급됐습니다."
+        transcript = "상속인들이 서류를 준비하고 있습니다."
+        self.assertIn("unmatched_finality_statement", explicit_conflicts([claim], transcript))
+
+    def test_negated_relationship_fact_is_not_flagged(self):
+        claim = "외삼촌은 대리 권한이 없습니다."
+        transcript = "외삼촌이 학교 상담에 동행했습니다."
+        self.assertNotIn("unmatched_relationship_or_representation_fact", explicit_conflicts([claim], transcript))
+
+    def test_negated_unsupported_assertion_term_is_not_flagged(self):
+        result = unsupported_assertions(["상대방이 책임을 부인하지 않았다는 취지로 말했습니다."], "내담자는 관련 자료를 정리 중입니다.")
+        self.assertEqual(result, [])

@@ -32,6 +32,8 @@ def feedback_agreement(results_dir: Path, feedback_dir: Path) -> dict:
     incomplete = [packet["case_id"] for packet in packets if packet.get("review_status") not in completed_statuses or packet.get("reviewer_decision") not in {"safe", "review_required", "high_risk"}]
     if incomplete:
         raise ValueError("incomplete human output reviews: " + ", ".join(incomplete))
+    if not packets:
+        raise ValueError("no human output review packets found to evaluate")
     matches = 0
     matrix = Counter()
     for packet in packets:

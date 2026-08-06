@@ -19,28 +19,49 @@ UNCERTAINTY_CUES = ("가능성", "수 있", "확인 필요", "확인이 필요",
 UNSUPPORTED_ASSERTION_TERMS = ("책임을 부인", "연락을 회피", "자료 제출을 미루", "절차를 진행 중")
 LEGAL_AUTHORITY_TERMS = ("권한", "위임", "후견", "유언집행", "송달", "효력", "대리")
 UNCONFIRMED_TERMS = ("확인하지 못", "알 수 없", "모릅니다", "언급된 적이 없", "보지 못")
+# A term match immediately followed by one of these means the claim is denying the
+# fact, not asserting it (e.g. "정정이 완료되지 않았다"). Checked against the text
+# right after the match so unrelated negation elsewhere in the sentence doesn't count.
+NEGATION_MARKERS = ("지 않", "지 못", "이 아니", "가 아니", "되지 않", "되지 못", "안 되", "않았", "못했", "아니었", "아니다", "아닙니다", "없습니다", "없었다", "된 바 없", "된 적 없")
+
+
+def _has_unnegated_term(claim: str, term: str, window: int = 12) -> bool:
+    """True only if some occurrence of term in claim is not immediately negated."""
+    start = 0
+    while True:
+        index = claim.find(term, start)
+        if index == -1:
+            return False
+        tail = claim[index + len(term): index + len(term) + window]
+        if not any(marker in tail for marker in NEGATION_MARKERS):
+            return True
+        start = index + len(term)
 
 
 def explicit_conflicts(claims: list[str], transcript: str) -> list[str]:
     conflicts: list[str] = []
     transcript_amounts = {value.replace(",", "") for value in AMOUNT_RE.findall(transcript)}
+    # Normalize separators the same way amounts are normalized above: a claim written
+    # "2025.1.3" must match a transcript written "2025-1-3" instead of being flagged
+    # as an unsupported date purely because of formatting.
+    transcript_dates = {re.sub(r"[-./]", "-", value) for value in DATE_RE.findall(transcript)}
     for claim in claims:
-        if any(date not in transcript for date in DATE_RE.findall(claim)):
+        if any(re.sub(r"[-./]", "-", date) not in transcript_dates for date in DATE_RE.findall(claim)):
             conflicts.append("unmatched_specific_date")
         if any(amount.replace(",", "") not in transcript_amounts for amount in AMOUNT_RE.findall(claim)):
             conflicts.append("unmatched_specific_amount")
-        if any(term in claim and term not in transcript for term in FINALITY_TERMS):
+        if any(_has_unnegated_term(claim, term) and term not in transcript for term in FINALITY_TERMS):
             conflicts.append("unmatched_finality_statement")
-        if any(term in claim and term not in transcript for term in RELATIONSHIP_FACT_TERMS) and not any(cue in claim for cue in UNCERTAINTY_CUES):
+        if any(_has_unnegated_term(claim, term) and term not in transcript for term in RELATIONSHIP_FACT_TERMS) and not any(cue in claim for cue in UNCERTAINTY_CUES):
             conflicts.append("unmatched_relationship_or_representation_fact")
     return sorted(set(conflicts))
 
 
 def unsupported_assertions(claims: list[str], transcript: str) -> list[str]:
     """Return non-specific allegations absent from the source for human review."""
-    unsupported = {term for claim in claims for term in UNSUPPORTED_ASSERTION_TERMS if term in claim and term not in transcript}
+    unsupported = {term for claim in claims for term in UNSUPPORTED_ASSERTION_TERMS if _has_unnegated_term(claim, term) and term not in transcript}
     for claim in claims:
-        has_unmatched_relation_or_finality = any(term in claim and term not in transcript for term in RELATIONSHIP_FACT_TERMS)
+        has_unmatched_relation_or_finality = any(_has_unnegated_term(claim, term) and term not in transcript for term in RELATIONSHIP_FACT_TERMS)
         if has_unmatched_relation_or_finality and any(cue in claim for cue in UNCERTAINTY_CUES):
             unsupported.add("unmatched_uncertain_relation_or_finality_claim")
     return sorted(unsupported)

@@ -44,12 +44,13 @@ function mapOutputValidation(raw) {
     };
   }
 
-  const unsupported = Array.isArray(raw.unsupported_assertions) ? raw.unsupported_assertions : [];
-  const conflicts = Array.isArray(raw.explicit_conflicts) ? raw.explicit_conflicts : [];
-  const format = raw.schema_valid === true;
-  const grounded = raw.low_support_ratio === 0 && unsupported.length === 0;
+  // output_validation.schema.json 계약 모양: 스키마 적합성·근거 사유는 최상위가 아니라
+  // validation/review_reasons 아래 중첩돼 있다(aioutputvalidation의 audit.build_audit_record 참고).
+  const reviewReasons = Array.isArray(raw.review_reasons) ? raw.review_reasons : [];
+  const format = raw.validation?.valid === true;
+  const grounded = !reviewReasons.some((reason) => typeof reason === 'string' && reason.startsWith('weak evidence'));
   const decision = raw.decision || 'review_required';
-  const hallucinationRisk = decision === 'high_risk' || conflicts.length > 0
+  const hallucinationRisk = decision === 'high_risk'
     ? 'high'
     : decision === 'review_required'
       ? 'review'
@@ -64,6 +65,7 @@ function mapOutputValidation(raw) {
     evidenceLabel: grounded ? '근거 확인' : '근거 보강 필요',
     riskLabel: hallucinationRisk === 'high' ? '높음' : hallucinationRisk === 'review' ? '검토 필요' : '낮음',
     decision,
+    reviewReasons,
   };
 }
 

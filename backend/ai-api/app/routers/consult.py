@@ -85,7 +85,7 @@ async def analyze_consult(
             top_n=5,
         )
     )
-    output_validation = validate_consultation_output(analysis_output=analysis.output, consultation_text=consult_text)
+    output_validation = validate_consultation_output(analysis_output=analysis.output, legal_sources=legal_sources)
 
     return {
         **result,
