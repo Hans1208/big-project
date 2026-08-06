@@ -20,8 +20,37 @@ public record ConsultAnalyzeApiResponse(
         String consultCaseSubtype,
         JsonNode consultExtracted,
         JsonNode consultTimeline,
+        JsonNode relatedStatutes,
+        JsonNode relatedPrecedents,
+        JsonNode relatedConsultations,
         JsonNode caseAnalysis,
         JsonNode reliefReviewChecklist,
         JsonNode missingItems
 ) {
+    public ConsultAnalyzeApiResponse(
+            JsonNode rawInput,
+            String consultSummary,
+            String consultCaseType,
+            String consultCaseSubtype,
+            JsonNode consultExtracted,
+            JsonNode consultTimeline,
+            JsonNode caseAnalysis,
+            JsonNode reliefReviewChecklist,
+            JsonNode missingItems
+    ) {
+        this(
+                rawInput,
+                consultSummary,
+                consultCaseType,
+                consultCaseSubtype,
+                consultExtracted,
+                consultTimeline,
+                null,
+                null,
+                null,
+                caseAnalysis,
+                reliefReviewChecklist,
+                missingItems
+        );
+    }
 }
