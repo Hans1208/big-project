@@ -325,6 +325,10 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   // 덮어써버리는 문제가 있었다. appliedFocusIdRef로 같은 focusedConsultationId에 대해서는
   // 한 번만 적용되게 막는다.
   const appliedFocusIdRef = useRef(null);
+  // 특정 사건으로 바로 진입했을 때(다른 화면에서 사건을 지정해 들어옴), 통화 시작·메모
+  // 영역이 아니라 그 사건의 'AI 분석 결과'까지 스크롤해 바로 보여준다.
+  const analysisResultsRef = useRef(null);
+  const pendingScrollFocusIdRef = useRef(null);
   useEffect(() => {
     if (!focusedConsultationId) {
       // 포커스가 풀리면(다른 화면으로 이동) 다음에 같은 사건으로 다시 들어와도
@@ -336,6 +340,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
     const focusedCase = consultations.find((item) => String(item.id) === String(focusedConsultationId));
     if (!focusedCase) return;
     appliedFocusIdRef.current = focusedConsultationId;
+    pendingScrollFocusIdRef.current = focusedConsultationId;
     setSelectedId(focusedConsultationId);
     setAnalyzed(Boolean(focusedCase?.analysis));
     setAnalysis(focusedCase?.analysis || null);
@@ -344,6 +349,15 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
     setAnalysisSaved(Boolean(focusedCase?.analysis));
     setConfirmedSections({});
   }, [focusedConsultationId, consultations]);
+  // selectedId가 실제로 focus 대상 사건으로 바뀌고 그 사건의 결과 섹션이 화면에 그려진
+  // 뒤에야 스크롤할 수 있어, 위 effect와 분리해 selectedId 반영 이후 시점에 스크롤한다.
+  useEffect(() => {
+    if (!pendingScrollFocusIdRef.current) return;
+    if (String(selectedId) !== String(pendingScrollFocusIdRef.current)) return;
+    if (!analysisResultsRef.current) return;
+    analysisResultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    pendingScrollFocusIdRef.current = null;
+  }, [selectedId, selectedCase]);
   // 이 상담을 진행할 때 도움이 될 후속 작업을 AI가 제안합니다.
   // 각 항목이 '무엇을 하는 것인지' 상담원이 바로 알 수 있도록 설명을 함께 둡니다. (요구사항 AI-04·05 계열)
   const suggestions = [
@@ -937,7 +951,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         ) : null}
         {selectedCase ? (
           <section className="analysisResultsWorkspace" aria-label="AI 분석 결과 작업 영역">
-          <div className="analysisSectionDivider">
+          <div className="analysisSectionDivider" ref={analysisResultsRef}>
             <span>AI 분석 결과</span>
             <p>상담 메모 · 첨부자료 기준</p>
           </div>

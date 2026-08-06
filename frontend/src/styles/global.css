@@ -12782,6 +12782,12 @@ table.dataTable td .reviewActionButton {
     margin-right: 0;
   }
 
+  .uploadPanel .uploadActionButtons {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
   .uploadPanel .uploadSubmitButton {
     width: 100%;
   }
@@ -15663,6 +15669,24 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   font-weight: 700;
 }
 
+.uploadPanel .uploadActionButtons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* "AI 분석 이동"과 "자료 저장"을 같은 크기의 버튼으로 맞춥니다. 텍스트 길이가 서로 달라
+   padding만으로는 폭이 안 맞아, 두 버튼 모두 같은 고정 폭을 줍니다. */
+.uploadPanel .uploadActionButtons .secondaryActionButton,
+.uploadPanel .uploadActionButtons .uploadSubmitButton {
+  width: 172px;
+  min-width: 0;
+  height: 48px;
+  min-height: 42px;
+  padding: 0 12px;
+}
+
 .draftPanel .draftCaseSummary,
 .searchPanel .referenceCaseSummary {
   gap: 12px;
@@ -15757,6 +15781,12 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   .searchPanel .referenceToolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .uploadPanel .uploadActionButtons {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
   }
 
   .uploadPanel .uploadSubmitButton {
