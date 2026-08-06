@@ -22,7 +22,7 @@ export function UtilityPanel({ view, role, consultations, onCreateConsultation, 
       consultations={consultations}
       onCreateConsultation={onCreateConsultation}
       onUpdateConsultation={onUpdateConsultation}
-      onGoToRealtimeAnalysis={() => onOpenAnalysis?.()}
+      onGoToRealtimeAnalysis={(id) => onOpenAnalysis?.(id)}
     />
   ) : <ProfilePanel role={role} currentUser={currentUser} onUpdateProfile={onUpdateProfile} />;
   // 법령·판례 검색은 변호사 전용입니다. 메뉴에서 이미 뺐지만, 상담원 role로 이 화면에

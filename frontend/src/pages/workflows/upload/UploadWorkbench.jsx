@@ -115,6 +115,10 @@ export function UploadWorkbench({ consultations = [], onCreateConsultation, onUp
   const selectedCase = !creatingNew ? consultations.find((item) => String(item.id) === String(selectedId)) : null;
   const canUploadAfterAnalysis = Boolean(selectedCase?.analysis || selectedCase?.analysisSaved || selectedCase?.analysisStatus === 'COMPLETED');
   const [message, setMessage] = useState('');
+  // "AI 분석 이동"은 방금 "자료 저장"한 내용을 실시간 상담에서 바로 확인하러 가는 버튼이라,
+  // 저장 전에는 갈 곳(반영된 자료)이 없어 막아둡니다. 사건을 바꾸면 그 사건은 아직 이번
+  // 화면에서 저장한 적이 없으므로 다시 잠급니다.
+  const [existingSaveCompleted, setExistingSaveCompleted] = useState(false);
 
   const emptyNewForm = { category: caseCategories[0].key, type: caseCategories[0].subTypes[0], memo: '', legalAidType: 'none', eligibilityEvidenceSubmitted: false };
   const savedDraft = readStorage(storageKeys.uploadDraft, null);
@@ -129,6 +133,7 @@ export function UploadWorkbench({ consultations = [], onCreateConsultation, onUp
     if (creatingNew) return;
     setExistingFiles(selectedCase?.attachments || []);
     setExistingEligibility(buildEligibilityDraftFromCase(selectedCase));
+    setExistingSaveCompleted(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, creatingNew]);
 
@@ -352,6 +357,7 @@ export function UploadWorkbench({ consultations = [], onCreateConsultation, onUp
       attachments: buildAttachmentPayload(registeredFiles),
     });
     setMessage('');
+    setExistingSaveCompleted(true);
     showToast('자료 저장 완료 · 검토 요청 시 함께 전달', 'success');
   };
 
@@ -462,7 +468,10 @@ export function UploadWorkbench({ consultations = [], onCreateConsultation, onUp
             />
             <div className="uploadActionRow">
               <span className="uploadSaveHint">{canUploadAfterAnalysis ? '파일을 추가한 뒤 저장하면 변호사 검토에 함께 전달됩니다.' : '분석 완료 전에는 자료를 저장할 수 없습니다.'}</span>
-              <button className="primaryButton uploadSubmitButton" type="button" onClick={submitExistingCase} disabled={!canUploadAfterAnalysis}>자료 저장</button>
+              <div className="uploadActionButtons">
+                <button className="secondaryActionButton" type="button" onClick={() => onGoToRealtimeAnalysis?.(selectedCase?.id)} disabled={!existingSaveCompleted}>AI 분석 이동</button>
+                <button className="primaryButton uploadSubmitButton" type="button" onClick={submitExistingCase} disabled={!canUploadAfterAnalysis}>자료 저장</button>
+              </div>
             </div>
           </>
         ) : (
