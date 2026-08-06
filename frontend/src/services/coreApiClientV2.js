@@ -414,6 +414,13 @@ function normalizeCoreConsultation(row = {}) {
     coreStatus: row.status || '',
     createdAt: row.createdAt || '',
     updatedAt: row.updatedAt || '',
+    // 서식 작성용 개인정보와 동의 기록. 이것도 복원해야 새로고침 뒤에 다시 묻지 않습니다 —
+    // 동의를 이미 받았는데 화면이 비어 있으면 상담원이 내담자에게 두 번 묻게 됩니다.
+    clientAddress: row.clientAddress || '',
+    clientPhone: row.clientPhone || '',
+    privacyConsent: Boolean(row.privacyConsent),
+    privacyConsentAt: row.privacyConsentAt || '',
+    privacyConsentSource: row.privacyConsentSource || '',
     coreAttachments: row.attachments || [],
     // 서버가 실제로 저장을 확정한 첨부파일 목록(각 항목에 DB row id=attachmentId 포함).
     // 상담 생성 직후 이 값을 쓰면, 방금 만든 상담의 첨부파일도 곧바로 "삭제" 가능한 상태로 화면에 반영됩니다.
