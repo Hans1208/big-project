@@ -12430,6 +12430,14 @@ textarea:focus-visible,
   margin-bottom: 14px;
   padding: 12px;
   border-radius: var(--r-card);
+  /* 상담 선택 드롭다운(.casePickerPopover)이 아래 카드에 덮이지 않게 합니다.
+     이 줄은 원래 sticky여서 z-index를 함께 갖고 있었는데, 스크롤을 따라오지 않게
+     sticky를 걷어낼 때 z-index도 같이 빠졌습니다. 그때부터 드롭다운을 열면
+     바로 아래 '상담받은 사람' 카드가 목록을 가렸습니다.
+     스티키는 되돌리지 않고 쌓임 순서만 되살립니다 — position이 없으면 z-index가
+     듣지 않으므로 relative만 붙입니다. */
+  position: relative;
+  z-index: 18;
 }
 
 .analysisPanel > .analysisCaseMeta {
