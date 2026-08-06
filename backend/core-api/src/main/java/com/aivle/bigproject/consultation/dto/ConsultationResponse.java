@@ -24,6 +24,14 @@ public record ConsultationResponse(
         String type,
         String legalAidType,
         Boolean eligibilityEvidenceSubmitted,
+        // 서식 작성용 개인정보와 그 동의 기록. 상담원이 화면에서 이어서 고칠 수 있어야
+        // 하므로 내려준다. 주민등록번호는 애초에 저장하지 않으므로 여기에도 없다 —
+        // 개인정보 보호법 제24조의2는 동의가 아니라 법령 근거를 요구한다.
+        String clientAddress,
+        String clientPhone,
+        Boolean privacyConsent,
+        LocalDateTime privacyConsentAt,
+        String privacyConsentSource,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         List<AttachmentResponse> attachments
@@ -49,6 +57,11 @@ public record ConsultationResponse(
                 consultation.getType(),
                 consultation.getLegalAidType(),
                 consultation.getEligibilityEvidenceSubmitted(),
+                consultation.getClientAddress(),
+                consultation.getClientPhone(),
+                consultation.getPrivacyConsent(),
+                consultation.getPrivacyConsentAt(),
+                consultation.getPrivacyConsentSource(),
                 consultation.getCreatedAt(),
                 consultation.getUpdatedAt(),
                 consultation.getAttachments().stream()

@@ -2231,6 +2231,191 @@ def _apply_confirmed_names_to_extracted(extracted: dict, applicant_name: str = "
     return fixed, changed
 
 
+# ══════════════════════════════════════
+# 서식 작성용 연락처 (주소·전화)
+# ══════════════════════════════════════
+# 법원 서식의 당사자 주소는 송달을 위한 법정 필수 기재사항이라, 비어 있으면 상담원이
+# 초안을 받아 손으로 다시 채워야 한다. 상담 접수 때 동의를 받고 적어둔 값이 있으면
+# 그걸 옮겨 적는다 — 이름·날짜와 같은 이유로 판단이 아니라 옮겨 적기다.
+#
+# 값은 core-api가 넘겨준다. 동의가 없으면 Consultation이 아예 값을 갖지 않아서
+# 빈 문자열이 오므로, 여기서 동의를 다시 검사하지 않는다.
+
+# 줄 첫머리의 라벨. 서식마다 "주소 :", "주소", "전화․휴대폰번호:"처럼 모양이 다르다.
+ADDRESS_LABEL_RE = re.compile(r"^\s*(?:주\s*소|현\s*주\s*소|송\s*달\s*장\s*소)\s*[:：]?")
+PHONE_LABEL_RE = re.compile(
+    r"^\s*(?:전\s*화|연\s*락\s*처|휴\s*대\s*폰|전화[․·、]?\s*휴대폰번호)"
+    r"(?:\s*번\s*호)?\s*[:：]?")
+
+# 이 라벨이 붙은 주소칸은 청구인 것이 아니다. 사망자의 최후주소·등록기준지에
+# 청구인 주소를 넣으면 사람이 뒤바뀐다.
+FOREIGN_ADDRESS_LABEL_RE = re.compile(r"등록기준지|최후\s*주소|본적|사무소|영업소")
+
+# 당사자 구획의 시작. 이 라벨이 나오면 '지금부터 누구 칸인지'가 바뀐다.
+APPLICANT_BLOCK_RE = re.compile(r"청\s*구\s*인|신\s*청\s*인|원\s*고|채\s*권\s*자")
+OTHER_BLOCK_RE = re.compile(
+    r"상\s*대\s*방|피\s*신\s*청\s*인|피\s*고|채\s*무\s*자"
+    r"|사\s*건\s*본\s*인|피\s*상\s*속\s*인|유\s*언\s*자|사\s*망\s*자|망\s*인")
+
+
+# 값 뒤에 남겨야 하는 안내 괄호. 자리표시자가 들어 있지 않은 괄호는 채울 칸이
+# 아니라 "여기에 무엇을 적어라"는 안내다.
+TRAILING_NOTE_RE = re.compile(r"(\([^()]*\))\s*$")
+
+
+def _fill_labeled_slot(text: str, label_match, value: str) -> str:
+    """라벨 뒤의 주소·전화 자리를 값으로 바꾼다. 빈 칸이면 라벨 뒤에 이어 붙인다.
+
+    "주소 : ○○시 ○○구 ○○길 ○○"                -> "주소 : 서울시 강남구 …"
+    "주소 : ○○시 ○○구 ○○길 ○○번지(○○동, ○○아파트)" -> "주소 : 서울시 강남구 …"
+    "주소 ○○시 ○○구 ○○길 ○○(우편번호)"          -> "주소 서울시 강남구 …(우편번호)"
+    "전화․휴대폰번호:"                          -> "전화․휴대폰번호: 010-0000-0000"
+
+    자리표시자 구간을 '첫 조각부터 마지막 조각까지'로 잡으면 안 된다. 서식은
+    "○○번지(○○동, ○○아파트)"처럼 자리표시자 사이에 '번지'·'아파트' 같은 글자를
+    끼워 두는데, 그것들도 주소 템플릿의 일부라 남기면 "테헤란로 123아파트)"가 된다
+    (실측). 첫 자리표시자부터 줄 끝까지를 통째로 값으로 바꾼다.
+
+    다만 끝에 붙은 안내 괄호는 남긴다 — "(우편번호)"를 지우면 상담원이 우편번호를
+    따로 적어야 한다는 것을 알 수 없다. 자리표시자가 든 괄호는 안내가 아니라
+    채울 칸이므로 함께 지운다."""
+    head_end = label_match.end()
+    rest = text[head_end:]
+
+    first = PLACEHOLDER_RE.search(rest)
+    if first:
+        body = rest[first.start():]
+        keep = ""
+        note = TRAILING_NOTE_RE.search(body)
+        if note and not PLACEHOLDER_RE.search(note.group(1)):
+            keep = note.group(1)
+            body = body[:note.start()]
+        head, gap = text[:head_end], rest[:first.start()]
+        # 라벨과 자리표시자가 붙어 있는 서식이 있다("주소○○시 ○○구"). 그대로 두면
+        # "주소서울특별시"가 되어 라벨과 값이 한 낱말로 읽힌다.
+        if not gap and head and not head[-1].isspace():
+            gap = " "
+        return head + gap + value + keep
+
+    # 빈 칸인 경우. 뒤에 다른 글자가 이미 있으면 건드리지 않는다 — 값이 두 번 찍힌다.
+    if rest.strip():
+        return text
+    return text[:head_end] + " " + value
+
+
+def _fill_contact_info(doc, address: str = "", phone: str = "") -> tuple:
+    """청구인의 주소·전화칸을 상담에서 받아둔 값으로 채운다.
+
+    '청구인 것'만 채우는 게 핵심이다. 서식에는 주소칸이 여럿 있는데(청구인 주소,
+    사망자 최후주소, 등록기준지) 전부 같은 자리표시자를 쓴다. 라벨만 보고 채우면
+    살아 있는 청구인의 주소가 사망자의 최후주소로 들어간다.
+
+    그래서 문단을 순서대로 읽으며 '지금 누구 구획인지'를 따라간다. 청구인 라벨이
+    나오면 그 아래가 청구인 칸이고, 상대방·사건본인 라벨이 나오면 거기서 끝난다.
+
+    각각 첫 칸만 채운다. 서식은 흔히 청구인 자리를 2개 두는데(공동청구인 대비)
+    한 명인 사건에서 두 칸을 같은 주소로 채우면 없는 사람이 하나 생긴다
+    (FIELD_PROMPT 8번과 같은 이유). 남는 칸은 C단계가 표시해 상담원에게 넘긴다.
+
+    반환: (채운 칸 수, 바뀐 문단 텍스트 집합)"""
+    address = (address or "").strip()
+    phone = (phone or "").strip()
+    if not address and not phone:
+        return 0, set()
+
+    filled, written = 0, set()
+    address_done = not address
+    phone_done = not phone
+
+    for sec in doc.sections:
+        in_applicant_block = False
+        for p in sec.paragraphs:
+            if address_done and phone_done:
+                break
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(x, "text", "") or "" for x in runs)
+            if not text.strip():
+                continue
+
+            # 구획 판정은 라벨이 줄 앞쪽에 있을 때만 한다. "청구인들은 피상속인 망
+            # △△△의 재산상속인으로서…" 같은 본문 문장이 구획을 바꾸면 안 된다.
+            head = re.sub(r"\s+", "", text)[:12]
+            if OTHER_BLOCK_RE.search(head):
+                in_applicant_block = False
+            elif APPLICANT_BLOCK_RE.search(head):
+                in_applicant_block = True
+
+            if not in_applicant_block:
+                continue
+            if FOREIGN_ADDRESS_LABEL_RE.search(text):
+                continue
+
+            new_text = text
+            if not address_done:
+                m = ADDRESS_LABEL_RE.match(text)
+                if m:
+                    new_text = _fill_labeled_slot(text, m, address)
+                    if new_text != text:
+                        address_done = True
+            if new_text == text and not phone_done:
+                m = PHONE_LABEL_RE.match(text)
+                if m:
+                    new_text = _fill_labeled_slot(text, m, phone)
+                    if new_text != text:
+                        phone_done = True
+
+            if new_text != text and _set_paragraph_text(p, new_text):
+                filled += 1
+                written.add(new_text)
+
+    return filled, written
+
+
+# ══════════════════════════════════════
+# 본인이 직접 적는 칸
+# ══════════════════════════════════════
+# 주민등록번호는 시스템에 저장하지 않는다. 개인정보 보호법 제24조의2는 주민등록번호를
+# 동의가 아니라 '법령에 구체적 근거가 있을 때'만 처리하도록 하고 있어서, 내담자가
+# 동의해도 우리가 보관할 수 없다.
+#
+# 그런데 그냥 비워두면 초안을 받은 사람은 그 칸이 이미 처리된 것인지, AI가 놓친
+# 것인지 알 수 없다. [예시:확인필요]와 구분되는 표시를 붙여 '일부러 비워둔 자리'임을
+# 밝힌다 — 본인 확인(신분증·가족관계증명서)을 거쳐 손으로 적어야 하는 값이다.
+SELF_WRITTEN_TAG = " [직접 기재]"
+
+# 줄 안 어디에 있든 잡는다. 이름 뒤에 괄호로 붙는 경우("○ ○ ○(주민등록번호)")와
+# 한 줄짜리 항목("주민등록번호 :             -") 둘 다 있다.
+SELF_WRITTEN_FIELD_RE = re.compile(r"주민\s*등록\s*번호|주민번호")
+
+
+def _tag_self_written_fields(doc) -> int:
+    """주민등록번호 칸에 '직접 기재' 표시를 붙인다.
+
+    이 표시는 C단계(_mark_unresolved_examples)보다 먼저 붙여야 한다. 그래야
+    같은 줄에 [예시:확인필요]가 겹쳐 붙지 않는다 — C단계는 태그가 있는 문단을
+    건너뛴다."""
+    marked = 0
+    for sec in doc.sections:
+        for p in sec.paragraphs:
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(r, "text", "") or "" for r in runs)
+            if not SELF_WRITTEN_FIELD_RE.search(text):
+                continue
+            if SELF_WRITTEN_TAG.strip() in text or PARA_EXAMPLE_TAG.strip() in text:
+                continue
+            _tag_paragraph(runs)
+            # _tag_paragraph는 [예시:확인필요]를 붙인다. 여기서는 다른 표시를 써야
+            # 하므로 방금 붙인 것을 바꿔 단다.
+            runs[-1].text = (runs[-1].text or "").replace(
+                PARA_EXAMPLE_TAG, SELF_WRITTEN_TAG)
+            marked += 1
+    return marked
+
+
 # 서식의 날짜 라벨 ← 분석이 뽑는 날짜 '항목' 이름. 항목명은 사건마다 달라서
 # (사망 / 사망일 / 사망일자 …) 포함으로 맞춘다.
 DATE_LABEL_KEYS = (
@@ -2377,10 +2562,18 @@ def _fill_known_role_names(doc, replacements: list, seeded: dict = None) -> int:
 # ══════════════════════════════════════
 # 메인
 # ══════════════════════════════════════
-def draft(form_name, extracted, summary="", applicant_name="", opponent_name=""):
+def draft(form_name, extracted, summary="", applicant_name="", opponent_name="",
+          applicant_address="", applicant_phone=""):
     """applicant_name / opponent_name은 상담 접수 때 적어둔 확정 값이다
     (core-api Consultation.clientName / opponentName). 주면 이름칸을 코드가
-    직접 채우고, 안 주면 지금까지처럼 GPT 결과에서 역할별 이름을 뽑아 쓴다."""
+    직접 채우고, 안 주면 지금까지처럼 GPT 결과에서 역할별 이름을 뽑아 쓴다.
+
+    applicant_address / applicant_phone도 같은 성격이다. 다만 이 둘은 서식 작성에
+    대한 동의를 받았을 때만 core-api가 값을 갖고 있어서, 동의가 없으면 빈 문자열이
+    온다 — 여기서 동의를 다시 검사하지 않는 이유다.
+
+    주민등록번호는 인자로 받지 않는다. 개인정보 보호법 제24조의2가 동의가 아니라
+    법령 근거를 요구해서 저장 자체를 하지 않고, 그 칸은 '직접 기재' 표시만 붙인다."""
     src = find_hwpx(form_name)
     if src is None:
         return {"file": None, "error": f"서식 파일 없음: {form_name}",
@@ -2476,7 +2669,14 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     # 문장은 건드리지 않는다 — 청구취지는 정형 문구라 다시 쓰면 청구가 사라진다.
     deceased_filled, deceased_texts = _fill_deceased_name_slots(doc, extracted)
     applied += deceased_filled
-    narr_texts = set(narr_texts) | deceased_texts
+
+    # 청구인의 주소·전화칸. 법원 서식의 당사자 주소는 송달을 위한 법정 필수
+    # 기재사항이라, 비어 있으면 상담원이 초안을 받아 손으로 다시 채워야 한다.
+    contact_filled, contact_texts = _fill_contact_info(
+        doc, applicant_address, applicant_phone)
+    applied += contact_filled
+
+    narr_texts = set(narr_texts) | deceased_texts | contact_texts
 
     # 값이 다 들어간 뒤, 사람 수보다 칸이 적으면 마지막 칸을 복제해 늘린다.
     # (상속인 4명인데 성명칸·배분항목이 3벌뿐인 협의서 등)
@@ -2556,6 +2756,11 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     # B단계는 '있는 문장을 바꾸는' 일만 하므로 빈 칸은 여기서 채운다.
     empty_section_filled = _fill_empty_narrative_section(doc, extracted, summary)
 
+    # 주민등록번호 칸은 시스템이 채우지 않는다 — 저장하지 않는 값이라 채울 수가 없다.
+    # C단계보다 먼저 표시해야 [예시:확인필요]와 겹치지 않는다(C단계는 태그가 붙은
+    # 문단을 건너뛴다). '못 채운 것'이 아니라 '일부러 비워둔 것'임을 밝히는 표시다.
+    self_written_marked = _tag_self_written_fields(doc)
+
     # ── C. 최후 안전장치: 처리 후에도 남아있는 원본 예시 표시 ──
     marked_examples = _mark_unresolved_examples(doc, rewritten_texts, extracted, summary)
 
@@ -2587,6 +2792,11 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
             "role_filled": role_filled,
             # 사망 표시 뒤 이름칸("망 △△△")에 사망자 이름을 채운 횟수.
             "deceased_filled": deceased_filled,
+            # 청구인 주소·전화칸을 채운 수. 0이 계속 나오면 동의를 안 받았거나
+            # core-api가 값을 안 보내고 있다는 신호다.
+            "contact_filled": contact_filled,
+            # 주민등록번호처럼 시스템이 채우지 않고 표시만 붙인 칸 수.
+            "self_written_marked": self_written_marked,
             # 상담원이 확인한 이름으로 분석값을 고친 횟수.
             # 0이 계속 나오면 core-api가 이름을 안 보내고 있다는 신호다.
             "name_corrections": name_corrections,

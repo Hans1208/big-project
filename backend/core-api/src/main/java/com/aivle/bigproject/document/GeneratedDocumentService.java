@@ -319,7 +319,8 @@ public class GeneratedDocumentService {
     // 초안에는 AI가 뽑은 이름이 그대로 들어간다.
     private JsonNode callAiApiDraft(String formName, AiAnalysis analysis, Consultation consultation) {
         JsonNode result = aiApiClient.generateDraft(formName, parseJson(analysis.getExtractedJson()), analysis.getSummary(),
-                consultation.getClientName(), consultation.getOpponentName());
+                consultation.getClientName(), consultation.getOpponentName(),
+                consultation.getClientAddress(), consultation.getClientPhone());
         JsonNode errorNode = result.path("error");
         if (!errorNode.isMissingNode() && !errorNode.isNull()) {
             throw new IllegalStateException("초안 생성 실패: " + errorNode.stringValue());

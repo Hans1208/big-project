@@ -238,6 +238,16 @@ function toCoreConsultationPayload({ userId, consultation }) {
     type: consultation.type || '',
     legalAidType: consultation.legalAidType || 'none',
     eligibilityEvidenceSubmitted: Boolean(consultation.eligibilityCheck?.evidenceSubmitted),
+    // 서식 작성용 개인정보. 법원 서식의 당사자 주소는 송달을 위한 법정 필수
+    // 기재사항이라, 없으면 상담원이 초안을 받아 손으로 다시 채워야 합니다.
+    //
+    // 이 셋은 항상 함께 보냅니다. 서버는 privacyConsent가 올 때만 동의 상태를
+    // 바꾸는데, 안 보내면 "동의를 뺐다"와 "동의 항목을 안 보냈다"를 구분할 수
+    // 없어서 동의를 해제해도 값이 남습니다.
+    clientAddress: consultation.clientAddress || '',
+    clientPhone: consultation.clientPhone || '',
+    privacyConsent: Boolean(consultation.privacyConsent),
+    privacyConsentSource: consultation.privacyConsentSource || '',
     attachments: (consultation.attachments || [])
       .filter((item) => item.fileKey)
       .map(toCoreAttachmentRegistration),

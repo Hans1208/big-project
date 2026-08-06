@@ -61,6 +61,9 @@ public class ConsultationService {
         Consultation saved = consultationRepository.save(
                 new Consultation(user, request.title(), request.clientName(), request.inputText(), request.opponentName(),
                         request.category(), request.type(), request.legalAidType(), request.eligibilityEvidenceSubmitted()));
+        // 동의를 먼저 기록하고 그다음에 주소·전화번호를 넣는다. 순서가 바뀌면
+        // applyDraftContactInfo가 아직 동의를 못 보고 값을 버린다.
+        applyPrivacyFields(saved, request);
         // 프론트가 S3에 이미 올려둔 첨부파일들을 여기서 등록. fileKey가 없는(로컬 폴백) 항목은 건너뜀 —
         // 서버에 실체가 없는 파일을 DB에만 기록해봐야 다운로드/분석 둘 다 불가능하기 때문.
         // cascade=ALL이라 saved.getAttachments()에 추가만 하면 flush 시 같이 insert됨.
@@ -161,9 +164,32 @@ public class ConsultationService {
         if (request.eligibilityEvidenceSubmitted() != null) {
             consultation.setEligibilityEvidenceSubmitted(request.eligibilityEvidenceSubmitted());
         }
+        applyPrivacyFields(consultation, request);
         // consultation은 이미 영속 상태(DB와 연결된 상태)라 setter만 호출해도
         // 트랜잭션이 끝날 때 JPA가 알아서 UPDATE 쿼리를 날림 (별도 save() 호출 불필요)
         return ConsultationResponse.from(consultation);
+    }
+
+    /** 서식 작성용 개인정보(주소·전화번호)와 그 동의를 반영한다. 생성·수정이 같은 규칙을
+     *  써야 해서 한 곳에 둔다 — 한쪽만 고치면 "등록할 땐 저장되는데 수정하면 지워지는"
+     *  식으로 어긋난다.
+     *
+     *  동의를 먼저 반영하고 값을 넣는다. 동의가 내려가면(잘못 체크했다가 해제) 이미 저장된
+     *  주소·전화번호도 함께 지워진다 — 동의를 철회했는데 값이 남아 있으면 그때부터는
+     *  근거 없이 보관하는 것이 된다(개인정보 보호법 제37조 처리정지 요구권).
+     *
+     *  update는 부분 수정이라 필드가 없으면 건드리지 않는 것이 원칙인데, 동의만은 예외로
+     *  둘 수 없다 — privacyConsent가 null로 올 때 "동의를 안 보냈다"와 "동의를 뺐다"를
+     *  구분할 수 없기 때문이다. 그래서 화면이 이 셋을 항상 함께 보내도록 하고, 여기서는
+     *  privacyConsent가 명시적으로 올 때만 동의 상태를 바꾼다. */
+    private void applyPrivacyFields(Consultation consultation, ConsultationRequest request) {
+        if (request.privacyConsent() != null) {
+            consultation.applyPrivacyConsent(request.privacyConsent(), request.privacyConsentSource());
+        }
+        if (request.clientAddress() != null || request.clientPhone() != null
+                || request.privacyConsent() != null) {
+            consultation.applyDraftContactInfo(request.clientAddress(), request.clientPhone());
+        }
     }
 
     // "상담 저장" 버튼 전용: 실시간 상담(전화/대면) 채널별 현재 메모를 Consultation에 반영한다.

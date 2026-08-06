@@ -150,6 +150,68 @@ public class Consultation {
     @Column(name = "eligibility_evidence_submitted")
     private Boolean eligibilityEvidenceSubmitted = false;
 
+    // ── 서식 작성용 개인정보 ──
+    //
+    // 법원 서식에서 당사자 주소는 송달을 위한 법정 필수 기재사항이라, 이게 없으면
+    // 초안이 성립하지 않는다. 그래서 '상담'에는 필요 없지만 '서식 작성'에는 필수다 —
+    // 목적이 다르므로 동의도 그 목적에 대해 따로 받는다(privacyConsent).
+    //
+    // clientName과 같은 이유로 암호화한다(CryptoConverter). 길이 500은 암호문 기준이다.
+    //
+    // 주민등록번호는 여기에 두지 않는다. 개인정보 보호법 제24조의2는 주민등록번호를
+    // 동의가 아니라 '법령에 구체적 근거가 있을 때'만 처리하도록 하고 있어서, 동의를
+    // 받아도 저장할 수 없다. 최종 서류에는 상담원이 신분증과 대조해 직접 적는다.
+    @Convert(converter = CryptoConverter.class)
+    @Column(name = "client_address", length = 500)
+    private String clientAddress;
+
+    @Convert(converter = CryptoConverter.class)
+    @Column(name = "client_phone", length = 500)
+    private String clientPhone;
+
+    // 위 두 값을 받아도 되는지. 개인정보 보호법 시행령 제17조 제1항 제2호는 '전화로
+    // 동의 내용을 알리고 동의 의사표시를 확인하는 방법'을 인정한다 — 상담원이 대신
+    // 동의하는 것이 아니라, 내담자에게 받은 동의를 기록하는 자리다.
+    //
+    // 동의 대화 자체는 상담 녹취(call_input_texts / inperson_input_texts)에 함께 남아
+    // 증거가 된다. 그런데 녹취만 있으면 "이 사람이 동의했나"를 확인하려고 텍스트 전체를
+    // 사람이 읽어야 한다 — 표현이 제각각("네", "그러세요")이라 자동으로 못 찾는다.
+    // 찾을 수 있게 하려고 필드로 따로 남긴다.
+    @Column(name = "privacy_consent")
+    private Boolean privacyConsent = false;
+
+    @Column(name = "privacy_consent_at")
+    private LocalDateTime privacyConsentAt;
+
+    // 어느 채널에서 받은 동의인지(call / inperson). 시행령이 인정하는 방법이 채널마다
+    // 달라서, 나중에 입증할 때 "무엇으로 받았는지"가 남아 있어야 한다.
+    @Column(name = "privacy_consent_source")
+    private String privacyConsentSource;
+
+    /** 동의를 기록한다. 동의를 내리는 경우(잘못 체크했을 때)는 시각·채널을 함께 지운다. */
+    public void applyPrivacyConsent(Boolean consented, String source) {
+        boolean agreed = Boolean.TRUE.equals(consented);
+        this.privacyConsent = agreed;
+        this.privacyConsentAt = agreed ? LocalDateTime.now() : null;
+        this.privacyConsentSource = agreed ? source : null;
+    }
+
+    /** 동의가 없으면 주소·전화번호를 저장하지 않는다. 화면에서도 막지만, 이 API를 직접
+     *  부르면 그 검사를 지나칠 수 있어 여기서도 본다(register()의 privacyAgreed와 같은 취지). */
+    public void applyDraftContactInfo(String address, String phone) {
+        if (!Boolean.TRUE.equals(this.privacyConsent)) {
+            this.clientAddress = null;
+            this.clientPhone = null;
+            return;
+        }
+        if (address != null) {
+            this.clientAddress = address.isBlank() ? null : address.trim();
+        }
+        if (phone != null) {
+            this.clientPhone = phone.isBlank() ? null : phone.trim();
+        }
+    }
+
     // 이 상담에 딸린 첨부파일 목록. 1:N 관계.
     // cascade=ALL: Consultation을 저장/삭제하면 Attachment도 같이 저장/삭제됨
     // orphanRemoval=true: 이 리스트에서 Attachment를 빼면 DB에서도 자동 삭제됨
