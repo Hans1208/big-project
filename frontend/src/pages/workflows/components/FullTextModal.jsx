@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { X, FileText } from 'lucide-react';
-import { fetchPrecedentFullText, fetchStatuteFullText } from '../../../services/aiApiClient.js';
+import {
+  fetchConsultationFullText, fetchPrecedentFullText, fetchStatuteFullText,
+} from '../../../services/aiApiClient.js';
 import { friendlyErrorMessage } from '../../../components/common.jsx';
 
 // 검색 결과 카드에 실리는 본문은 색인이 쪼개 둔 '조각 하나'입니다.
@@ -25,9 +27,13 @@ export function FullTextModal({ item, referenceType, onClose }) {
     setText('');
     setMessage('');
 
+    // 상담사례 카드의 본문은 답변을 잘라낸 발췌라, 결론이 뒤에 있는 긴 답변은
+    // 발췌만 읽으면 반대로 이해할 수 있습니다.
     const request = referenceType === 'precedent'
       ? fetchPrecedentFullText({ id: item.id, precedentId: item.precedentId || '' })
-      : fetchStatuteFullText(item.id);
+      : referenceType === 'similar'
+        ? fetchConsultationFullText(item.id)
+        : fetchStatuteFullText(item.id);
 
     request
       .then((payload) => {

@@ -10,6 +10,7 @@ import { statusAll, today } from '../constants.jsx';
 import { EmptyRows, InlineEmptyNotice, StatusButton, SummaryCards, ConsultationTable, HitlConfirmModal, WorkPageHeader, workflowStatusTone, HorizontalScrollBox, ScrollableDataTable, FIRST_SEVEN_COLUMN_MIN_WIDTHS, CollapsibleSection, friendlyErrorMessage } from '../components/common.jsx';
 import { useConfirm, useToast } from '../components/feedback.jsx';
 import { UtilityPanel, ReliefReviewSummary, DOCUMENT_STATUS_LABEL, documentStatusTone, GeneratedFileLink, DraftContentReviewLabel, SummaryBulletList, resolveConfirmedCaseType } from './workflows/index.jsx';
+import { referenceTypeLabel } from './workflows/shared/referenceTypes.js';
 import { appendAuditLog, getAuditLogs } from '../services/storage.js';
 import { checkAiApiHealth, checkFormRevisions, acknowledgeFormRevisions } from '../services/aiApiClient.js';
 import { approveCoreAnalysis, approveCoreDocument, checkCoreApiStatus, fetchCoreAdminStats, fetchCoreAuditLogs, fetchCoreDocuments, fetchCoreUsers, mapCoreUserToLocal, requestCoreAnalysisRevision, verifyCoreAuditLogChain } from '../services/coreApiClientV2.js';
@@ -1154,7 +1155,7 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               {adoptedReferences.length
                 ? adoptedReferences.map((item) => (
                   <span key={item.id}>
-                    [{item.type === 'precedent' ? '판례' : '법령'}] {item.title}
+                    [{referenceTypeLabel(item.type)}] {item.title}
                     {item.reason ? ` · ${item.reason}` : ''}
                   </span>
                 ))

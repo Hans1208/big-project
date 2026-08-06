@@ -3,9 +3,11 @@ import { ClipboardList, CheckCircle2, Gavel, BookOpen } from 'lucide-react';
 import { WorkPageHeader, InlineEmptyNotice, friendlyErrorMessage } from '../../../components/common.jsx';
 import { searchReferenceCandidates } from '../../../services/legalAidApi.js';
 import {
-  recommendPrecedents, recommendStatutes, searchPrecedents, searchStatutes,
+  recommendConsultations, recommendPrecedents, recommendStatutes,
+  searchConsultations, searchPrecedents, searchStatutes,
 } from '../../../services/aiApiClient.js';
 import { caseOptions } from '../shared/caseHelpers.js';
+import { referenceTypeLabel } from '../shared/referenceTypes.js';
 import { CasePicker } from '../components/CasePicker.jsx';
 import { FullTextModal } from '../components/FullTextModal.jsx';
 
@@ -67,6 +69,21 @@ const RAG_TABS = {
     emptySearch: '해당하는 판례를 찾지 못했습니다 · 검색어를 바꿔보세요',
     errorMessage: '판례를 불러오지 못했습니다',
   },
+  // 세 번째 자료. 법령이 '조문', 판례가 '법원 판단'이라면 이건 '공단이 실제로
+  // 답변한 기록'입니다 — 같은 질문에 이미 나간 답이 있으면 그게 가장 빠른 길입니다.
+  // 카드 제목 자리에는 상담 질문이, 본문에는 답변이 들어옵니다.
+  similar: {
+    label: '유사 상담사례',
+    search: ({ query, topK }) => searchConsultations({ query, topK }),
+    recommend: (analysis, options) => recommendConsultations(analysis, options),
+    // 법령의 시행일·판례의 선고일 자리에 오는 것은 자료 기준일입니다.
+    dateLabel: '기준',
+    bodyToggleLabel: '답변 전문 보기',
+    countMessage: (n) => `상담사례 ${n}건 · 대한법률구조공단`,
+    emptyRecommend: '이 상담과 비슷한 상담 기록을 찾지 못했습니다 · 직접 검색으로 찾아보세요',
+    emptySearch: '해당하는 상담사례를 찾지 못했습니다 · 검색어를 바꿔보세요',
+    errorMessage: '상담사례를 불러오지 못했습니다',
+  },
 };
 
 export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
@@ -78,11 +95,15 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
   const [selected, setSelected] = useState([]);
   const [referenceMessage, setReferenceMessage] = useState('');
   const [saving, setSaving] = useState(false);
-  const label = referenceType === 'precedent' ? '판례' : referenceType === 'similar' ? '유사 상담사례' : '법령';
+  const label = referenceTypeLabel(referenceType);
   const selectedCase = consultations.find((item) => String(item.id) === String(caseId));
 
-  // 법령·판례 탭은 실제 색인을 검색합니다. 유사 상담사례는 아직 색인이 없어
-  // 예시 목록을 그대로 씁니다 — 어느 쪽을 보고 있는지 화면에 밝혀둡니다.
+  // 세 탭 모두 실제 색인을 검색합니다. 유사 상담사례는 색인이 없어 예시 목록을
+  // 쓰고 있었는데, 상담사례 RAG(가사 1,664건)가 붙어 이제 셋 다 실제 자료입니다.
+  //
+  // 아래 searchReferenceCandidates 폴백은 그래서 지금은 아무 탭도 타지 않습니다.
+  // 그래도 남겨둡니다 — 탭이 늘 때 색인보다 화면이 먼저 나오는 일이 반복돼서,
+  // RAG_TABS에 없는 탭이 생겨도 화면이 빈 채로 죽지 않게 하는 자리입니다.
   const [ragResults, setRagResults] = useState([]);
   const [ragLoading, setRagLoading] = useState(false);
   // '전문 보기'로 연 자료. 카드 안에서 펼치지 않고 창으로 띄웁니다 — 카드에 실린
@@ -203,7 +224,7 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
         reason: item.reason || '',
         content: item.content || '',
         referenceType: item.type || 'statute',
-        referenceLabel: item.type === 'precedent' ? '판례' : '법령',
+        referenceLabel: referenceTypeLabel(item.type),
         selectedBy: item.selected_by || 'manual',
       }))
       : []);
