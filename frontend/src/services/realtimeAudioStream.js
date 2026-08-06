@@ -170,6 +170,10 @@ export class RealtimeAudioStream {
     this.remoteAnalyser = null;
     this.micLevelBuffer = null;
     this.remoteLevelBuffer = null;
+    this.remoteGain = null;
+    // 상담원이 시각화 위젯의 마이크/스피커 아이콘으로 직접 끄고 켤 수 있는 음소거 상태입니다.
+    this.micMuted = false;
+    this.remoteMuted = false;
   }
 
   async start({ callId } = {}) {
@@ -183,6 +187,9 @@ export class RealtimeAudioStream {
     this.mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
+    // 통화를 다시 시작하는 게 아니라 같은 인스턴스로 재연결하는 경우를 대비해, 이전에
+    // 눌러둔 음소거 상태를 새 트랙에도 그대로 적용합니다.
+    this.mediaStream.getAudioTracks().forEach((track) => { track.enabled = !this.micMuted; });
     try {
       // 티켓은 30초짜리라 연결할 때마다 새로 받습니다(재사용도 막혀 있습니다).
       const ticket = await requestAudioTicket();
@@ -238,10 +245,14 @@ export class RealtimeAudioStream {
       this.processor.connect(this.silentGain);
       this.silentGain.connect(this.audioContext.destination);
       // 상대방 오디오는 각 프레임마다 새 AudioBufferSourceNode로 재생되므로(playIncomingAudio),
-      // 여기서는 재생 경로에 상시 끼워둘 analyser 하나만 만들어 destination 앞에 둡니다.
+      // 여기서는 재생 경로에 상시 끼워둘 gain(음소거용)과 analyser를 만들어 destination 앞에 둡니다.
+      // gain을 analyser보다 앞에 둬서, 음소거하면 시각화 막대도 함께 0으로 내려가게 합니다.
+      this.remoteGain = this.audioContext.createGain();
+      this.remoteGain.gain.value = this.remoteMuted ? 0 : 1;
       this.remoteAnalyser = this.audioContext.createAnalyser();
       this.remoteAnalyser.fftSize = 256;
       this.remoteLevelBuffer = new Uint8Array(this.remoteAnalyser.fftSize);
+      this.remoteGain.connect(this.remoteAnalyser);
       this.remoteAnalyser.connect(this.audioContext.destination);
       this.onStatus('streaming');
     } catch (error) {
@@ -260,7 +271,7 @@ export class RealtimeAudioStream {
     buffer.copyToChannel(samples, 0);
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.remoteAnalyser || this.audioContext.destination);
+    source.connect(this.remoteGain || this.remoteAnalyser || this.audioContext.destination);
     const startAt = Math.max(this.audioContext.currentTime, this.playbackCursor);
     source.start(startAt);
     this.playbackCursor = startAt + buffer.duration;
@@ -276,12 +287,27 @@ export class RealtimeAudioStream {
     };
   }
 
+  // 내 마이크를 끄고 켭니다. 트랙 자체를 비활성화해서(track.enabled = false), 서버로 나가는
+  // 오디오도 무음이 되고 — 실제로 상대방에게 들리지 않습니다 — 시각화 막대도 같이 0이 됩니다.
+  setMicMuted(muted) {
+    this.micMuted = muted;
+    this.mediaStream?.getAudioTracks().forEach((track) => { track.enabled = !muted; });
+  }
+
+  // 상대방 음성 재생을 끄고 켭니다. gain을 0으로 낮춰 스피커 출력만 막고, 수신 자체는
+  // 계속되므로(연결이 끊기지 않으므로) 다시 켜면 그 순간부터 이어서 들립니다.
+  setRemoteMuted(muted) {
+    this.remoteMuted = muted;
+    if (this.remoteGain) this.remoteGain.gain.value = muted ? 0 : 1;
+  }
+
   stop() {
     if (this.processor) this.processor.disconnect();
     if (this.source) this.source.disconnect();
     if (this.silentGain) this.silentGain.disconnect();
     if (this.micAnalyser) this.micAnalyser.disconnect();
     if (this.remoteAnalyser) this.remoteAnalyser.disconnect();
+    if (this.remoteGain) this.remoteGain.disconnect();
     if (this.audioContext && this.audioContext.state !== 'closed') this.audioContext.close();
     if (this.socket && this.socket.readyState === WebSocket.OPEN) this.socket.close(1000, 'call-ended');
     if (this.mediaStream) this.mediaStream.getTracks().forEach((track) => track.stop());
@@ -292,6 +318,7 @@ export class RealtimeAudioStream {
     this.remoteAnalyser = null;
     this.micLevelBuffer = null;
     this.remoteLevelBuffer = null;
+    this.remoteGain = null;
     this.audioContext = null;
     this.socket = null;
     this.mediaStream = null;
