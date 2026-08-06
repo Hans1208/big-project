@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  ShieldCheck, ClipboardList, Info, Check, PhoneCall, FileSearch, Paperclip, EyeOff, BadgeCheck,
-  Scale, ListChecks, Sparkles, Clock, Inbox, CheckCircle2, FolderOpen,
+  ShieldCheck, ClipboardList, Info, Check, PhoneCall, Paperclip, EyeOff,
+  Scale, ListChecks, Sparkles, Clock, CheckCircle2, FolderOpen,
 } from 'lucide-react';
 import { today } from '../../../constants.jsx';
 import { useToast } from '../../../components/feedback.jsx';
@@ -1120,24 +1120,6 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
               <CollapsibleSection icon={Sparkles} title="AI 분석 요약" pinned confirmed={Boolean(confirmedSections.summary)} onToggleConfirm={() => toggleSectionConfirmed('summary')}>
                 <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
               </CollapsibleSection>
-              <CollapsibleSection icon={Inbox} title="받은 자료" confirmed={Boolean(confirmedSections.modalities)} onToggleConfirm={() => toggleSectionConfirmed('modalities')}>
-                <div className="resultCard">
-                  {/* 복원 경로가 이 필드를 안 채우면 undefined.map으로 화면이 통째로 죽습니다.
-                      병합으로 모양은 맞췄지만, 그리는 쪽에서도 한 번 더 막아둡니다. */}
-                  {(analysis.modalities || []).map((item) => <span key={item.key} className="miniField" style={{ marginRight: 12 }}>{item.key}: {item.count}건</span>)}
-                </div>
-              </CollapsibleSection>
-              <CollapsibleSection icon={FileSearch} title="자료 읽기 결과" confirmed={Boolean(confirmedSections.extraction)} onToggleConfirm={() => toggleSectionConfirmed('extraction')}>
-                <div className="resultCard">
-                  {analysis.extractionDetail?.length ? analysis.extractionDetail.map((item, index) => (
-                    <div key={`${item.fileLink}-${index}`} className="extractRow">
-                      <span className={`extractStatus status-${item.status}`}>{extractionStatusLabel(item.status)}</span>
-                      <span className="extractName"><Paperclip size={12} strokeWidth={2.4} aria-hidden="true" /> {item.fileLink || '(파일명 없음)'}</span>
-                      <span className="extractNote">{item.note}</span>
-                    </div>
-                  )) : <p>첨부파일 없음 · 메모만 분석</p>}
-                </div>
-              </CollapsibleSection>
               <CollapsibleSection icon={EyeOff} title="개인정보는 자동으로 가려집니다" confirmed={Boolean(confirmedSections.stt)} onToggleConfirm={() => toggleSectionConfirmed('stt')}>
                 <div className="resultCard">
                   <div className="segmented compactSegmented">
@@ -1147,13 +1129,6 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                   {!showMaskedStt ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
                   <p className="sttPreviewText">{showMaskedStt ? analysis.sttPreview?.masked : analysis.sttPreview?.original}</p>
                   <p className="helperText">기본값: 개인정보 가림 · 원문: 오류 확인용</p>
-                </div>
-              </CollapsibleSection>
-              <CollapsibleSection icon={BadgeCheck} title="AI 응답 검증" confirmed={Boolean(confirmedSections.verification)} onToggleConfirm={() => toggleSectionConfirmed('verification')}>
-                <div className="resultCard">
-                  <span className="miniField">형식 검증: {analysis.verification?.format ? '통과' : '오류'}</span>
-                  <span className="miniField">근거 검증: {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
-                  <span className="miniField">환각 탐지: {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
                 </div>
               </CollapsibleSection>
               <CollapsibleSection icon={Scale} title="무료 법률구조 대상 검토" confirmed={Boolean(confirmedSections.eligibility)} onToggleConfirm={() => toggleSectionConfirmed('eligibility')}>

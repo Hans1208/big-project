@@ -720,6 +720,25 @@ button:disabled:active {
   background: var(--accent-tint);
 }
 
+/* 무료 법률구조 대상 확인(좌) · 상담 자료 추가(우)를 가로 1:1로 나란히 배치합니다. */
+.uploadPanel .eligibilityUploadRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+  margin: 16px 0 20px;
+}
+
+.uploadPanel .eligibilityUploadRow > .eligibilityPanel {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .uploadPanel .eligibilityUploadRow {
+    grid-template-columns: 1fr;
+  }
+}
+
 .eligibilityHeader {
   display: flex;
   align-items: flex-start;
@@ -3823,7 +3842,6 @@ button:disabled:active {
 .uploadPanel .fileDropzone {
   align-items: center;
   justify-content: center;
-  min-height: 150px;
   padding: 22px 16px;
   border-radius: var(--r-surface);
   text-align: center;
@@ -4107,10 +4125,9 @@ button:disabled:active {
 .uploadPanel .newUploadGuide { padding:14px 16px; border-radius: var(--r-card) !important; background:var(--surface-subtle) !important; box-shadow:none !important; }
 .uploadPanel .eligibilityPanel { padding:22px 24px; border:0 !important; border-radius: var(--r-surface) !important; background:var(--surface-subtle) !important; box-shadow:none !important; }
 .uploadPanel .evidenceBox { border:0 !important; border-radius: var(--r-card) !important; background:#fff !important; box-shadow:none !important; }
-.uploadPanel .uploadFileWorkspace { gap:24px; border:0 !important; background:transparent !important; }
-.uploadPanel .uploadFileWorkspace .uploadDropzoneColumn,
-.uploadPanel .uploadFileWorkspace .uploadListColumn { padding:0 !important; border:0 !important; background:transparent !important; }
-.uploadPanel .uploadFileWorkspace .uploadListColumn { padding-left:24px !important; border-left:1px solid var(--border) !important; }
+.uploadPanel .uploadFilesPanel .uploadDropzoneColumn,
+.uploadPanel .uploadFilesPanel .uploadListColumn { padding:0 !important; border:0 !important; background:transparent !important; }
+.uploadPanel .uploadFilesPanel .uploadListColumn { padding-top:10px !important; border-top:0 !important; }
 .uploadPanel .uploadActionRow { margin-top:20px; padding:16px 0 0 !important; border-top:1px solid var(--border) !important; border-radius:0 !important; background:transparent !important; box-shadow:none !important; }
 .dashboard .documentReviewForm > textarea { width:100%; min-height:96px; padding:14px 16px; border:1px solid var(--border); border-radius: var(--r-pill); background:#fff; color:var(--text-main); line-height:1.6; }
 .dashboard .documentReviewForm > .inlineControls { justify-content:flex-end; margin:4px 0 0; padding:12px 0 0; border-top:1px solid var(--border); background:transparent; }
@@ -4155,11 +4172,7 @@ button:disabled:active {
   box-shadow: 0 0 0 2px var(--accent), var(--shadow-soft);
 }
 
-/* 상담 분석 화면의 핵심 조작부를 화면 상단에 유지해, 긴 분석 결과를 내려가도 찾기 쉽게 합니다. */
 .analysisPanel > .inlineControls {
-  position: sticky;
-  top: 82px;
-  z-index: 18;
   box-shadow: 0 8px 22px rgba(13, 22, 32, 0.08);
   backdrop-filter: blur(8px);
 }
@@ -11997,9 +12010,6 @@ a:focus-visible,
 }
 
 .analysisPanel > .inlineControls {
-  position: sticky;
-  top: 82px;
-  z-index: 18;
   box-shadow: 0 8px 22px rgba(13, 22, 32, 0.08);
   backdrop-filter: blur(8px);
 }
@@ -12100,10 +12110,6 @@ textarea:focus-visible,
 }
 
 @media (max-width: 900px) {
-  .analysisPanel > .inlineControls {
-    top: 74px;
-  }
-
   .analysisActionRail {
     position: static;
     order: -1;
@@ -12132,7 +12138,6 @@ textarea:focus-visible,
   }
 
   .analysisPanel > .inlineControls {
-    position: static;
     display: grid;
     grid-template-columns: 1fr;
     padding: 12px;
@@ -12448,9 +12453,6 @@ textarea:focus-visible,
 }
 
 .analysisPanel .analysisProgressPanel {
-  position: sticky;
-  top: 78px;
-  z-index: 16;
   gap: 8px;
   margin-bottom: 16px;
   padding: 10px 14px;
@@ -12500,10 +12502,6 @@ textarea:focus-visible,
 }
 
 .analysisPanel .analysisFinalActions {
-  position: sticky;
-  bottom: 12px;
-  z-index: 12;
-
   padding: 12px 14px;
   border-radius: var(--r-card);
   box-shadow: 0 8px 24px rgba(13, 22, 32, 0.12);
@@ -12590,10 +12588,6 @@ textarea:focus-visible,
 }
 
 @media (max-width: 900px) {
-  .analysisPanel .analysisProgressPanel {
-    position: static;
-  }
-
   .analysisPanel .analysisActionRail {
     position: static;
     max-height: none;
@@ -12672,38 +12666,31 @@ table.dataTable td .reviewActionButton {
   margin-inline: auto;
 }
 
-/* 상담 자료 업로드 영역은 설명·조작·목록이 같은 높이에서 시작되도록 2열 카드로 정렬합니다. */
-.uploadPanel .eligibilityPanel + .workflowColumns {
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
-  gap: 24px;
-  margin: 24px 0;
-  align-items: stretch;
+/* 업로드 목록은 자료 선택 탭 아래로 이어지는 세로 흐름으로, 무료 법률구조 대상 확인과
+   같은 박스(.eligibilityPanel) 안에 함께 둡니다. */
+.uploadPanel .uploadFilesPanel {
+  margin: 20px 0;
 }
 
-.uploadPanel .eligibilityPanel + .workflowColumns > div {
+.uploadPanel .uploadFilesPanel > div {
   display: flex;
   min-width: 0;
   flex-direction: column;
 }
 
-.uploadPanel .eligibilityPanel + .workflowColumns > div > h3 {
-  margin: 0 0 6px;
-  padding: 0 0 0 10px;
-  border-left: 3px solid var(--accent-border);
-  font-size: var(--fs-md);
+.uploadPanel .uploadFilesPanel > div > h3 {
+  margin: 0 0 4px;
+  font-size: var(--fs-body);
 }
 
-.uploadPanel .eligibilityPanel + .workflowColumns > div > .helperText {
-  min-height: 42px;
-  margin: 0 0 10px;
+.uploadPanel .uploadFilesPanel > div > .helperText {
+  margin: 0 0 12px;
   line-height: 1.5;
 }
 
 .uploadPanel .fileDropzone {
-  flex: 1;
   align-items: flex-start;
   justify-content: flex-start;
-  min-height: 150px;
   padding: 20px;
   border-radius: var(--r-card);
   text-align: left;
@@ -12717,7 +12704,7 @@ table.dataTable td .reviewActionButton {
    stretch로 파일 한 개당 카드가 넓적하고 두꺼워짐)을 없애고, 위→아래로 쌓는 세로 목록으로
    바꿉니다. grid-template-rows를 5줄로 고정해 5개가 차면 오른쪽에 새 열이 이어지게 합니다
    (6번째 파일부터 두 번째 열 1행에 놓임). */
-.uploadPanel .eligibilityPanel + .workflowColumns .scrollBox {
+.uploadPanel .uploadFilesPanel .scrollBox {
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(5, auto);
@@ -12735,27 +12722,16 @@ table.dataTable td .reviewActionButton {
 
 /* 위 grid의 gap(8px)이 이미 항목 사이 간격을 담당하므로, 세로 목록용이던 각 항목의
    margin-bottom(8px)을 더하면 간격이 이중으로 벌어집니다. */
-.uploadPanel .eligibilityPanel + .workflowColumns .scrollBox .uploadItem {
+.uploadPanel .uploadFilesPanel .scrollBox .uploadItem {
   margin-bottom: 0;
 }
 
-.uploadPanel .eligibilityPanel + .workflowColumns .scrollBox > p {
+.uploadPanel .uploadFilesPanel .scrollBox > p {
   grid-column: 1 / -1;
   align-self: center;
   margin: auto;
   color: var(--text-sub);
   text-align: center;
-}
-
-@media (max-width: 760px) {
-  .uploadPanel .eligibilityPanel + .workflowColumns {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-
-  .uploadPanel .eligibilityPanel + .workflowColumns > div > .helperText {
-    min-height: 0;
-  }
 }
 
 /* 요약 카드의 선택 표시는 왼쪽 세로선 대신 카드 전체 강조와 작은 상태 배지로 보여줍니다. */
@@ -14068,6 +14044,7 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 }
 
 .uploadPanel .eligibilityPanel > .formGrid {
+  grid-template-columns: 1fr;
   align-items: stretch;
 }
 
@@ -14113,10 +14090,6 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   align-items: center;
 }
 
-.uploadPanel .uploadFileWorkspace {
-  align-items: stretch;
-}
-
 .uploadPanel .uploadDropzoneColumn,
 .uploadPanel .uploadListColumn {
   display: flex;
@@ -14124,7 +14097,6 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   flex-direction: column;
 }
 
-.uploadPanel .uploadDropzoneColumn .fileDropzone,
 .uploadPanel .uploadListColumn .scrollBox {
   flex: 1 1 auto;
   min-height: 150px;
@@ -14416,12 +14388,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   box-shadow: 0 1px 0 var(--border);
 }
 
-/* ── 하단 고정(sticky) 액션바 배경 누락 수정 ──
- * 상담원 분석 화면(.analysisPanel .analysisFinalActions)과 변호사 검토 화면
- * (.hitlReviewPage .statusConfirmActions)의 하단 고정 버튼바가 position: sticky +
- * box-shadow만 있고 background가 한 번도 지정되지 않아, 스크롤되는 본문 텍스트가 버튼
- * 뒤로 그대로 비쳐 보이는 문제가 실제 화면에서 확인됐습니다. 흰 카드처럼 보이도록
- * 불투명 배경과 위쪽 경계선을 추가합니다. */
+/* 변호사 검토 화면(.hitlReviewPage .statusConfirmActions)의 하단 고정 버튼바가
+ * position: sticky + box-shadow만 있고 background가 한 번도 지정되지 않아, 스크롤되는
+ * 본문 텍스트가 버튼 뒤로 그대로 비쳐 보이는 문제가 실제 화면에서 확인됐습니다. 흰
+ * 카드처럼 보이도록 불투명 배경과 위쪽 경계선을 추가합니다. */
 .analysisPanel .analysisFinalActions,
 .hitlReviewPage .statusConfirmActions {
   background: var(--surface);
@@ -14634,8 +14604,7 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 
 /* 상단 커맨드 바: 사건 고르기 + 새 상담 + 분석 버튼. 이 화면 전체가 이미 하나의 큰 카드
    (.analysisPanel)라, 커맨드 바까지 자체 모서리·그림자를 가지면 "카드 안에 카드"로 겹쳐
-   보입니다. 스크롤을 따라 붙는 동안 아래 내용이 비치지 않도록 배경만 채우고, 밑줄 하나로
-   본문과 나눕니다. */
+   보입니다. 배경만 채우고 밑줄 하나로 본문과 나눕니다. */
 .analysisPanel > .inlineControls.analysisCommandBar {
   background: var(--surface) !important;
   border: none !important;
@@ -14643,9 +14612,6 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   border-radius: 0 !important;
   padding: 14px 0 !important;
   box-shadow: none !important;
-  position: sticky;
-  top: 12px;
-  z-index: 5;
 }
 
 /* 실시간 상담의 사건 선택 드롭다운도 상담 자료 올리기와 완전히 같은 구성(라벨+아이콘 →
@@ -15618,7 +15584,7 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 }
 
 .uploadPanel .eligibilityPanel .formGrid {
-  grid-template-columns: minmax(0, 1.15fr) minmax(240px, 0.85fr);
+  grid-template-columns: 1fr;
   align-items: stretch;
   gap: 14px;
 }
@@ -15642,31 +15608,12 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   margin: 12px 0 0;
 }
 
-.uploadPanel .eligibilityPanel + .workflowColumns {
-  gap: 18px;
-  margin: 20px 0;
-}
-
-.uploadPanel .eligibilityPanel + .workflowColumns > div {
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-surface);
-  background: var(--surface);
-}
-
-.uploadPanel .eligibilityPanel + .workflowColumns > div > h3 {
-  margin-bottom: 4px;
-  font-size: var(--fs-body);
-}
-
-.uploadPanel .eligibilityPanel + .workflowColumns > div > .helperText {
-  min-height: auto;
-  margin-bottom: 12px;
-}
-
-.uploadPanel .fileDropzone,
-.uploadPanel .eligibilityPanel + .workflowColumns .scrollBox {
+.uploadPanel .uploadFilesPanel .scrollBox {
   min-height: 126px;
+  border-radius: var(--r-control);
+}
+
+.uploadPanel .fileDropzone {
   border-radius: var(--r-control);
 }
 
@@ -16682,8 +16629,7 @@ body,
 }
 
 .uploadPanel .uploadCaseSummary,
-.uploadPanel .eligibilityPanel,
-.uploadPanel .eligibilityPanel + .workflowColumns > div {
+.uploadPanel .eligibilityPanel {
   border-color: rgba(47, 130, 246, 0.16) !important;
   background: rgba(255, 255, 255, 0.54) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76) !important;
@@ -16695,19 +16641,17 @@ body,
 }
 
 .uploadPanel .eligibilityPanel .evidenceBox,
-.uploadPanel .fileDropzone,
-.uploadPanel .eligibilityPanel + .workflowColumns .scrollBox {
+.uploadPanel .uploadFilesPanel .scrollBox {
   border-color: rgba(47, 130, 246, 0.14) !important;
   background: rgba(255, 255, 255, 0.48) !important;
   box-shadow: none !important;
 }
 
+/* 자료 유형 선택 영역은 더 이상 독립된 점선 박스가 아니라, 무료 법률구조 대상 확인과
+   같은 패널(.eligibilityPanel) 안에서 바로 이어지는 내용입니다. */
 .uploadPanel .fileDropzone {
-  border-style: dashed !important;
-}
-
-.uploadPanel .uploadFileWorkspace .uploadListColumn {
-  border-left-color: rgba(47, 130, 246, 0.16) !important;
+  border: 0 !important;
+  background: transparent !important;
 }
 
 .uploadPanel .uploadActionRow {
