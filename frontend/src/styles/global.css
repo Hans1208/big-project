@@ -12908,9 +12908,22 @@ table.dataTable td .reviewActionButton {
 
 .dashboard-counselor .dashboardLeft > .panel > .tableScrollX,
 .dashboard-counselor .dashboardRight > .calendarPanel > .tableScrollX {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  /* 세로 스크롤은 안쪽 .tableScroll 한 곳에서만 담당합니다. 이 바깥 상자까지
+     overflow:auto(세로 포함)를 쓰면, 안쪽 .tableScroll이 이미 자기 높이만큼
+     스크롤을 만들어낸 뒤 남는 여백 때문에 바깥 상자도 함께 스크롤바를 만들어
+     스크롤바가 2개로 보였습니다. */
+  overflow-y: hidden;
+}
+
+.dashboard-counselor .dashboardLeft > .panel > .tableScrollX > .tableScroll,
+.dashboard-counselor .dashboardRight > .calendarPanel > .tableScrollX > .tableScroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 @media (max-width: 1440px) {
