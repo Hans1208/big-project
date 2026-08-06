@@ -4155,11 +4155,7 @@ button:disabled:active {
   box-shadow: 0 0 0 2px var(--accent), var(--shadow-soft);
 }
 
-/* 상담 분석 화면의 핵심 조작부를 화면 상단에 유지해, 긴 분석 결과를 내려가도 찾기 쉽게 합니다. */
 .analysisPanel > .inlineControls {
-  position: sticky;
-  top: 82px;
-  z-index: 18;
   box-shadow: 0 8px 22px rgba(13, 22, 32, 0.08);
   backdrop-filter: blur(8px);
 }
@@ -11997,9 +11993,6 @@ a:focus-visible,
 }
 
 .analysisPanel > .inlineControls {
-  position: sticky;
-  top: 82px;
-  z-index: 18;
   box-shadow: 0 8px 22px rgba(13, 22, 32, 0.08);
   backdrop-filter: blur(8px);
 }
@@ -12100,10 +12093,6 @@ textarea:focus-visible,
 }
 
 @media (max-width: 900px) {
-  .analysisPanel > .inlineControls {
-    top: 74px;
-  }
-
   .analysisActionRail {
     position: static;
     order: -1;
@@ -12132,7 +12121,6 @@ textarea:focus-visible,
   }
 
   .analysisPanel > .inlineControls {
-    position: static;
     display: grid;
     grid-template-columns: 1fr;
     padding: 12px;
@@ -12448,9 +12436,6 @@ textarea:focus-visible,
 }
 
 .analysisPanel .analysisProgressPanel {
-  position: sticky;
-  top: 78px;
-  z-index: 16;
   gap: 8px;
   margin-bottom: 16px;
   padding: 10px 14px;
@@ -12500,10 +12485,6 @@ textarea:focus-visible,
 }
 
 .analysisPanel .analysisFinalActions {
-  position: sticky;
-  bottom: 12px;
-  z-index: 12;
-
   padding: 12px 14px;
   border-radius: var(--r-card);
   box-shadow: 0 8px 24px rgba(13, 22, 32, 0.12);
@@ -12590,10 +12571,6 @@ textarea:focus-visible,
 }
 
 @media (max-width: 900px) {
-  .analysisPanel .analysisProgressPanel {
-    position: static;
-  }
-
   .analysisPanel .analysisActionRail {
     position: static;
     max-height: none;
@@ -14416,12 +14393,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   box-shadow: 0 1px 0 var(--border);
 }
 
-/* ── 하단 고정(sticky) 액션바 배경 누락 수정 ──
- * 상담원 분석 화면(.analysisPanel .analysisFinalActions)과 변호사 검토 화면
- * (.hitlReviewPage .statusConfirmActions)의 하단 고정 버튼바가 position: sticky +
- * box-shadow만 있고 background가 한 번도 지정되지 않아, 스크롤되는 본문 텍스트가 버튼
- * 뒤로 그대로 비쳐 보이는 문제가 실제 화면에서 확인됐습니다. 흰 카드처럼 보이도록
- * 불투명 배경과 위쪽 경계선을 추가합니다. */
+/* 변호사 검토 화면(.hitlReviewPage .statusConfirmActions)의 하단 고정 버튼바가
+ * position: sticky + box-shadow만 있고 background가 한 번도 지정되지 않아, 스크롤되는
+ * 본문 텍스트가 버튼 뒤로 그대로 비쳐 보이는 문제가 실제 화면에서 확인됐습니다. 흰
+ * 카드처럼 보이도록 불투명 배경과 위쪽 경계선을 추가합니다. */
 .analysisPanel .analysisFinalActions,
 .hitlReviewPage .statusConfirmActions {
   background: var(--surface);
@@ -14634,8 +14609,7 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 
 /* 상단 커맨드 바: 사건 고르기 + 새 상담 + 분석 버튼. 이 화면 전체가 이미 하나의 큰 카드
    (.analysisPanel)라, 커맨드 바까지 자체 모서리·그림자를 가지면 "카드 안에 카드"로 겹쳐
-   보입니다. 스크롤을 따라 붙는 동안 아래 내용이 비치지 않도록 배경만 채우고, 밑줄 하나로
-   본문과 나눕니다. */
+   보입니다. 배경만 채우고 밑줄 하나로 본문과 나눕니다. */
 .analysisPanel > .inlineControls.analysisCommandBar {
   background: var(--surface) !important;
   border: none !important;
@@ -14643,9 +14617,6 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   border-radius: 0 !important;
   padding: 14px 0 !important;
   box-shadow: none !important;
-  position: sticky;
-  top: 12px;
-  z-index: 5;
 }
 
 /* 실시간 상담의 사건 선택 드롭다운도 상담 자료 올리기와 완전히 같은 구성(라벨+아이콘 →
