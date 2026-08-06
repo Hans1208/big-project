@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, Check } from 'lucide-react';
-import { useInPersonRecording } from '../../../hooks/useInPersonRecording.js';
+import { Mic, Check, EyeOff, Headphones, Radio } from 'lucide-react';
 import { RealtimeMemoCard } from './RealtimeAnalysisPanel.jsx';
+import { correctClientName } from '../shared/nameCorrection.js';
+import { CollapsibleSection } from '../../../components/common.jsx';
 
 // RealtimeCallControl과 같은 위치·패턴이지만 통화 대신 녹음을 시작/종료합니다.
 // 통화 경과 시간 카운트 같은 통화 전용 로직은 옮기지 않고, 녹음 상태(status)는 useInPersonRecording에서
@@ -52,10 +53,6 @@ function buildTranscriptChunk(segments, field) {
     .trim();
 }
 
-function buildTranscript(segments, field) {
-  return buildTranscriptChunk([...segments].sort((a, b) => a.idx - b.idx), field);
-}
-
 // "녹음 시작"을 다시 눌렀는데 이전 세션 텍스트가 실시간 상담 메모에 이미 쌓여 있으면, 그걸 그냥
 // 이어붙이면 이전 상담 내용과 새 상담 내용이 뒤섞입니다. 그렇다고 묻지도 않고 지우면 실수로
 // 다시 누른 경우 되돌릴 수 없이 날아갑니다 — 그래서 확인 팝업을 거칩니다.
@@ -77,21 +74,46 @@ function RestartRecordingConfirmModal({ onConfirm, onCancel }) {
 // core-api(InPersonRecordingWebSocketHandler)가 stt-mask-api로 실제 마스킹한 결과를 원문/마스킹본
 // 토글로 보여줍니다. AnalysisWorkbench의 "개인정보는 자동으로 가려집니다" 카드와 같은 UX입니다.
 // 기본값을 마스킹본으로 두는 이유도 동일합니다 — 원문은 검증이 필요할 때만 확인합니다.
-export function InPersonSttPreview({ segments }) {
+//
+// 이름 교정(correctClientName)은 여기서 따로 하지 않습니다. 이 카드가 읽는
+// selectedCase.inpersonMemo(Masked)가 이미 교정을 거친 값이라, 한 번 더 돌리면
+// 같은 일을 두 곳에서 하게 됩니다.
+// 요구사항: (1) 기본적으로 보이고 (2) 녹음 시작/중에는 원문 토글을 막아 마스킹 전 상태가 잘못
+// 노출되지 않게 하고 (3) 녹음이 끝나면 다시 조작 가능해지고 (4) 그 시점에 아코디언이 자동으로
+// 펼쳐져야 합니다. status가 'done'인지 아닌지로 key를 바꿔 CollapsibleSection을 다시 마운트시켜
+// defaultOpen을 그때그때 새로 적용합니다(이 컴포넌트는 비제어형이라 이 방법이 가장 단순합니다).
+//
+// 표시 텍스트는 현재 세션의 segments가 아니라 selectedCase.inpersonMemo(Masked)를 받습니다 —
+// 그 값은 (a) 녹음 중에는 세그먼트가 도착할 때마다 InPersonAnalysisPanel의 useEffect가 그대로
+// 반영해 실시간성을 잃지 않고, (b) 새로고침·다른 상담으로 갔다 온 뒤에는 core-api가 돌려주는
+// inperson_input_texts(_masked) 배열의 최신 스냅샷(consultationMemosFromRow/latestSnapshot)에서
+// 복원되므로, "저장된 가장 최근 결과"가 항상 이 카드에 보입니다. segments는 이번 세션에서
+// 변환 실패 구간이 있었는지(hasError) 표시하는 용도로만 남겨둡니다.
+export function InPersonSttPreview({ maskedText, rawText, hasError, status }) {
   const [showMasked, setShowMasked] = useState(true);
-  if (!segments.length) return null;
-  const hasError = segments.some((segment) => segment.error);
-  const text = buildTranscript(segments, showMasked ? 'maskedText' : 'text');
+  const isRecordingActive = status === 'connecting' || status === 'recording';
+  const text = showMasked ? maskedText : rawText;
   return (
-    <div className="resultCard sttReferenceCard">
-      <div className="segmented compactSegmented">
-        <button type="button" className={showMasked ? 'active' : ''} onClick={() => setShowMasked(true)}>개인정보 가림</button>
-        <button type="button" className={!showMasked ? 'active' : ''} onClick={() => setShowMasked(false)}>원문</button>
+    <CollapsibleSection
+      key={status === 'done' ? 'inperson-stt-open' : 'inperson-stt-collapsed'}
+      icon={EyeOff}
+      title="개인정보 마스크 결과"
+      defaultOpen={status === 'done'}
+    >
+      <div className="resultCard sttReferenceCard">
+        <div className="segmented compactSegmented">
+          <button type="button" className={showMasked ? 'active' : ''} disabled={isRecordingActive} onClick={() => setShowMasked(true)}>개인정보 가림</button>
+          <button type="button" className={!showMasked ? 'active' : ''} disabled={isRecordingActive} onClick={() => setShowMasked(false)}>원문</button>
+        </div>
+        {isRecordingActive ? (
+          <p className="helperText">녹음이 끝나면 원문 확인 등 조작이 가능합니다.</p>
+        ) : !showMasked ? (
+          <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p>
+        ) : null}
+        <p className="sttPreviewText">{text || '녹음 결과가 없습니다.'}</p>
+        {hasError ? <p className="helperText">일부 구간은 변환에 실패해 메모에서 제외되었습니다.</p> : null}
       </div>
-      {!showMasked ? <p className="sensitiveSourceNotice">민감정보 포함 가능 · 검증 시에만 확인</p> : null}
-      <p className="sttPreviewText">{text || '녹음 결과가 없습니다.'}</p>
-      {hasError ? <p className="helperText">일부 구간은 변환에 실패해 메모에서 제외되었습니다.</p> : null}
-    </div>
+    </CollapsibleSection>
   );
 }
 
@@ -104,10 +126,16 @@ export function InPersonSttPreview({ segments }) {
 // 다만 전체를 통째로 다시 쓰면 그 사이 상담원이 직접 입력한 메모(같은 칸의 "메모 추가")를
 // 덮어써 버리므로, 이미 반영한 segment 개수(flushedCountRef)를 추적해 "새로 도착한 조각만"
 // 기존 값 뒤에 이어붙입니다.
-export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, caseMeta }) {
+//
+// status/segments/startRecording/stopRecording은 useInPersonRecording을 여기서 직접 부르지 않고
+// AnalysisWorkbench로부터 props로 받습니다 — "상담 저장" 버튼이 녹음 상태(상담 중/변환 중)에
+// 따라 라벨을 바꿔야 해서, 그 버튼이 있는 AnalysisWorkbench가 이 훅을 대신 소유합니다.
+export function InPersonAnalysisPanel({
+  selectedCase, onUpdateConsultation,
+  inPersonStatus: status, inPersonSegments: segments, inPersonErrorMessage: errorMessage,
+  onStartInPersonRecording, onStopInPersonRecording,
+}) {
   const hasCase = Boolean(selectedCase);
-  const { status, segments, errorMessage, startRecording, stopRecording } =
-    useInPersonRecording({ consultationId: selectedCase?.coreId });
 
   const [pendingRestartConfirm, setPendingRestartConfirm] = useState(false);
   const hasExistingMemo = Boolean((selectedCase?.inpersonMemo || '').trim() || (selectedCase?.inpersonMemoMasked || '').trim());
@@ -116,12 +144,12 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
       setPendingRestartConfirm(true);
       return;
     }
-    startRecording();
+    onStartInPersonRecording();
   };
   const confirmRestart = () => {
     setPendingRestartConfirm(false);
     onUpdateConsultation(selectedCase.id, { inpersonMemo: '', inpersonMemoMasked: '' });
-    startRecording();
+    onStartInPersonRecording();
   };
 
   const flushedCountRef = useRef(0);
@@ -138,8 +166,12 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
     const newSegments = sorted.slice(flushedCountRef.current);
     flushedCountRef.current = sorted.length;
 
-    const newText = buildTranscriptChunk(newSegments, 'text');
-    const newMaskedText = buildTranscriptChunk(newSegments, 'maskedText');
+    // 상담원이 이름칸에 적어둔 이름이 있으면, 받아쓰기가 잘못 들은 이름을 그 이름으로 되돌립니다.
+    // 이 메모가 그대로 상담 저장 -> AI 분석 -> 서식 초안까지 흘러가기 때문에, 여기서 안 고치면
+    // 청구인 이름이 틀린 채로 법률 문서가 만들어집니다.
+    const clientName = selectedCase.name || '';
+    const newText = correctClientName(buildTranscriptChunk(newSegments, 'text'), clientName);
+    const newMaskedText = correctClientName(buildTranscriptChunk(newSegments, 'maskedText'), clientName);
     if (!newText && !newMaskedText) return;
 
     const currentMemo = selectedCase.inpersonMemo || '';
@@ -150,6 +182,35 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, hasCase]);
+
+  // 실제 흐름은 "녹음 -> 받아쓰기에서 이름이 틀린 걸 발견 -> 이름칸을 고침" 순서입니다. 그래서
+  // 새로 들어오는 조각만 고쳐서는 부족하고, 이름이 바뀐 시점에 이미 쌓여 있는 메모까지 같이
+  // 고쳐야 저장되는 본문에서 틀린 이름이 사라집니다.
+  //
+  // 고칠 게 없으면 아무것도 안 하므로(아래 비교) 갱신이 반복되지 않습니다.
+  //
+  // 이름칸이 바로 옆(caseMeta)에 있어서 한 글자 칠 때마다 이 효과가 돕니다. 메모를 덮어쓰는
+  // 일이라 '문', '문가'처럼 아직 다 안 친 상태로 반영되면 안 되므로, 타이핑이 멎은 뒤에만
+  // 한 번 적용합니다.
+  useEffect(() => {
+    if (!hasCase) return undefined;
+    const timer = setTimeout(() => {
+      const clientName = selectedCase.name || '';
+      const memo = selectedCase.inpersonMemo || '';
+      const masked = selectedCase.inpersonMemoMasked || '';
+      const nextMemo = correctClientName(memo, clientName);
+      const nextMasked = correctClientName(masked, clientName);
+      if (nextMemo === memo && nextMasked === masked) return;
+      onUpdateConsultation(selectedCase.id, { inpersonMemo: nextMemo, inpersonMemoMasked: nextMasked });
+    }, 800);
+    return () => clearTimeout(timer);
+    // 메모 내용은 의존성에서 뺍니다. 상담원이 메모를 직접 고칠 수 있게 되면서
+    // (RealtimeMemoCard), 메모가 바뀔 때마다 이 교정이 돌면 일부러 적은 이름까지
+    // 되돌려 버립니다 — 예를 들어 상대방 이름이 내담자와 소리가 비슷하면, 적는 족족
+    // 내담자 이름으로 바뀝니다. 사람이 고친 것이 기계보다 우선입니다.
+    // 이름칸이 바뀐 순간에만 한 번 훑습니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCase?.id, selectedCase?.name]);
 
   const headline = status === 'recording'
     ? '녹음 중입니다. 대면 상담 내용이 실시간으로 전송됩니다.'
@@ -162,33 +223,44 @@ export function InPersonAnalysisPanel({ selectedCase, onUpdateConsultation, case
   return (
     <section className="realtimeWorkbenchPanel" aria-label="대면 상담 메모">
       <div className="realtimeWorkbenchHeader">
-        <div>
-          <span className="flowStageEyebrow">대면 상담</span>
-          <strong>{headline}</strong>
-          <p>마이크 녹음 중 개인정보가 가려진 대화 내용이 실시간으로 상담 메모에 반영됩니다.</p>
+        <div className="realtimeHeaderTags">
+          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
+          <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
         </div>
-        <InPersonRecordingControl
-          hasCase={hasCase}
-          status={status}
-          onStart={handleStartClick}
-          onStop={stopRecording}
-        />
       </div>
       <div className="realtimeConsultationLayout">
         <div className="realtimeConsultationMain">
-          <RealtimeMemoCard
-            selectedCase={selectedCase}
-            onUpdateConsultation={onUpdateConsultation}
-            field="inpersonMemo"
-            composerPlaceholder="대면 상담 내용을 바로 적어주세요."
-          />
-          {/* "개인정보 가림"/"원문" 토글은 녹음 종료 후 결과만 보여달라는 요구에 맞춰
-              status === 'done'일 때만 렌더링합니다(위 실시간 메모와는 별개 요구사항). */}
-          {status === 'done' ? <InPersonSttPreview segments={segments} /> : null}
+          <div className="realtimeSplitRow">
+            <div className="realtimeSplitColumn">
+              <strong>{headline}</strong>
+              <p>마이크 녹음 중 개인정보가 가려진 대화 내용이 실시간으로 상담 메모에 반영됩니다.</p>
+              <InPersonRecordingControl
+                hasCase={hasCase}
+                status={status}
+                onStart={handleStartClick}
+                onStop={onStopInPersonRecording}
+              />
+              {/* 개인정보 마스크 결과는 기본적으로 보이되, 녹음 중에는 토글이 비활성화되고
+                  녹음이 끝나면 다시 조작 가능해지면서 아코디언이 자동으로 펼쳐집니다
+                  (구체적인 활성/펼침 제어는 InPersonSttPreview 내부에서 status로 처리).
+                  텍스트는 selectedCase에서 가져와 — 이 사건에 저장된 가장 최근 결과를 보여줍니다. */}
+              {hasCase ? (
+                <InPersonSttPreview
+                  maskedText={selectedCase?.inpersonMemoMasked || ''}
+                  rawText={selectedCase?.inpersonMemo || ''}
+                  hasError={segments.some((segment) => segment.error)}
+                  status={status}
+                />
+              ) : null}
+            </div>
+            <RealtimeMemoCard
+              selectedCase={selectedCase}
+              onUpdateConsultation={onUpdateConsultation}
+              field="inpersonMemo"
+              composerPlaceholder="대면 상담 내용을 바로 적어주세요."
+            />
+          </div>
         </div>
-        <aside className="realtimeConsultationSide">
-          {caseMeta}
-        </aside>
       </div>
       {pendingRestartConfirm ? (
         <RestartRecordingConfirmModal

@@ -101,8 +101,15 @@ export function mergeContractAnalysisResponse(baseAnalysis, contractResult, extr
 export function splitSummaryIntoBullets(summaryText = '') {
   // 문장으로 끊어 쓴 요약은 마침표 기준으로, "사건 유형: 이혼 / 긴급도: 중"처럼 슬래시로
   // 항목을 나열한 요약(core-api 응답 형식)은 슬래시 기준으로 쪼갭니다.
+  //
+  // 예전에는 '다'와 '요' 뒤에서도 끊었습니다("~했다", "~예요" 같은 한국어 종결어미를 잡으려던
+  // 의도). 그런데 문장 끝인지를 안 보고 글자만 봐서, 문장 한가운데가 잘렸습니다:
+  //   "남편이 남긴 채무가 재산보다 / 약 2억 원 더 많아..."   <- '재산보다'의 '다'
+  // '~보다', '~하다가', '~한다면', '~하고요' 전부 같은 일이 납니다. 종결어미는 거의 항상
+  // 마침표를 달고 오므로 문장부호만 기준으로 삼습니다. 마침표 없이 쓴 요약은 안 쪼개지고
+  // 한 줄로 남는데, 문장이 잘리는 것보다는 낫습니다.
   return summaryText
-    .split(/(?<=[.!?다요])\s+|\n+|\s+\/\s+/)
+    .split(/(?<=[.!?])\s+|\n+|\s+\/\s+/)
     .map((sentence) => sentence.trim())
     .filter(Boolean);
 }
@@ -210,8 +217,27 @@ export function buildAnalysisResult(selectedCase) {
   const modalities = summarizeAttachmentModalities(attachments);
   const hasMultimodalEvidence = modalities.some((item) => item.count > 0);
   const audioAttachments = attachments.filter((item) => /mp3|wav|m4a|webm/i.test(item.mimeType || item.name || ''));
-  const sttOriginal = audioAttachments.map((item) => item.sttOriginalText || item.extractedText).filter(Boolean).join('\n\n');
-  const sttMasked = audioAttachments.map((item) => item.sttMaskedText || item.extractedText).filter(Boolean).join('\n\n');
+  // 실시간 상담(전화 memo / 대면 inpersonMemo)도 STT 결과다. 첨부 녹취파일만 보면 마이크로만
+  // 진행한 상담은 "개인정보가 가려진 상담 내용" 카드가 통째로 비어, 화면이 약속한 원문/가림
+  // 대조를 보여줄 수 없다 — 정작 그 카드가 가장 필요한 경우가 실시간 상담이다.
+  //
+  // 마스킹본은 stt-mask-api가 조각마다 돌려준 값을 InPersonAnalysisPanel이 쌓아둔 것이라
+  // 상담원 화면(녹음 패널)과 같은 값이다. 두 화면이 서로 다른 방식으로 가리면 조합해서
+  // 원본을 복원할 수 있다는 지적(formatters.js의 규제 TODO)도 이렇게 같은 값을 쓰면 없어진다.
+  const liveOriginal = [selectedCase?.memo, selectedCase?.inpersonMemo]
+    .filter((value) => value && value.trim()).join('\n\n');
+  const liveMasked = [selectedCase?.memoMasked, selectedCase?.inpersonMemoMasked]
+    .filter((value) => value && value.trim()).join('\n\n');
+  const sttOriginal = [
+    ...audioAttachments.map((item) => item.sttOriginalText || item.extractedText),
+    liveOriginal,
+  ].filter(Boolean).join('\n\n');
+  // 마스킹본이 아직 없을 때(전화 상담은 자동 STT가 없어 memoMasked가 비어 있다) 원문을
+  // 그대로 올리지 않는다 — 가려졌다고 적힌 자리에 원문이 나가면 안 된다.
+  const sttMasked = [
+    ...audioAttachments.map((item) => item.sttMaskedText || item.extractedText),
+    liveMasked,
+  ].filter(Boolean).join('\n\n');
   // 긴급도 등급/점수/근거와 구조대상 판정은 '구조대상 판정' 버튼과 같은 규칙(공용 함수)으로 산출합니다.
   const emergency = computeCaseEmergency(selectedCase);
   const { eligibilityCheck, isTargetCandidate, evidenceSubmitted, eligibility } = resolveEligibilityFromCase(selectedCase);
@@ -255,8 +281,8 @@ export function buildAnalysisResult(selectedCase) {
     extractionDetail: buildExtractionDetail(attachments),
     // STT 개인정보 마스킹 미리보기 (원문 → 마스킹본)
     sttPreview: {
-      original: sttOriginal || '녹취 파일의 STT 결과가 아직 없습니다.',
-      masked: sttMasked || '녹취 파일의 개인정보 가림 결과가 아직 없습니다.',
+      original: sttOriginal || '녹음하거나 녹취 파일을 올리면 상담 내용이 여기에 표시됩니다.',
+      masked: sttMasked || '가릴 개인정보가 확인된 상담 내용이 아직 없습니다.',
     },
     verification: {
       // AI 응답 검증(형식/근거/환각 탐지, 요구사항 AI-07 시리즈)을 화면에서 확인할 수 있도록 만든 mock 검증 결과입니다.

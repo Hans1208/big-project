@@ -13,6 +13,7 @@ import {
   approveCoreUser,
   createCoreAnalysis,
   createCoreConsultation,
+  consultationMemosFromRow,
   deleteCoreConsultation,
   fetchCoreAnalyses,
   fetchCoreConsultations,
@@ -232,7 +233,11 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
               coreId: row.id,
               name: row.clientName || '이름 미입력',
               title: row.title || '제목 미입력',
-              memo: row.inputText || '',
+              // 전화/대면 메모와 각 개인정보 가림본까지 되살립니다. 예전에는 memo에 inputText
+              // (두 채널 합본)만 넣어서, 다른 PC나 변호사 계정으로 열면 대면 녹음 결과와
+              // 가림본이 통째로 비어 보였습니다 — "개인정보가 가려진 상담 내용" 카드가 정작
+              // 검토자 화면에서 항상 비어 있던 원인입니다.
+              ...consultationMemosFromRow(row),
               opponentName: row.opponentName || '',
               status: '진행 중',
               date: (row.createdAt || '').slice(0, 10) || today,
@@ -301,11 +306,13 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         if (cancelled) return;
         hydrateConsultationsWithCoreAnalyses(results, candidateCases);
         setReviews((currentReviews) => {
-          const known = new Set(
-            currentReviews
-              .filter((item) => item.coreId && item.coreAnalysisId)
-              .map((item) => `${item.coreId}:${item.coreAnalysisId}`),
-          );
+          // 한 상담에 SUBMITTED_FOR_REVIEW 분석이 여러 건 올라온 경우 같은 건을 두 번
+          // 처리하지 않기 위한 것입니다. 예전에는 여기에 '이미 reviews에 있는 건'까지
+          // 미리 담아 두고 건너뛰었는데, 그러면 검토 요청 뒤에 저장된 내용이 변호사
+          // 화면에 영영 반영되지 않았습니다 — 상담원이 법령·판례를 담아 저장해도
+          // '담아둔 법령·판례 없음'으로 남았습니다(DB에는 들어가 있는데도).
+          // 이미 있는 건은 건너뛰는 대신, 아래 merge에서 분석 내용만 갱신합니다.
+          const known = new Set();
           // requestLegalReview는 상담(target.id) 하나당 review 행 하나만 유지합니다(재요청 시
           // 새로 추가하지 않고 기존 행을 덮어씀). 여기서도 같은 규칙을 지켜야 합니다 — 그렇지 않으면
           // 반려/수정 요청 후 상담원이 새 분석을 다시 제출했을 때, 이전 분석의 review 행을 그대로 둔 채
@@ -348,7 +355,25 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
           });
           if (!upsertsByConsultationId.size) return currentReviews;
           const existingIds = new Set(currentReviews.map((item) => item.id));
-          const merged = currentReviews.map((item) => upsertsByConsultationId.get(item.id) || item);
+          const merged = currentReviews.map((item) => {
+            const next = upsertsByConsultationId.get(item.id);
+            if (!next) return item;
+            // 같은 분석 건이 이미 화면에 있으면 진행 상태(승인/반려, 담당 변호사,
+            // 요청일)는 이 브라우저 것이 최신이므로 그대로 두고, 서버에 저장된
+            // 분석 내용만 최신으로 바꿔 끼웁니다. 통째로 덮으면 변호사가 방금 내린
+            // 결정이 '검토 대기'로 되돌아갑니다.
+            if (String(item.coreAnalysisId) === String(next.coreAnalysisId)) {
+              return {
+                ...item,
+                type: next.type,
+                summary: next.summary,
+                urgency: next.urgency,
+                eligibility: next.eligibility,
+                analysis: next.analysis,
+              };
+            }
+            return next;
+          });
           const brandNew = Array.from(upsertsByConsultationId.entries())
             .filter(([id]) => !existingIds.has(id))
             .map(([, review]) => review);
@@ -585,9 +610,24 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
       // 서식 추천/초안 생성 API(recommend-forms, generate-draft)는 상담 id뿐 아니라 이 분석 id도
       // 함께 있어야 호출할 수 있습니다. 응답은 AiAnalysisResponse라 snake_case(analysis_id)로 옵니다.
       const analysisId = savedAnalysis?.analysis_id || existingAnalysisId;
-      if (analysisId && analysisId !== existingAnalysisId) {
-        setConsultations((items) => items.map((item) => item.id === consultation.id ? { ...item, coreAnalysisId: analysisId } : item));
-      }
+      // 저장한 내용을 화면이 들고 있는 상담에도 반영합니다. 예전에는 analysisId가
+      // 새로 생겼을 때만 갱신해서, 서버에는 저장됐는데 다른 화면은 저장 전 값을
+      // 계속 보여줬습니다 — 변호사가 담은 법령·판례를 저장해도 '담은 자료'
+      // 화면이 비어 있던 것이 이 때문입니다(저장은 됐다고 뜨는데 안 보임).
+      setConsultations((items) => items.map((item) => (item.id === consultation.id
+        ? {
+          ...item,
+          analysis: { ...(item.analysis || {}), ...analysis },
+          coreAnalysisId: analysisId || item.coreAnalysisId,
+        }
+        : item)));
+      // 이미 검토 요청이 올라간 상담이면 변호사 화면이 들고 있는 사본도 같이 고칩니다.
+      // 그 사본은 검토 요청을 누른 그 순간의 스냅샷이라, 뒤에 담은 법령·판례는 서버에만
+      // 들어가고 변호사 화면에는 안 보였습니다. 서버에서 다시 읽어오는 경로는 상담 목록이
+      // 바뀔 때만 도는데, 같은 브라우저에서 역할만 바꾸면 그 경로가 돌지 않습니다.
+      setReviews((items) => items.map((item) => (item.id === consultation.id
+        ? { ...item, analysis: { ...(item.analysis || {}), ...analysis } }
+        : item)));
       return { ok: true, synced: true, message: '분석 결과가 저장되었습니다.' };
     } catch (error) {
       return {
@@ -612,6 +652,22 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         inpersonInputText: consultation.inpersonMemo || '',
         inpersonInputTextMasked: consultation.inpersonMemoMasked || '',
       });
+      // 상담받은 사람 이름도 여기서 함께 저장합니다.
+      //
+      // 이 이름은 서식 초안의 청구인이 되는 값입니다 — core-api가 초안을 만들 때
+      // consultation.clientName을 그대로 ai-api로 넘깁니다. 그런데 이름칸은 여태
+      // 화면 상태만 바꾸고 서버에는 아무것도 안 보냈습니다. 상담을 등록할 때 한 번
+      // 보낸 값이 DB에 그대로 남아서, 화면에는 고친 이름이 보이는데 초안에는 옛
+      // 이름(또는 빈칸)이 찍혔습니다.
+      //
+      // transcript API는 메모 전용이라(TranscriptSaveRequest에 이름 자리가 없음)
+      // 이름은 상담 수정 API로 따로 보냅니다. 실패하면 아래 catch로 내려가
+      // "저장 실패"가 화면에 뜹니다 — 조용히 넘어가면 상담원은 저장된 줄 압니다.
+      if (consultation.name?.trim()) {
+        await updateCoreConsultation(consultation.coreId, {
+          clientName: consultation.name.trim(),
+        });
+      }
       return { ok: true, synced: true, message: '상담 내용이 저장되었습니다.' };
     } catch (error) {
       return {
@@ -744,7 +800,7 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         }}
       />
       {role === 'counselor' ? <CounselorDashboard consultations={consultations} setConsultations={setConsultations} onCreateConsultation={createConsultation} onRequestLegalReview={requestLegalReview} onAnalysisSaved={notifyAnalysisSaved} onSaveTranscript={saveConsultationTranscript} onDeleteConsultation={deleteConsultation} onOpenConsultationForm={() => changeActiveView('상담 등록')} onOpenAnalysis={(id) => { setFocusedConsultationId(id); pushViewHistory('기타'); setActiveView('기타'); }} onOpenDraft={(id, templateName) => { setFocusedConsultationId(id); setFocusedTemplateName(templateName || null); pushViewHistory('서식 생성'); setActiveView('서식 생성'); }} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedConsultationId={focusedConsultationId} focusedTemplateName={focusedTemplateName} analysisRuns={analysisRuns} onStartAnalysis={startConsultationAnalysis} /> : null}
-      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
+      {role === 'lawyer' ? <LawyerDashboard reviews={reviews} setReviews={setReviews} consultations={consultations} onReviewDecision={applyReviewDecision} onGoToDashboard={() => changeActiveView('대시보드')} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} onNotify={addNotification} onAnalysisSaved={notifyAnalysisSaved} focusedReviewCaseNo={focusedReviewCaseNo} /> : null}
       {role === 'admin' ? <AdminDashboard users={users} onUpdateUserStatus={onUpdateUserStatus} consultations={consultations} reviews={reviews} activeView={activeView} currentUser={currentUser} onUpdateProfile={onUpdateProfile} notifications={notifications} onReadNotifications={markNotificationsRead} onDeleteNotification={deleteNotification} onOpenNotification={openNotification} focusedAdminView={focusedAdminView} /> : null}
     </div>
   );

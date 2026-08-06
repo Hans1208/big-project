@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck, ClipboardList, Info, Check, PhoneCall, FileSearch, Paperclip, EyeOff, BadgeCheck,
-  Scale, ListChecks, Sparkles, Clock, Inbox, CheckCircle2, AlertTriangle,
+  Scale, ListChecks, Sparkles, Clock, Inbox, CheckCircle2, FolderOpen,
 } from 'lucide-react';
 import { today } from '../../../constants.jsx';
 import { useToast } from '../../../components/feedback.jsx';
@@ -21,6 +21,7 @@ import {
 } from '../../../services/coreApiClientV2.js';
 import { readCachedFormRecommendations } from '../../../services/draftDocumentStore.js';
 import { createRealtimeAudioStream, fetchAvailableAudioCalls } from '../../../services/realtimeAudioStream.js';
+import { useInPersonRecording } from '../../../hooks/useInPersonRecording.js';
 import { caseOptions, computeCaseEmergency, resolveEligibilityFromCase, emergencyReason, levelFromRatio, fitRatioToLevel } from '../shared/caseHelpers.js';
 import {
   mergeContractAnalysisResponse,
@@ -36,6 +37,8 @@ import { reviewActionTone, checklistItemNote, checklistItemFlag } from '../share
 import { extractionStatusLabel, buildAttachmentLinkMetadata } from '../shared/attachmentHelpers.js';
 import { CasePicker } from '../components/CasePicker.jsx';
 import { ConsultationChannelTabs } from '../components/ConsultationChannelTabs.jsx';
+import { CounselorFlowStage } from '../components/CounselorFlowStage.jsx';
+import { ConsultationCaseMeta } from '../components/ConsultationCaseMeta.jsx';
 import { SummaryBulletList } from '../components/SummaryBulletList.jsx';
 import { RecommendedFormsPanel } from './RecommendedFormsPanel.jsx';
 import { ReliefReviewDetailTabs } from '../relief/ReliefReviewDetailTabs.jsx';
@@ -133,7 +136,21 @@ async function requestMissingDataCandidate(selectedCase, analysis, options = {})
     },
   }, 'missing');
 }
-export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, onSaveTranscript, currentUser, onGoToDashboard, onOpenDraft, focusedConsultationId, analysisRuns = {}, onStartAnalysis }) {
+// 저장 직후 되돌아온 분석인지 가려내기 위한 내용 지문입니다. 화면이 판단에 쓰는 필드만
+// 정해진 순서로 모읍니다 — 객체를 통째로 stringify하면 병합 때 키 순서가 달라져 어긋납니다.
+function analysisSignature(item) {
+  if (!item) return '';
+  return JSON.stringify([
+    item.summary || '',
+    item.caseType || '',
+    item.caseSubtype || '',
+    item.urgency || '',
+    item.eligibility || '',
+    item.missingInfo || [],
+  ]);
+}
+
+export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdateConsultation, onRequestLegalReview, onAnalysisSaved, onSaveTranscript, currentUser, onGoToDashboard, onOpenDraft, onGoToUpload, focusedConsultationId, analysisRuns = {}, onStartAnalysis }) {
   const [selectedId, setSelectedId] = useState(focusedConsultationId || caseOptions(consultations)[0].id);
   const [analyzed, setAnalyzed] = useState(false);
   const selectedCase = consultations.find((item) => String(item.id) === String(selectedId));
@@ -178,6 +195,16 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
     const timer = setInterval(() => setCallSeconds((seconds) => seconds + 1), 1000);
     return () => clearInterval(timer);
   }, [callStatus]);
+  // 대면 상담 녹음 상태도 여기서 소유합니다(전에는 InPersonAnalysisPanel 안에서 직접 이 훅을
+  // 불렀음) — "상담 저장" 버튼이 녹음 상태(상담 중/변환 중)에 따라 라벨을 바꿔야 하는데,
+  // 그 버튼은 채널 탭 바깥(AnalysisWorkbench)에 있어서 상태를 여기까지 끌어올려야 합니다.
+  const {
+    status: inPersonStatus,
+    segments: inPersonSegments,
+    errorMessage: inPersonErrorMessage,
+    startRecording: startInPersonRecording,
+    stopRecording: stopInPersonRecording,
+  } = useInPersonRecording({ consultationId: selectedCase?.coreId });
   const startCall = async () => {
     if (!selectedCase) return;
     setCallStatus('ongoing');
@@ -233,6 +260,10 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   const [aiTaskMessage, setAiTaskMessage] = useState('');
   const [aiResultSummary, setAiResultSummary] = useState(null);
   const [analysisSaved, setAnalysisSaved] = useState(false);
+  // 마지막으로 저장한 분석의 내용 지문. 저장하면 상담 객체의 analysis가 새 객체로 바뀌어
+  // 돌아오는데, 그게 '새 분석'인지 '방금 저장한 것'인지 객체 비교로는 구분되지 않습니다.
+  // 화면이 실제로 쓰는 값만 모아 비교합니다(키 순서에 영향받지 않도록 배열로 고정).
+  const savedSignatureRef = useRef('');
   const [savingTranscript, setSavingTranscript] = useState(false);
   // 구조대상·누락자료 버튼처럼 이 화면 안에서 끝나는 짧은 작업의 진행 상태입니다.
   // 사건 분석 자체는 App이 돌리므로(analysisRuns) 여기서 관리하지 않습니다.
@@ -410,7 +441,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   // 옮겨도 끝까지 진행되고, 끝나면 알림이 뜹니다. 이 화면은 시작만 시키고, 결과는 상담 객체에
   // 실려 돌아오는 것을 아래 effect가 받아 그립니다.
   const startAnalysis = async () => {
-    if (!selectedCase || isAnalyzing) return;
+    if (!selectedCase || isAnalyzing || !isTranscriptSaved) return;
     setAiTaskMessage('');
     const result = await onStartAnalysis(selectedCase);
     if (result?.ok || result?.alreadyRunning) return;
@@ -426,6 +457,17 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   useEffect(() => {
     const incoming = selectedCase?.analysis;
     if (!incoming || incoming === analysis) return;
+    // 방금 저장한 그 분석이 돌아온 것이라면 '저장 안 됨'으로 되돌리지 않습니다.
+    //
+    // 저장은 App(notifyAnalysisSaved)에서 기존 값과 병합해 상담에 다시 실어줍니다
+    // ({...item.analysis, ...analysis} — 다른 화면이 담아둔 항목을 잃지 않으려고). 그래서
+    // 저장 직후 여기 들어오는 값은 내용은 같은데 객체가 달라, 위 identity 비교를 통과해
+    // 'AI가 새 분석을 내놨다'로 취급됐습니다. 그 결과 저장 직후 analysisSaved가 다시
+    // false가 되고, 그 값에만 걸려 있는 '변호사 검토 요청' 버튼이 계속 잠겨 있었습니다.
+    if (analysisSignature(incoming) === savedSignatureRef.current) {
+      setAnalysis(incoming);
+      return;
+    }
     setAnalysis(incoming);
     setAnalyzed(true);
     setAnalysisSaved(false);
@@ -573,9 +615,14 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
     return {
       ...analysis,
       sourceAttachments,
-      recommendation: cachedRecommendations?.length
-        ? { recommendations: cachedRecommendations }
-        : (analysis?.recommendation || {}),
+      // recommendation 한 칸에 서로 다른 두 가지가 같이 삽니다 — 서식 추천
+      // (recommendations)과 법령·판례 화면에서 담은 자료(adopted). 예전에는 서식
+      // 추천이 있으면 이 칸을 통째로 갈아끼워서, 담아둔 법령·판례가 저장할 때마다
+      // 지워졌습니다. 덮어쓰지 말고 서식 추천만 얹습니다.
+      recommendation: {
+        ...(analysis?.recommendation || {}),
+        ...(cachedRecommendations?.length ? { recommendations: cachedRecommendations } : {}),
+      },
       extractedJson: {
         ...(analysis?.extractedJson || {}),
         attachment_links: sourceAttachments,
@@ -592,6 +639,9 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
 
   const performSaveAnalysis = async () => {
     const reviewAnalysis = buildReviewAnalysisPackage();
+    // 상담 객체를 건드리기 전에 남겨둡니다. 이 저장으로 되돌아오는 값은 '새 분석'이 아니라는
+    // 표시입니다(위 effect에서 이 지문과 대조합니다).
+    savedSignatureRef.current = analysisSignature(reviewAnalysis);
     onUpdateConsultation(selectedCase.id, {
       analysis: reviewAnalysis,
       workflowStatus: '상담 검토',
@@ -721,15 +771,67 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   // 성공한 시점의 스냅샷)와 지금 값을 비교해서 판단합니다 — 저장 직후엔 서로 같아 "저장 완료"로
   // 잠기고, 재녹음으로 inpersonMemo가 지워지거나(InPersonAnalysisPanel의 재시작 확인) 새 내용이
   // 쌓이면 값이 달라져 자동으로 "상담 저장"으로 풀립니다.
+  //
+  // 상담받은 사람 이름도 함께 봅니다. 이 이름은 서식 초안의 청구인이 되는 값이라
+  // (core-api GeneratedDocumentService가 consultation.clientName을 그대로 넘깁니다)
+  // 상담원이 고쳤는데 저장이 안 되면, 화면에는 고친 이름이 보이는데 초안에는 옛 이름이
+  // 찍힙니다. 이름만 고친 경우에도 '상담 저장'이 다시 열려야 합니다.
   const currentCallMemo = selectedCase?.memo || '';
   const currentInpersonMemo = selectedCase?.inpersonMemo || '';
-  const hasTranscriptContent = Boolean(currentCallMemo.trim() || currentInpersonMemo.trim());
+  const currentClientName = selectedCase?.name || '';
+  const hasTranscriptContent = Boolean(
+    currentCallMemo.trim() || currentInpersonMemo.trim() || currentClientName.trim(),
+  );
   const isTranscriptSaved = hasTranscriptContent
     && currentCallMemo === (selectedCase?.transcriptSavedMemo || '')
-    && currentInpersonMemo === (selectedCase?.transcriptSavedInpersonMemo || '');
+    && currentInpersonMemo === (selectedCase?.transcriptSavedInpersonMemo || '')
+    && currentClientName === (selectedCase?.transcriptSavedName || '');
+
+  // 전화("상담 중")/대면("상담 중" → "변환 중") 채널 상태에 따라 버튼 자체를 잠급니다 — 상담이
+  // 진행 중이거나 STT/마스킹이 아직 처리 중인 텍스트를 "저장 완료"로 잠가버리면 안 되기 때문입니다.
+  // 대면 녹음의 'error' 상태는 여기서 막지 않습니다 — 그 상태로 무기한 잠기면 그때까지 쌓인
+  // 내용을 저장할 방법이 없어집니다.
+  const isConsultationOngoing = callStatus === 'ongoing' || inPersonStatus === 'connecting' || inPersonStatus === 'recording';
+  const isTranscriptConverting = inPersonStatus === 'processing';
+
+  // 변환 중(STT·마스킹 처리)이 얼마나 걸릴지는 녹음 후처리를 맡는 서버 쪽 사정이라 프론트가
+  // 알 수 없습니다. 분석 중 캡션(analysisElapsedSec)과 같은 방식으로 변환 시작부터 지난
+  // 시간만이라도 보여줘 멈춘 것처럼 보이지 않게 합니다.
+  const [transcriptConvertingElapsedSec, setTranscriptConvertingElapsedSec] = useState(0);
+  useEffect(() => {
+    if (!isTranscriptConverting) {
+      setTranscriptConvertingElapsedSec(0);
+      return undefined;
+    }
+    const timer = setInterval(() => setTranscriptConvertingElapsedSec((seconds) => seconds + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isTranscriptConverting]);
+
+  let transcriptButtonContent = '상담 저장';
+  let transcriptButtonDisabled = !hasTranscriptContent;
+  let showEmptyTranscriptCaption = !hasTranscriptContent;
+  if (isConsultationOngoing) {
+    transcriptButtonContent = '상담 중...';
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  } else if (isTranscriptConverting) {
+    transcriptButtonContent = '변환 중...';
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  } else if (savingTranscript) {
+    transcriptButtonContent = '저장 중...';
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  } else if (isTranscriptSaved) {
+    transcriptButtonContent = (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 저장 완료</span>
+    );
+    transcriptButtonDisabled = true;
+    showEmptyTranscriptCaption = false;
+  }
 
   const handleSaveTranscript = async () => {
-    if (!selectedCase || savingTranscript) return;
+    if (!selectedCase || savingTranscript || isConsultationOngoing || isTranscriptConverting) return;
     setSavingTranscript(true);
     try {
       const result = await onSaveTranscript?.(selectedCase);
@@ -740,6 +842,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
       onUpdateConsultation(selectedCase.id, {
         transcriptSavedMemo: currentCallMemo,
         transcriptSavedInpersonMemo: currentInpersonMemo,
+        transcriptSavedName: currentClientName,
       });
       showToast(result?.message || '상담 내용이 저장되었습니다.', 'success');
     } catch (error) {
@@ -755,30 +858,18 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         <WorkPageHeader
           title="실시간 상담"
           description="통화를 시작하고 메모한 뒤, 상담이 끝나면 분석하세요."
+          meta={<CounselorFlowStage current="realtime" onNavigate={onGoToUpload ? () => onGoToUpload() : undefined} />}
         />
         <div className="inlineControls analysisCommandBar">
-          <CasePicker consultations={consultations} value={selectedId} onChange={selectCase} />
+          <label className="field uploadCaseSelector">
+            <span><span className="fieldLabelWithIcon"><FolderOpen size={14} strokeWidth={2.4} aria-hidden="true" /> 상담 선택</span></span>
+            <CasePicker consultations={consultations} value={selectedId} onChange={selectCase} />
+          </label>
           <button type="button" className="quickStartButton" onClick={startQuickRealtimeSession} disabled={isStartingQuickSession}>
             <PhoneCall size={15} strokeWidth={2.4} /> {isStartingQuickSession ? '준비하는 중...' : '새 상담 준비'}
           </button>
-          <div className="callAnalyzeButtonGroup">
-            <button
-              type="button"
-              className={`callAnalyzeButton${analyzed ? ' done' : ''}`}
-              onClick={startAnalysis}
-              disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing'}
-            >
-              {isAnalyzing ? (
-                // 몇 분씩 걸리는 작업이라 경과 시간을 같이 보여줍니다 — 없으면 멈춘 것처럼 보입니다.
-                `분석 중... ${formatElapsed(analysisElapsedSec)}`
-              ) : analyzed ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 재분석 실행</span>
-              ) : '분석 시작'}
-            </button>
-            {/* 툴팁이 아니라 항상 보이는 캡션으로 둬서, 왜 눌리지 않는지 바로 알 수 있게 합니다. */}
-            {callStatus === 'ongoing' ? <small className="callAnalyzeCaption">통화 종료 후 분석 가능</small> : null}
-          </div>
         </div>
+        <ConsultationCaseMeta selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
         <ConsultationChannelTabs
           selectedCase={selectedCase}
           onUpdateConsultation={onUpdateConsultation}
@@ -794,57 +885,54 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           onRefreshAudioCalls={refreshAvailableAudioCalls}
           onStartCall={startCall}
           onEndCall={endCall}
-          caseMeta={selectedCase ? (
-            <div className="analysisCaseMeta">
-              <span>사건 번호 <strong>{selectedCase.caseNo}</strong></span>
-              <label className={`analysisCaseMetaEdit realtimeRequiredNameField${selectedCase.name ? '' : ' missing'}`}>
-                <span>
-                  {!selectedCase.name ? <AlertTriangle size={13} strokeWidth={2.4} className="realtimeRequiredNameFieldIcon" aria-hidden="true" /> : null}
-                  상담받은 사람
-                  {selectedCase.name
-                    ? (selectedCase.nameSource === 'ai' ? <em className="nameSourceAi">AI가 찾음 · 확인해주세요</em> : null)
-                    : <em>필수 입력</em>}
-                </span>
-                <input
-                  value={selectedCase.name || ''}
-                  onChange={(event) => onUpdateConsultation(selectedCase.id, {
-                    name: event.target.value,
-                    nameSource: 'counselor',
-                  })}
-                  placeholder="통화 중 이름 입력 · 분석 후 자동 정리"
-                />
-                {!selectedCase.name ? <small>이름은 서식 생성과 검토 요청에 쓰이니 입력해주세요.</small> : null}
-                {selectedCase.name && selectedCase.nameSource === 'ai'
-                  ? <small>통화 내용에서 찾은 이름입니다. 잘못 들었을 수 있으니 맞는지 봐주세요.</small>
-                  : null}
-              </label>
-              <label className="analysisCaseMetaEdit">
-                <span>상담 제목</span>
-                <input
-                  value={selectedCase.title || ''}
-                  onChange={(event) => onUpdateConsultation(selectedCase.id, { title: event.target.value })}
-                  placeholder="상담 제목 입력"
-                />
-              </label>
-              <span>작성 시간 <strong>{selectedCase.date || '-'}{selectedCase.registeredTime ? ` ${selectedCase.registeredTime}` : ''}</strong></span>
-            </div>
-          ) : null}
+          inPersonStatus={inPersonStatus}
+          inPersonSegments={inPersonSegments}
+          inPersonErrorMessage={inPersonErrorMessage}
+          onStartInPersonRecording={startInPersonRecording}
+          onStopInPersonRecording={stopInPersonRecording}
         />
         {selectedCase ? (
-          <div className="inlineControls analysisCommandBar">
-            <button
-              type="button"
-              className={`callAnalyzeButton${isTranscriptSaved ? ' done' : ''}`}
-              onClick={handleSaveTranscript}
-              disabled={savingTranscript || isTranscriptSaved || !hasTranscriptContent}
-            >
-              {savingTranscript ? (
-                '저장 중...'
-              ) : isTranscriptSaved ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 저장 완료</span>
-              ) : '상담 저장'}
-            </button>
-            {!hasTranscriptContent ? <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small> : null}
+          <div className="inlineControls analysisCommandBar transcriptSaveBar">
+            {/* "분석 시작" 그룹과 같은 모양(버튼+캡션 컬럼)으로 둬서, 캡션이 뜨고 안 뜨고에
+                상관없이 두 버튼의 위쪽 위치가 항상 같은 줄에 맞습니다. */}
+            <div className="callAnalyzeButtonGroup">
+              <button
+                type="button"
+                className={`callAnalyzeButton${isTranscriptSaved ? ' done' : ''}`}
+                onClick={handleSaveTranscript}
+                disabled={transcriptButtonDisabled}
+              >
+                {transcriptButtonContent}
+              </button>
+              {isTranscriptConverting ? (
+                <small className="callAnalyzeCaption">잠시만 기다려주세요... {formatElapsed(transcriptConvertingElapsedSec)}</small>
+              ) : showEmptyTranscriptCaption ? (
+                <small className="callAnalyzeCaption">전화 또는 대면 상담 메모가 있어야 저장할 수 있습니다</small>
+              ) : null}
+            </div>
+            <div className="callAnalyzeButtonGroup">
+              <button
+                type="button"
+                className={`callAnalyzeButton${analyzed ? ' done' : ''}`}
+                onClick={startAnalysis}
+                disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing' || !isTranscriptSaved}
+              >
+                {isAnalyzing ? (
+                  // 몇 분씩 걸리는 작업이라 경과 시간을 같이 보여줍니다 — 없으면 멈춘 것처럼 보입니다.
+                  `분석 중... ${formatElapsed(analysisElapsedSec)}`
+                ) : analyzed ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Check size={15} strokeWidth={2.4} /> 재분석 실행</span>
+                ) : '분석 시작'}
+              </button>
+              {/* 툴팁이 아니라 항상 보이는 캡션으로 둬서, 왜 눌리지 않는지 바로 알 수 있게 합니다. */}
+              {/* 분석은 DB에 저장된 상담 내용을 대상으로 돌기 때문에, 저장 전 상태(내용 없음/미저장/저장 중)에서는
+                  막아둡니다 — 방금 입력했지만 저장 안 한 메모가 분석에 반영되지 않아 헷갈리는 상황을 막기 위함입니다. */}
+              {callStatus === 'ongoing' ? (
+                <small className="callAnalyzeCaption">통화 종료 후 분석 가능</small>
+              ) : !isTranscriptSaved && !isAnalyzing ? (
+                <small className="callAnalyzeCaption">상담 내용을 저장한 뒤 분석할 수 있습니다</small>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {selectedCase ? (
@@ -993,9 +1081,22 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         {!analyzed ? (
           <div className="emptyState">
             <ClipboardList size={22} strokeWidth={2.2} aria-hidden="true" />
-            <p>{callStatus === 'ongoing' ? '통화가 끝나면 분석을 시작할 수 있습니다.' : ((selectedCase?.memo || '').trim() || (selectedCase?.inpersonMemo || '').trim()) ? '메모 작성 완료 · 분석을 시작하세요.' : '메모를 작성하면 분석을 시작할 수 있습니다.'}</p>
+            <p>
+              {callStatus === 'ongoing'
+                ? '통화가 끝나면 분석을 시작할 수 있습니다.'
+                : !hasTranscriptContent
+                  ? '메모를 작성하면 분석을 시작할 수 있습니다.'
+                  : !isTranscriptSaved
+                    ? '상담 내용을 저장한 뒤 분석을 시작하세요.'
+                    : '메모 작성 완료 · 분석을 시작하세요.'}
+            </p>
             <span className="emptyStateHint">현재 메모를 바탕으로 사건 유형과 확인할 자료를 정리합니다.</span>
-            <button type="button" className="emptyStateAction callAnalyzeButton" onClick={startAnalysis} disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing'}>
+            <button
+              type="button"
+              className="emptyStateAction callAnalyzeButton"
+              onClick={startAnalysis}
+              disabled={isAnalyzing || !selectedCase || callStatus === 'ongoing' || !isTranscriptSaved}
+            >
               {isAnalyzing ? `분석 중... ${formatElapsed(analysisElapsedSec)}` : '분석 시작'}
             </button>
           </div>

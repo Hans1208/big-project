@@ -53,13 +53,24 @@ async def analyze_consult(
         consult_text
     )
 
+    # 판정 계층도 같은 원문을 본다. 주민등록번호·전화번호는 여기서도 지운다 -
+    # 구조대상 판단과 누락자료 목록에 번호가 실려 나갈 이유가 없고, 실측에서
+    # 분석 요약에 지어낸 주민번호가 찍힌 적이 있다(analysis/service.py 주석 참고).
+    scrub = analysis_service.scrub_sensitive_numbers
+    safe_content = {
+        **content,
+        "summary": scrub(content.get("summary", "")),
+        "details": scrub(content.get("details", "")),
+    }
     result = await run_consult_analysis(
         {
-            "content": content,
+            "content": safe_content,
             "extracted": {
-                "texts": extracted.texts,
+                # texts/text는 첨부에서 뽑은 본문이라 지운다.
+                # details는 파일별 처리 상태(파일명·성공여부)라 본문이 없다.
+                "texts": [scrub(t) for t in (extracted.texts or [])],
                 "details": extracted.details,
-                "text": extracted.text,
+                "text": scrub(extracted.text or ""),
             },
         }
     )
