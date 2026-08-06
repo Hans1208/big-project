@@ -36,14 +36,36 @@ _PHONE_RE = re.compile(r"0\d{1,2}\s*[-)]\s*\d{3,4}\s*[-]\s*\d{4}")
 
 
 def scrub_sensitive_numbers(text: str) -> str:
-    """분석 입력에서 주민등록번호·전화번호를 지운다.
+    """주민등록번호·전화번호를 둘 다 지운다. 판정 계층(consult)이 쓴다.
+
+    구조대상 판단과 누락자료 목록에는 어느 쪽 번호도 실릴 이유가 없다.
 
     구분자가 있는 형태만 지운다. 구분자 없는 긴 숫자를 지우면 금액과 사건번호가
     함께 사라진다."""
     if not text:
         return text
-    text = _RRN_RE.sub("[주민등록번호]", text)
-    return _PHONE_RE.sub("[전화번호]", text)
+    return _PHONE_RE.sub("[전화번호]", scrub_resident_number(text))
+
+
+def scrub_resident_number(text: str) -> str:
+    """주민등록번호만 지운다. 구조화 분석 입력이 쓴다.
+
+    전화번호는 남긴다 — 서식의 당사자 연락처칸에 들어가야 하는 값이라, 지우면
+    분석이 뽑을 수가 없고 상담원이 초안을 받아 손으로 채워야 한다.
+
+    주민등록번호는 계속 지운다. 이유가 전화번호와 다르다:
+      · 개인정보 보호법 제24조의2 — 동의가 아니라 법령 근거가 있어야 처리할 수 있어
+        애초에 보관하지 않기로 한 값이다. 서식에서도 [직접 기재]로 남긴다.
+      · 지어낼 위험이 훨씬 크다. 실측에서 STT가 뭉갠 소리("팔치유공산 2.1을 2글팔
+        4.2.2")를 모델이 형식만 완벽한 가짜 주민번호로 채웠고, 그게 요약에 실려
+        DB까지 갔다. 형식이 그럴듯해서 사람 눈으로는 걸러지지 않는다.
+
+    전화번호도 같은 위험이 있지만 두 가지가 다르다 — 상담원이 화면에서 눈으로
+    확인·수정하는 단계를 거치고, 분석 프롬프트에도 "자릿수가 안 맞으면 null"이라고
+    적어 두었다."""
+    if not text:
+        return text
+    return _RRN_RE.sub("[주민등록번호]", text)
 
 
 class ConsultAnalysis:
@@ -95,7 +117,9 @@ def build_consult_text(summary: str, details: str, extracted_text: str) -> str:
     녹취록을 올린 경우 그 내용까지 요약·추출 대상이 되어야 하므로
     stt 단계 결과(extracted_text)가 반드시 포함되어야 한다.
     """
-    return scrub_sensitive_numbers(
+    # 주민등록번호만 지운다. 전화번호는 서식의 연락처칸에 들어가야 해서 남긴다
+    # (scrub_resident_number 주석 참고).
+    return scrub_resident_number(
         f"[요약]\n{summary or ''}\n\n"
         f"[상세]\n{details or ''}\n\n"
         f"[추출된 첨부내용]\n{extracted_text or ''}"
@@ -121,10 +145,46 @@ def analyze(consult_text: str) -> ConsultAnalysis:
     # 하위 필드가 Pydantic 모델이라 그대로 응답에 실으면 직렬화에서 막힌다.
     # model_dump()로 중첩까지 한 번에 dict/list로 바꾼다.
     data = result.model_dump()
+    extracted = data.get("extracted_json")
     return ConsultAnalysis(
-        summary=(data.get("summary") or "").strip() or None,
+        summary=strip_contact_from_summary(data.get("summary"), extracted) or None,
         case_type=data.get("case_type"),
         case_subtype=data.get("case_subtype"),
-        extracted=data.get("extracted_json"),
+        extracted=extracted,
         timeline=data.get("timeline_json"),
     )
+
+
+# "주소(서울시 …)"처럼 괄호로 덧붙인 모양. 값을 지우면 빈 괄호가 남으므로 괄호째 지운다.
+_CONTACT_PAREN_RE = "[(（][^)）]*{}[^)）]*[)）]"
+
+
+def strip_contact_from_summary(summary: str, extracted: dict | None) -> str:
+    """요약에서 주소·전화번호를 지운다.
+
+    이 값들은 extracted_json의 전용 칸에 이미 들어가 있다. 요약에까지 실리면 같은
+    개인정보가 두 군데에 쌓이고, 그 요약은 변호사 검토 화면에 그대로 뜬다. 연락처는
+    사실관계도 쟁점도 아니라 검토에 쓸모도 없다.
+
+    프롬프트에도 "요약에 쓰지 말라"고 적어 두었지만 지켜지지 않는다(실측: 두 번 연속
+    "청구인은 본인의 주소(서울특별시 …)와 연락처(010-…)를 제공하였습니다"가 나왔다).
+    이 파일이 여러 번 택한 방식대로, 프롬프트로 못 막는 것은 코드로 막는다.
+
+    지우는 것은 값 자체다. "주소를 제공하였습니다" 같은 서술은 남긴다 — 상담원이
+    연락처를 받았다는 사실은 검토에 의미가 있고, 값이 없으면 개인정보도 아니다."""
+    text = (summary or "").strip()
+    if not text or not isinstance(extracted, dict):
+        return text
+
+    for key in ("주소", "전화번호"):
+        value = str(extracted.get(key) or "").strip()
+        if len(value) < 4 or value not in text:
+            continue
+        # 괄호로 덧붙인 모양을 먼저 지운다. 값만 지우면 "주소()와"가 남는다.
+        text = re.sub(_CONTACT_PAREN_RE.format(re.escape(value)), "", text)
+        text = text.replace(value, "")
+
+    # 값을 들어낸 자리에 남는 군더더기를 정리한다.
+    text = re.sub(r"\s*[(（][\s,·]*[)）]", "", text)   # 빈 괄호
+    text = re.sub(r"\s{2,}", " ", text)
+    return re.sub(r"\s+([,.·])", r"\1", text).strip()

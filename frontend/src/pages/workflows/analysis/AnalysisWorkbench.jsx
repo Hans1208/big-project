@@ -384,10 +384,21 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   };
 
   const applyCompletedAnalysis = (nextAnalysis, { notify = false } = {}) => {
-    setAnalysis(nextAnalysis);
+    // 방금 받은 분석을 상담 객체에도 실어줍니다.
+    //
+    // 예전에는 화면 상태(setAnalysis)에만 담고 상담에는 안 실었습니다. 그래서
+    // selectedCase.analysis는 계속 '예전에 저장한 분석'이었고, 두 값이 어긋난 채로
+    // 화면이 그려졌습니다. 게다가 App의 서버 동기화가 저장된 분석을 상담에 다시
+    // 실어주면 아래 effect가 깨어나 방금 받은 결과를 옛 값으로 되돌렸습니다 —
+    // 재분석을 해도 요약만 바뀌고 구조대상·체크리스트·누락자료가 그대로였던 게 이것입니다.
+    //
+    // pendingServerSave는 '화면에는 있지만 아직 서버에 저장 안 된 분석'이라는 표시입니다.
+    // App의 동기화가 이 표시를 보고 덮어쓰지 않습니다(hydrateConsultationsWithCoreAnalyses).
+    const fresh = { ...nextAnalysis, pendingServerSave: true };
+    setAnalysis(fresh);
     // 통화에서 확인된 상담자 이름을 AI가 채웁니다. 상담원이 직접 입력한 값은 덮어쓰지 않습니다.
-    const aiName = pickClientName(nextAnalysis);
-    const patch = { analysisJobId: '' };
+    const aiName = pickClientName(fresh);
+    const patch = { analysisJobId: '', analysis: fresh };
     if (nextAnalysis.analysisId && nextAnalysis.analysisId !== selectedCase.coreAnalysisId) {
       patch.coreAnalysisId = nextAnalysis.analysisId;
     }

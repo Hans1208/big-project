@@ -570,6 +570,48 @@ def _demand_clause_mask(texts: list) -> list:
     return mask
 
 
+# 별지의 시작. "별지", "(별 지)", "별지." 등 모양이 제각각이라 공백을 지워 본다.
+# 본문 문장("별지 목록 기재와 같이 …")이 구간을 열어버리면 그 뒤가 통째로
+# 재서술 대상에서 빠지므로, 제목처럼 짧은 줄일 때만 인정한다.
+ANNEX_START_RE = re.compile(r"^\(?별\s*지\)?")
+ANNEX_TITLE_MAX = 6
+
+
+def _annex_mask(texts: list) -> list:
+    """각 문단이 별지 구간 안에 있는지 표시한다.
+
+    별지는 압류·청구의 '대상'을 특정하는 법정 문구가 들어가는 자리다. 사건
+    사실을 서술하는 칸이 아니라, 목록·금액·행위를 적어 넣는 칸이다. 그런데
+    자리표시자가 들어 있고 문장이 길어서 B단계가 예시 사연으로 오인한다.
+    실제로 양육비 직접지급명령 신청서의 압류채권목록 별지
+
+        양육비채무자(◇◇지점 근무)가 소득세원천징수의무자로부터 지급받는
+        다음의 채권으로서 별지 청구채권목록 기재 금액에 이르기까지의 금액…
+
+    이 "신청인은 현재 초등학교 4학년인 딸을 양육하고 있으며, 본인은 마트에서
+    월 160만 원의 소득을 얻고 있습니다…"로 덮였다. ◇◇ 하나 때문에 예시로
+    판정됐는데, 실은 채워 넣어야 할 지점명이 든 필수 기재사항이었다.
+    압류채권목록은 압류 대상을 특정하는 별지라 이 문구가 사라지면 명령 자체가
+    성립하지 않는다. 게다가 바뀐 문장이 읽기에는 그럴듯해서 상담원이 걸러내기도
+    어렵다 — _find_example_paragraphs가 재서술 실패를 비워두는 것과 같은 이유로
+    '남의 사연으로 덮이는' 쪽이 제일 위험하다.
+
+    별지는 서식 맨 뒤에 붙어 그 뒤로는 안내표뿐이므로, 한 번 들어가면 섹션
+    끝까지 구간으로 본다(291개 중 별지가 있는 7개를 전수 확인했다 —
+    상속재산목록·청구채권목록·압류채권목록·동의서·후견 권한범위로, 전부
+    서술란이 아니다). 원본을 남기면 자리표시자가 그대로라 C단계가 표시를
+    붙여 상담원에게 넘긴다."""
+    mask = [False] * len(texts)
+    inside = False
+    for i, t in enumerate(texts):
+        compact = re.sub(r"\s+", "", t)
+        if (compact and len(compact) <= ANNEX_TITLE_MAX
+                and ANNEX_START_RE.match(compact)):
+            inside = True
+        mask[i] = inside
+    return mask
+
+
 def _find_example_paragraphs(doc) -> list:
     """예시 사연 '블록'을 통째로 식별.
     1) 서술체(길이 40자↑ + 종결어미) 문단의 끊김 없는 연속 구간을 블록 후보로 삼는다.
@@ -588,9 +630,10 @@ def _find_example_paragraphs(doc) -> list:
         for p in paras:
             runs = getattr(p, "runs", [])
             texts.append("".join(getattr(r, "text", "") or "" for r in runs))
-        # 청구취지 구간은 정형 문구다 — 재서술 대상에서 아예 뺀다.
+        # 청구취지 구간과 별지는 정형 문구다 — 재서술 대상에서 아예 뺀다.
         in_demand = _demand_clause_mask(texts)
-        is_narr = [_is_narrative(t) and not in_demand[i]
+        in_annex = _annex_mask(texts)
+        is_narr = [_is_narrative(t) and not in_demand[i] and not in_annex[i]
                    for i, t in enumerate(texts)]
         is_blank = [not t.strip() for t in texts]
         has_ph = [is_narr[i] and bool(PLACEHOLDER_RE.search(texts[i]))
@@ -2062,12 +2105,20 @@ def _seed_role_names(applicant_name: str = "", opponent_name: str = "",
 #                       적혀 있어 넣으면 오히려 잘못된 값을 만든다. 사건 내용은
 #                       summary로 따로 전달된다.
 #   case_list 등        사건 분류·긴급도. 서식 칸에 들어갈 값이 아니다.
+#   주소·전화번호       LLM 단계에 보이면 안 되는 값이다. 서식의 주소칸은 청구인
+#                       것도 채무자 것도 회사 것도 모양이 같아서, 모델이 이 값을
+#                       쥐고 있으면 어느 칸에든 넣는다 — A단계 일괄 치환에서는
+#                       한 번에 세 칸이 전부 청구인 주소가 됐다. 당사자 구획을
+#                       따라가는 _fill_contact_info가 draft() 인자로 따로 받아
+#                       청구인 칸만 채운다. 그쪽은 이 목록과 무관하게 동작한다.
+#   개인정보동의        수집 동의 여부. 서식에 적히는 값이 아니다.
 _DRAFT_IRRELEVANT_KEYS = {
     "aiAnalysisResponse", "aiEligibilityResponse", "aiMissingDataResponse",
     "raw_input_json", "extracted_content", "extracted_content_detail",
     "attachment_links", "submitted_file_link",
     "case_list", "case_emergency_level", "case_emergency_ratio",
     "case_emergency_reason",
+    "주소", "전화번호", "개인정보동의",
 }
 
 
@@ -2231,6 +2282,278 @@ def _apply_confirmed_names_to_extracted(extracted: dict, applicant_name: str = "
     return fixed, changed
 
 
+# ══════════════════════════════════════
+# 서식 작성용 연락처 (주소·전화)
+# ══════════════════════════════════════
+# 법원 서식의 당사자 주소는 송달을 위한 법정 필수 기재사항이라, 비어 있으면 상담원이
+# 초안을 받아 손으로 다시 채워야 한다. 상담 접수 때 동의를 받고 적어둔 값이 있으면
+# 그걸 옮겨 적는다 — 이름·날짜와 같은 이유로 판단이 아니라 옮겨 적기다.
+#
+# 값은 core-api가 넘겨준다. 동의가 없으면 Consultation이 아예 값을 갖지 않아서
+# 빈 문자열이 오므로, 여기서 동의를 다시 검사하지 않는다.
+
+# 줄 첫머리의 라벨. 서식마다 "주소 :", "주소", "전화․휴대폰번호:"처럼 모양이 다르고,
+# "(연락처 :        )"처럼 라벨째 괄호에 들어간 것도 있다 — 여는 괄호를 허용하지
+# 않으면 ^\s* 다음에 "("를 만나 통째로 놓친다(양육비 직접지급명령 신청서에서 실측).
+ADDRESS_LABEL_RE = re.compile(
+    r"^\s*\(?\s*(?:주\s*소|현\s*주\s*소|송\s*달\s*장\s*소)\s*[:：]?")
+# 긴 것부터 늘어놓아야 한다. 정규식 선택지는 앞에서부터 맞춰보므로 "전화"를
+# 먼저 두면 "전화․휴대폰번호:"가 "전화"까지만 먹고 나머지를 값으로 오인해
+# 영영 안 채워진다(이 파일의 docstring 예시가 실제로는 동작하지 않고 있었다).
+PHONE_LABEL_RE = re.compile(
+    r"^\s*\(?\s*(?:전화[․·、]?\s*휴대폰번호|전\s*화|연\s*락\s*처|휴\s*대\s*폰)"
+    r"(?:\s*번\s*호)?\s*[:：]?")
+
+# 라벨 전체가 괄호에 싸여 홀로 한 줄을 차지하는 서식이 있다("(주소)").
+# 이건 라벨이 아니라 "여기에 주소를 적어라"는 자리표시자다 — 통째로 값이 된다.
+# 라벨로 보고 뒤에 이어 붙이면 "(주소) 서울특별시…"처럼 안내문구가 인쇄된다.
+BARE_ADDRESS_PAREN_RE = re.compile(
+    r"^(\s*)\(\s*(?:주\s*소|현\s*주\s*소|송\s*달\s*장\s*소)\s*\)\s*$")
+BARE_PHONE_PAREN_RE = re.compile(
+    r"^(\s*)\(\s*(?:전\s*화(?:\s*번\s*호)?|연\s*락\s*처|휴\s*대\s*폰)\s*\)\s*$")
+
+# A단계 치환에서 걷어낼 주소·전화칸의 라벨(_drop_contact_fills). 공백을 지운
+# before와 맞춘다. 등록기준지·최후주소는 애초에 상담에서 받지 않는 값이라,
+# A단계가 뭔가 채웠다면 그건 지어낸 것이거나 남의 주소다.
+CONTACT_SLOT_LABEL_RE = re.compile(
+    r"^\(?(?:주소|현주소|송달장소|등록기준지|최후주소|본적"
+    r"|전화번호|전화|연락처|휴대폰번호|휴대폰)")
+
+# 이 라벨이 붙은 주소칸은 청구인 것이 아니다. 사망자의 최후주소·등록기준지에
+# 청구인 주소를 넣으면 사람이 뒤바뀐다.
+FOREIGN_ADDRESS_LABEL_RE = re.compile(r"등록기준지|최후\s*주소|본적|사무소|영업소")
+
+# 당사자 구획의 시작. 이 라벨이 나오면 '지금부터 누구 칸인지'가 바뀐다.
+APPLICANT_BLOCK_RE = re.compile(r"청\s*구\s*인|신\s*청\s*인|원\s*고|채\s*권\s*자")
+OTHER_BLOCK_RE = re.compile(
+    r"상\s*대\s*방|피\s*신\s*청\s*인|피\s*고|채\s*무\s*자"
+    r"|사\s*건\s*본\s*인|피\s*상\s*속\s*인|유\s*언\s*자|사\s*망\s*자|망\s*인")
+
+
+# 값 뒤에 남겨야 하는 안내 괄호. 자리표시자가 들어 있지 않은 괄호는 채울 칸이
+# 아니라 "여기에 무엇을 적어라"는 안내다.
+TRAILING_NOTE_RE = re.compile(r"(\([^()]*\))\s*$")
+
+
+def _fill_labeled_slot(text: str, label_match, value: str) -> str:
+    """라벨 뒤의 주소·전화 자리를 값으로 바꾼다. 빈 칸이면 라벨 뒤에 이어 붙인다.
+
+    "주소 : ○○시 ○○구 ○○길 ○○"                -> "주소 : 서울시 강남구 …"
+    "주소 : ○○시 ○○구 ○○길 ○○번지(○○동, ○○아파트)" -> "주소 : 서울시 강남구 …"
+    "주소 ○○시 ○○구 ○○길 ○○(우편번호)"          -> "주소 서울시 강남구 …(우편번호)"
+    "전화․휴대폰번호:"                          -> "전화․휴대폰번호: 010-0000-0000"
+
+    자리표시자 구간을 '첫 조각부터 마지막 조각까지'로 잡으면 안 된다. 서식은
+    "○○번지(○○동, ○○아파트)"처럼 자리표시자 사이에 '번지'·'아파트' 같은 글자를
+    끼워 두는데, 그것들도 주소 템플릿의 일부라 남기면 "테헤란로 123아파트)"가 된다
+    (실측). 첫 자리표시자부터 줄 끝까지를 통째로 값으로 바꾼다.
+
+    다만 끝에 붙은 안내 괄호는 남긴다 — "(우편번호)"를 지우면 상담원이 우편번호를
+    따로 적어야 한다는 것을 알 수 없다. 자리표시자가 든 괄호는 안내가 아니라
+    채울 칸이므로 함께 지운다."""
+    head_end = label_match.end()
+    rest = text[head_end:]
+
+    first = PLACEHOLDER_RE.search(rest)
+    if first:
+        body = rest[first.start():]
+        keep = ""
+        note = TRAILING_NOTE_RE.search(body)
+        if note and not PLACEHOLDER_RE.search(note.group(1)):
+            keep = note.group(1)
+            body = body[:note.start()]
+        head, gap = text[:head_end], rest[:first.start()]
+        # 라벨과 자리표시자가 붙어 있는 서식이 있다("주소○○시 ○○구"). 그대로 두면
+        # "주소서울특별시"가 되어 라벨과 값이 한 낱말로 읽힌다.
+        if not gap and head and not head[-1].isspace():
+            gap = " "
+        return _balance_parens(head + gap + value + keep)
+
+    # 빈 칸인 경우. 뒤에 다른 글자가 이미 있으면 건드리지 않는다 — 값이 두 번 찍힌다.
+    # 다만 "(연락처 :        )"처럼 닫는 괄호만 남은 것은 빈 칸이다. 이걸 '글자가
+    # 있다'로 보면 라벨째 괄호에 든 전화칸을 영영 못 채운다.
+    tail = rest.strip()
+    if tail and tail != ")":
+        return text
+    return text[:head_end] + " " + value + tail
+
+
+def _balance_parens(text: str) -> str:
+    """라벨이 괄호 안에 있을 때 값으로 지워진 닫는 괄호를 되살린다.
+
+    "(주소 : ○○시 ○○구)"는 라벨 매칭이 "(주소 :"까지 먹고, 자리표시자부터
+    줄 끝까지를 값으로 바꾸면서 닫는 괄호도 함께 지운다."""
+    if text.count("(") > text.count(")"):
+        return text + ")"
+    return text
+
+
+def _fill_contact_line(text: str, bare_re, label_re, value: str) -> str:
+    """주소·전화 한 줄을 값으로 채운다. 못 채우면 원문 그대로 돌려준다.
+
+    괄호로만 된 자리표시자를 먼저 본다. "(주소)"는 ADDRESS_LABEL_RE에도 걸리는데,
+    라벨로 처리하면 "(주소) 서울특별시…"가 되어 안내문구가 남는다."""
+    m = bare_re.match(text)
+    if m:
+        return m.group(1) + value
+    m = label_re.match(text)
+    if m:
+        return _fill_labeled_slot(text, m, value)
+    return text
+
+
+def _fill_contact_info(doc, address: str = "", phone: str = "") -> tuple:
+    """청구인의 주소·전화칸을 상담에서 받아둔 값으로 채운다.
+
+    '청구인 것'만 채우는 게 핵심이다. 서식에는 주소칸이 여럿 있는데(청구인 주소,
+    사망자 최후주소, 등록기준지) 전부 같은 자리표시자를 쓴다. 라벨만 보고 채우면
+    살아 있는 청구인의 주소가 사망자의 최후주소로 들어간다.
+
+    그래서 문단을 순서대로 읽으며 '지금 누구 구획인지'를 따라간다. 청구인 라벨이
+    나오면 그 아래가 청구인 칸이고, 상대방·사건본인 라벨이 나오면 거기서 끝난다.
+
+    각각 첫 칸만 채운다. 서식은 흔히 청구인 자리를 2개 두는데(공동청구인 대비)
+    한 명인 사건에서 두 칸을 같은 주소로 채우면 없는 사람이 하나 생긴다
+    (FIELD_PROMPT 8번과 같은 이유). 남는 칸은 C단계가 표시해 상담원에게 넘긴다.
+
+    반환: (채운 칸 수, 바뀐 문단 텍스트 집합)"""
+    address = (address or "").strip()
+    phone = (phone or "").strip()
+    if not address and not phone:
+        return 0, set()
+
+    filled, written = 0, set()
+    address_done = not address
+    phone_done = not phone
+
+    for sec in doc.sections:
+        in_applicant_block = False
+        for p in sec.paragraphs:
+            if address_done and phone_done:
+                break
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(x, "text", "") or "" for x in runs)
+            if not text.strip():
+                continue
+
+            # 구획 판정은 라벨이 줄 앞쪽에 있을 때만 한다. "청구인들은 피상속인 망
+            # △△△의 재산상속인으로서…" 같은 본문 문장이 구획을 바꾸면 안 된다.
+            head = re.sub(r"\s+", "", text)[:12]
+            if OTHER_BLOCK_RE.search(head):
+                in_applicant_block = False
+            elif APPLICANT_BLOCK_RE.search(head):
+                in_applicant_block = True
+
+            if not in_applicant_block:
+                continue
+            if FOREIGN_ADDRESS_LABEL_RE.search(text):
+                continue
+
+            new_text = text
+            if not address_done:
+                new_text = _fill_contact_line(
+                    text, BARE_ADDRESS_PAREN_RE, ADDRESS_LABEL_RE, address)
+                if new_text != text:
+                    address_done = True
+            if new_text == text and not phone_done:
+                new_text = _fill_contact_line(
+                    text, BARE_PHONE_PAREN_RE, PHONE_LABEL_RE, phone)
+                if new_text != text:
+                    phone_done = True
+
+            if new_text != text and _set_paragraph_text(p, new_text):
+                filled += 1
+                written.add(new_text)
+
+    return filled, written
+
+
+def _drop_contact_fills(replacements: list, *values: str) -> tuple:
+    """주소·전화를 채우는 A단계 치환을 버린다. _fill_contact_info가 전담한다.
+
+    A단계는 doc.replace_text_in_runs로 '일치하는 곳을 전부' 바꾼다. 그런데
+    서식의 주소칸은 청구인 것도 채무자 것도 회사 것도 같은 모양이라("(주소)"),
+    치환 하나가 세 칸을 전부 청구인 주소로 만든다. 양육비 직접지급명령
+    신청서에서 실측했다 — 채무자와 소득세원천징수의무자(회사)의 주소가 전부
+    채권자 집주소가 됐다. 압류명령이 회사로 가지 않고 채무자에게 송달도
+    안 되는 문서다. _apply_repeated_name_slots가 이름칸에서 막아둔 것과
+    똑같은 사고가 주소로 재발했다.
+
+    원인은 프롬프트가 아니라 치환 방식이라 여기서 걷어낸다. 상담에서 받는
+    주소·전화는 상담자 본인 것뿐이고(상대방이 어디 사는지는 모른다), 그 한
+    칸은 당사자 구획을 따라가는 _fill_contact_info가 채운다. 나머지 칸은
+    예전처럼 C단계가 [예시:확인필요]로 표시해 상담원에게 넘긴다.
+
+    버린 치환은 unfilled에 넣지 않는다 — '못 채운 칸'이 아니라 뒤에서 제대로
+    채우는 칸이라, 올리면 상담원에게 거짓 경고가 된다.
+
+    반환: (남길 치환 목록, 버린 자리 설명 목록 — 로그·집계용)"""
+    known = [re.sub(r"\s+", "", v) for v in values if v and len(v.strip()) >= 6]
+    kept, dropped = [], []
+    for r in replacements:
+        before, after = r.get("before", "") or "", r.get("after", "") or ""
+        reason = ""
+        if CONTACT_SLOT_LABEL_RE.match(re.sub(r"\s+", "", before)):
+            reason = "주소·전화칸"
+        else:
+            # GPT가 주소를 잘라 넣는 경우가 있어("경기도 수원시 팔달구 인계로 178")
+            # 양쪽 방향으로 본다. 짧은 값은 우연히 겹친다 — "수원"만으로 지우면
+            # "수원가정법원"을 채우는 정상 치환까지 버린다.
+            a = re.sub(r"\s+", "", after)
+            if len(a) >= 6 and any(v in a or a in v for v in known):
+                reason = "상담자 연락처"
+        if reason:
+            dropped.append(f"{reason}(당사자 구획 보고 채움): {before[:30]}")
+            continue
+        kept.append(r)
+    return kept, dropped
+
+
+# ══════════════════════════════════════
+# 본인이 직접 적는 칸
+# ══════════════════════════════════════
+# 주민등록번호는 시스템에 저장하지 않는다. 개인정보 보호법 제24조의2는 주민등록번호를
+# 동의가 아니라 '법령에 구체적 근거가 있을 때'만 처리하도록 하고 있어서, 내담자가
+# 동의해도 우리가 보관할 수 없다.
+#
+# 그런데 그냥 비워두면 초안을 받은 사람은 그 칸이 이미 처리된 것인지, AI가 놓친
+# 것인지 알 수 없다. [예시:확인필요]와 구분되는 표시를 붙여 '일부러 비워둔 자리'임을
+# 밝힌다 — 본인 확인(신분증·가족관계증명서)을 거쳐 손으로 적어야 하는 값이다.
+SELF_WRITTEN_TAG = " [직접 기재]"
+
+# 줄 안 어디에 있든 잡는다. 이름 뒤에 괄호로 붙는 경우("○ ○ ○(주민등록번호)")와
+# 한 줄짜리 항목("주민등록번호 :             -") 둘 다 있다.
+SELF_WRITTEN_FIELD_RE = re.compile(r"주민\s*등록\s*번호|주민번호")
+
+
+def _tag_self_written_fields(doc) -> int:
+    """주민등록번호 칸에 '직접 기재' 표시를 붙인다.
+
+    이 표시는 C단계(_mark_unresolved_examples)보다 먼저 붙여야 한다. 그래야
+    같은 줄에 [예시:확인필요]가 겹쳐 붙지 않는다 — C단계는 태그가 있는 문단을
+    건너뛴다."""
+    marked = 0
+    for sec in doc.sections:
+        for p in sec.paragraphs:
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(r, "text", "") or "" for r in runs)
+            if not SELF_WRITTEN_FIELD_RE.search(text):
+                continue
+            if SELF_WRITTEN_TAG.strip() in text or PARA_EXAMPLE_TAG.strip() in text:
+                continue
+            _tag_paragraph(runs)
+            # _tag_paragraph는 [예시:확인필요]를 붙인다. 여기서는 다른 표시를 써야
+            # 하므로 방금 붙인 것을 바꿔 단다.
+            runs[-1].text = (runs[-1].text or "").replace(
+                PARA_EXAMPLE_TAG, SELF_WRITTEN_TAG)
+            marked += 1
+    return marked
+
+
 # 서식의 날짜 라벨 ← 분석이 뽑는 날짜 '항목' 이름. 항목명은 사건마다 달라서
 # (사망 / 사망일 / 사망일자 …) 포함으로 맞춘다.
 DATE_LABEL_KEYS = (
@@ -2377,10 +2700,18 @@ def _fill_known_role_names(doc, replacements: list, seeded: dict = None) -> int:
 # ══════════════════════════════════════
 # 메인
 # ══════════════════════════════════════
-def draft(form_name, extracted, summary="", applicant_name="", opponent_name=""):
+def draft(form_name, extracted, summary="", applicant_name="", opponent_name="",
+          applicant_address="", applicant_phone=""):
     """applicant_name / opponent_name은 상담 접수 때 적어둔 확정 값이다
     (core-api Consultation.clientName / opponentName). 주면 이름칸을 코드가
-    직접 채우고, 안 주면 지금까지처럼 GPT 결과에서 역할별 이름을 뽑아 쓴다."""
+    직접 채우고, 안 주면 지금까지처럼 GPT 결과에서 역할별 이름을 뽑아 쓴다.
+
+    applicant_address / applicant_phone도 같은 성격이다. 다만 이 둘은 서식 작성에
+    대한 동의를 받았을 때만 core-api가 값을 갖고 있어서, 동의가 없으면 빈 문자열이
+    온다 — 여기서 동의를 다시 검사하지 않는 이유다.
+
+    주민등록번호는 인자로 받지 않는다. 개인정보 보호법 제24조의2가 동의가 아니라
+    법령 근거를 요구해서 저장 자체를 하지 않고, 그 칸은 '직접 기재' 표시만 붙인다."""
     src = find_hwpx(form_name)
     if src is None:
         return {"file": None, "error": f"서식 파일 없음: {form_name}",
@@ -2433,6 +2764,12 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     reps, dropped_dead = _drop_unfounded_deceased_fills(reps, extracted)
     unfilled.extend(dropped_dead)
 
+    # 주소·전화는 A단계에 맡기지 않는다. 일괄 치환이 당사자를 구분하지 못해
+    # 청구인 주소가 채무자·회사 칸까지 번진다(_drop_contact_fills 주석 참고).
+    # unfilled에 올리지 않는다 — 아래 _fill_contact_info가 청구인 칸을 채운다.
+    reps, dropped_contact = _drop_contact_fills(
+        reps, applicant_address, applicant_phone)
+
     # TODO: 서식의 예시 당사자가 실제 당사자보다 많을 때 남는 자리를 같은 사람으로
     # 메우는 문제(_drop_surplus_person_fills)는 아직 연결하지 않는다. 중복 치환을
     # 버리는 것까지는 정확히 동작하지만, 그렇게 비운 자리를 뒤의 모양 기반 채우기
@@ -2476,7 +2813,18 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     # 문장은 건드리지 않는다 — 청구취지는 정형 문구라 다시 쓰면 청구가 사라진다.
     deceased_filled, deceased_texts = _fill_deceased_name_slots(doc, extracted)
     applied += deceased_filled
-    narr_texts = set(narr_texts) | deceased_texts
+
+    # 청구인의 주소·전화칸. 법원 서식의 당사자 주소는 송달을 위한 법정 필수
+    # 기재사항이라, 비어 있으면 상담원이 초안을 받아 손으로 다시 채워야 한다.
+    #
+    # 값은 core-api가 넘겨준 것만 쓴다. 분석이 상담에서 뽑아낸 값(extracted_json의
+    # 주소·전화번호)은 화면에서 상담원이 확인·수정한 뒤 core-api에 저장되고, 그것이
+    # 여기로 온다 — 받아쓰기가 숫자를 자주 틀려서 사람이 한 번 보는 단계를 거친다.
+    contact_filled, contact_texts = _fill_contact_info(
+        doc, applicant_address, applicant_phone)
+    applied += contact_filled
+
+    narr_texts = set(narr_texts) | deceased_texts | contact_texts
 
     # 값이 다 들어간 뒤, 사람 수보다 칸이 적으면 마지막 칸을 복제해 늘린다.
     # (상속인 4명인데 성명칸·배분항목이 3벌뿐인 협의서 등)
@@ -2556,6 +2904,11 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     # B단계는 '있는 문장을 바꾸는' 일만 하므로 빈 칸은 여기서 채운다.
     empty_section_filled = _fill_empty_narrative_section(doc, extracted, summary)
 
+    # 주민등록번호 칸은 시스템이 채우지 않는다 — 저장하지 않는 값이라 채울 수가 없다.
+    # C단계보다 먼저 표시해야 [예시:확인필요]와 겹치지 않는다(C단계는 태그가 붙은
+    # 문단을 건너뛴다). '못 채운 것'이 아니라 '일부러 비워둔 것'임을 밝히는 표시다.
+    self_written_marked = _tag_self_written_fields(doc)
+
     # ── C. 최후 안전장치: 처리 후에도 남아있는 원본 예시 표시 ──
     marked_examples = _mark_unresolved_examples(doc, rewritten_texts, extracted, summary)
 
@@ -2587,6 +2940,14 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
             "role_filled": role_filled,
             # 사망 표시 뒤 이름칸("망 △△△")에 사망자 이름을 채운 횟수.
             "deceased_filled": deceased_filled,
+            # 청구인 주소·전화칸을 채운 수. 0이 계속 나오면 동의를 안 받았거나
+            # core-api가 값을 안 보내고 있다는 신호다.
+            "contact_filled": contact_filled,
+            # A단계가 주소·전화칸에 손대려던 것을 걷어낸 수. 0이 아니어도
+            # 정상이다 — 그 칸은 _fill_contact_info가 청구인 것만 채운다.
+            "contact_fills_dropped": len(dropped_contact),
+            # 주민등록번호처럼 시스템이 채우지 않고 표시만 붙인 칸 수.
+            "self_written_marked": self_written_marked,
             # 상담원이 확인한 이름으로 분석값을 고친 횟수.
             # 0이 계속 나오면 core-api가 이름을 안 보내고 있다는 신호다.
             "name_corrections": name_corrections,

@@ -13,6 +13,7 @@ import {
   approveCoreDocument,
   submitCoreDocumentForReview,
   generateCoreDraft,
+  updateCoreConsultation,
 } from '../../../services/coreApiClientV2.js';
 import { hydrateDraftDocument, rememberDraftDocumentSnapshot } from '../../../services/draftDocumentStore.js';
 import { readLawyerDraftEdit, saveLawyerDraftEdit } from '../../../services/documentReviewStore.js';
@@ -24,6 +25,7 @@ import { GeneratedFileBox, GeneratedFileLink } from '../documents/GeneratedFileB
 import { CasePicker } from '../components/CasePicker.jsx';
 import { ChoicePicker } from '../components/ChoicePicker.jsx';
 import { useFormRecommendations } from '../analysis/RecommendedFormsPanel.jsx';
+import { DraftContactConsent } from './DraftContactConsent.jsx';
 
 export function DraftWorkbench({ consultations, currentUser, role, onUpdateConsultation, onNotify, focusedConsultationId, focusedTemplateName }) {
   const showToast = useToast();
@@ -97,6 +99,41 @@ export function DraftWorkbench({ consultations, currentUser, role, onUpdateConsu
   // 분석 화면과 같은 훅을 씁니다. 저장된 recommendation_json이 있으면 그걸 쓰고,
   // 없으면 이번 세션 캐시를, 그것도 없으면 API를 부릅니다.
   const { aiRecommendations, loading: recommendLoading } = useFormRecommendations(selectedCase);
+
+  // ── 서식에 넣을 주소·전화번호와 그 동의.
+  //
+  // 화면 상태를 먼저 바꾸고 서버로 보냅니다. 타이핑할 때마다 서버를 부르면 글자마다
+  // 요청이 나가므로, 저장은 입력이 멎은 뒤에 한 번만 합니다.
+  //
+  // 서버에 못 보내면 화면에만 남습니다 — 그대로 두면 상담원은 저장된 줄 알고 초안을
+  // 만드는데 주소칸이 비어서 나옵니다. 그래서 실패를 토스트로 알립니다.
+  const contactSaveTimer = useRef(null);
+  const [contactSaveError, setContactSaveError] = useState('');
+  const updateDraftContact = (changes) => {
+    if (!selectedCase) return;
+    onUpdateConsultation?.(selectedCase.id, changes);
+    if (!selectedCase.coreId) return;
+
+    const next = { ...selectedCase, ...changes };
+    clearTimeout(contactSaveTimer.current);
+    contactSaveTimer.current = setTimeout(() => {
+      // 셋을 항상 함께 보냅니다. 서버는 privacyConsent가 올 때만 동의 상태를 바꾸는데,
+      // 안 보내면 "동의를 뺐다"와 "이 항목을 안 보냈다"를 구분할 수 없습니다.
+      updateCoreConsultation(selectedCase.coreId, {
+        privacyConsent: Boolean(next.privacyConsent),
+        privacyConsentSource: next.privacyConsentSource || '',
+        clientAddress: next.clientAddress || '',
+        clientPhone: next.clientPhone || '',
+      })
+        .then(() => setContactSaveError(''))
+        .catch((error) => {
+          const message = friendlyErrorMessage(error, '주소·전화번호를 서버에 저장하지 못했습니다.');
+          setContactSaveError(message);
+          showToast(message, 'warn');
+        });
+    }, 700);
+  };
+  useEffect(() => () => clearTimeout(contactSaveTimer.current), []);
 
   // ── 생성된 초안의 core-api 문서 상태(초안 생성 → 검토 요청 → 승인/반려)입니다.
   // 사건이나 서식을 바꾸면 이전 초안의 id가 지금 화면과 안 맞으니 초기화합니다.
@@ -449,6 +486,20 @@ export function DraftWorkbench({ consultations, currentUser, role, onUpdateConsu
             <span><small>상담 제목</small><strong>{selectedCase.title}</strong></span>
             <span><small>첨부자료</small><strong>{selectedCase.attachments?.length || 0}건</strong></span>
           </div>
+        ) : null}
+        {/* 주소·전화번호는 초안을 만들 때만 필요하므로 여기서 받습니다. 상담만 받고
+            끝나는 경우에는 묻지 않습니다(개인정보 보호법 제3조 제1항 — 필요한 최소한).
+            변호사는 제출된 초안을 검토만 하므로 이 칸을 보지 않습니다. */}
+        {selectedCase && !isLawyerReviewer ? (
+          <>
+            <DraftContactConsent
+              consultation={selectedCase}
+              onChange={updateDraftContact}
+            />
+            {contactSaveError
+              ? <p className="apiPendingMessage" role="status">{contactSaveError}</p>
+              : null}
+          </>
         ) : null}
         {selectedCase ? (
           <section className="documentReviewPanel">

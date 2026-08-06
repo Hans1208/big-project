@@ -1,5 +1,6 @@
 package com.aivle.bigproject.consultation;
 
+import com.aivle.bigproject.analysis.AiAnalysis;
 import com.aivle.bigproject.analysis.AiAnalysisRepository;
 import com.aivle.bigproject.analysis.job.AnalysisJobRepository;
 import com.aivle.bigproject.attachment.Attachment;
@@ -19,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +40,11 @@ public class ConsultationService {
     private final AnalysisJobRepository analysisJobRepository; // 삭제 시 딸린 분석 작업 기록도 같이 지우기 위해 필요
     private final AuditLogService auditLogService; // SEC-01-01-01: 상담 조회를 감사 로그에 남기기 위해 필요
     private final UserRepository userRepository; // 목록 조회 시 로그인한 사용자를 email로 찾기 위해 필요
+    private final ObjectMapper objectMapper; // extracted_json(jsonb를 담은 String)에서 키를 지우는 데 필요
+
+    // 분석이 서식 작성용으로 뽑아 두는 키들. 계약서(contracts/README_ai_analysis_contract.md)의
+    // extracted_json 안에 들어가며, 이름·금액·날짜와 달리 동의를 받아야 다룰 수 있는 항목이다.
+    private static final List<String> DRAFT_CONTACT_KEYS = List.of("주소", "전화번호", "개인정보동의");
 
     public ConsultationService(ConsultationRepository consultationRepository,
                                 S3FileStorageService s3FileStorageService,
@@ -43,7 +53,8 @@ public class ConsultationService {
                                 GeneratedDocumentRepository generatedDocumentRepository,
                                 AnalysisJobRepository analysisJobRepository,
                                 AuditLogService auditLogService,
-                                UserRepository userRepository) {
+                                UserRepository userRepository,
+                                ObjectMapper objectMapper) {
         this.consultationRepository = consultationRepository;
         this.s3FileStorageService = s3FileStorageService;
         this.userService = userService;
@@ -52,6 +63,7 @@ public class ConsultationService {
         this.analysisJobRepository = analysisJobRepository;
         this.auditLogService = auditLogService;
         this.userRepository = userRepository;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -61,6 +73,9 @@ public class ConsultationService {
         Consultation saved = consultationRepository.save(
                 new Consultation(user, request.title(), request.clientName(), request.inputText(), request.opponentName(),
                         request.category(), request.type(), request.legalAidType(), request.eligibilityEvidenceSubmitted()));
+        // 동의를 먼저 기록하고 그다음에 주소·전화번호를 넣는다. 순서가 바뀌면
+        // applyDraftContactInfo가 아직 동의를 못 보고 값을 버린다.
+        applyPrivacyFields(saved, request);
         // 프론트가 S3에 이미 올려둔 첨부파일들을 여기서 등록. fileKey가 없는(로컬 폴백) 항목은 건너뜀 —
         // 서버에 실체가 없는 파일을 DB에만 기록해봐야 다운로드/분석 둘 다 불가능하기 때문.
         // cascade=ALL이라 saved.getAttachments()에 추가만 하면 flush 시 같이 insert됨.
@@ -161,9 +176,77 @@ public class ConsultationService {
         if (request.eligibilityEvidenceSubmitted() != null) {
             consultation.setEligibilityEvidenceSubmitted(request.eligibilityEvidenceSubmitted());
         }
+        applyPrivacyFields(consultation, request);
         // consultation은 이미 영속 상태(DB와 연결된 상태)라 setter만 호출해도
         // 트랜잭션이 끝날 때 JPA가 알아서 UPDATE 쿼리를 날림 (별도 save() 호출 불필요)
         return ConsultationResponse.from(consultation);
+    }
+
+    /** 서식 작성용 개인정보(주소·전화번호)와 그 동의를 반영한다. 생성·수정이 같은 규칙을
+     *  써야 해서 한 곳에 둔다 — 한쪽만 고치면 "등록할 땐 저장되는데 수정하면 지워지는"
+     *  식으로 어긋난다.
+     *
+     *  동의를 먼저 반영하고 값을 넣는다. 동의가 내려가면(잘못 체크했다가 해제) 이미 저장된
+     *  주소·전화번호도 함께 지워진다 — 동의를 철회했는데 값이 남아 있으면 그때부터는
+     *  근거 없이 보관하는 것이 된다(개인정보 보호법 제37조 처리정지 요구권).
+     *
+     *  update는 부분 수정이라 필드가 없으면 건드리지 않는 것이 원칙인데, 동의만은 예외로
+     *  둘 수 없다 — privacyConsent가 null로 올 때 "동의를 안 보냈다"와 "동의를 뺐다"를
+     *  구분할 수 없기 때문이다. 그래서 화면이 이 셋을 항상 함께 보내도록 하고, 여기서는
+     *  privacyConsent가 명시적으로 올 때만 동의 상태를 바꾼다. */
+    private void applyPrivacyFields(Consultation consultation, ConsultationRequest request) {
+        boolean revoked = false;
+        if (request.privacyConsent() != null) {
+            revoked = consultation.applyPrivacyConsent(request.privacyConsent(), request.privacyConsentSource());
+        }
+        if (request.clientAddress() != null || request.clientPhone() != null
+                || request.privacyConsent() != null) {
+            consultation.applyDraftContactInfo(request.clientAddress(), request.clientPhone());
+        }
+        if (revoked) {
+            scrubDraftContactFromAnalyses(consultation);
+        }
+    }
+
+    // 동의를 철회했을 때 분석이 extracted_json에 뽑아 둔 주소·전화번호를 지운다.
+    //
+    // 같은 값이 두 곳에 생긴다. consultation.client_address는 암호화되고 동의를 내리면
+    // 지워지는데, extracted_json 쪽은 평문이고 아무도 안 지웠다 — 내담자가 동의를
+    // 철회해도 주소가 그대로 남았다(개인정보 보호법 제37조 삭제 요구권).
+    //
+    // 동의가 살아 있는 동안은 지우지 않는다. 보관 근거가 있어 지울 이유가 없고,
+    // extracted_json은 'AI가 무엇을 뽑았는지'의 기록이라 사후에 손대면 저장된 분석이
+    // 실제 응답과 달라진다(AI 응답 검증이 이 값을 본다).
+    //
+    // 상담 원문(input_text, *_input_texts)은 건드리지 않는다. 거기 주소가 들어 있는 건
+    // 내담자가 상담 중에 말했기 때문이지 우리가 서식용으로 수집해서가 아니다. 상담 기록
+    // 자체라 보관 근거가 다르고, 지우면 상담이 어떻게 진행됐는지가 사라진다.
+    // (그 컬럼의 평문 저장 문제는 Consultation.inputText의 TODO(규제)로 따로 남아 있다.)
+    private void scrubDraftContactFromAnalyses(Consultation consultation) {
+        if (consultation.getId() == null) {
+            return;
+        }
+        for (AiAnalysis analysis : aiAnalysisRepository.findByConsultationId(consultation.getId())) {
+            String json = analysis.getExtractedJson();
+            if (json == null || json.isBlank()) {
+                continue;
+            }
+            try {
+                JsonNode node = objectMapper.readTree(json);
+                if (!(node instanceof ObjectNode object)) {
+                    continue;
+                }
+                boolean changed = false;
+                for (String key : DRAFT_CONTACT_KEYS) {
+                    changed |= object.remove(key) != null;
+                }
+                if (changed) {
+                    analysis.setExtractedJson(objectMapper.writeValueAsString(object));
+                }
+            } catch (JacksonException e) {
+                // 모양이 예상과 다르면 그냥 둔다. 분석 결과를 깨뜨리는 쪽이 더 나쁘다.
+            }
+        }
     }
 
     // "상담 저장" 버튼 전용: 실시간 상담(전화/대면) 채널별 현재 메모를 Consultation에 반영한다.

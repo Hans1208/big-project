@@ -26,6 +26,14 @@ def draft_form(payload: dict):
     확인하고 고친 이름이다. 요약문에서 뽑아낸 이름보다 이쪽이 정확하므로,
     주면 이름칸을 코드가 직접 채운다(drafter.draft 참고).
 
+    payload 선택 키: applicant_address, applicant_phone — 서식 작성 동의를 받고
+    적어둔 청구인 연락처다. 법원 서식의 당사자 주소는 송달을 위한 법정 필수
+    기재사항이라, 없으면 상담원이 초안을 받아 손으로 채워야 한다. 동의가 없으면
+    core-api가 값을 갖지 않아 빈 문자열이 온다.
+
+    주민등록번호는 받지 않는다. 개인정보 보호법 제24조의2가 동의가 아니라 법령
+    근거를 요구해 저장 자체를 하지 않고, 그 칸에는 '직접 기재' 표시만 붙는다.
+
     반환에 초안 파일 경로(file)와 llm_judge 환각 재검증 결과가 포함된다.
     이 결과는 항상 '검토 대기'로 취급하고, 최종 확정은 상담원/변호사가
     수행해야 한다 (HITL) — 여기서 파일을 자동 확정하지 않는다."""
@@ -34,7 +42,9 @@ def draft_form(payload: dict):
         raise HTTPException(status_code=400, detail="form_name이 필요합니다")
     return draft(form_name, payload.get("extracted", {}), payload.get("summary", ""),
                  payload.get("applicant_name") or "",
-                 payload.get("opponent_name") or "")
+                 payload.get("opponent_name") or "",
+                 payload.get("applicant_address") or "",
+                 payload.get("applicant_phone") or "")
 
 
 @router.post("/verify")
