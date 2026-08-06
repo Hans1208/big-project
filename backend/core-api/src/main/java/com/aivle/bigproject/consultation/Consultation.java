@@ -188,12 +188,26 @@ public class Consultation {
     @Column(name = "privacy_consent_source")
     private String privacyConsentSource;
 
-    /** 동의를 기록한다. 동의를 내리는 경우(잘못 체크했을 때)는 시각·채널을 함께 지운다. */
-    public void applyPrivacyConsent(Boolean consented, String source) {
+    /** 동의를 기록한다. 동의를 내리는 경우(잘못 체크했을 때)는 시각·채널을 함께 지운다.
+     *
+     *  @return 이번 호출이 '동의했다가 철회한 것'이면 true.
+     *
+     *  철회를 따로 알려주는 이유: 이 엔티티의 주소·전화번호만 지워서는 부족하기 때문이다.
+     *  분석 단계가 같은 값을 ai_analysis.extracted_json에도 뽑아 두는데, 그건 서식 작성을
+     *  위해 동의를 받고 만든 사본이라 동의가 사라지면 함께 지워야 한다. 그 정리는 다른
+     *  테이블을 건드리는 일이라 엔티티가 못 하고, ConsultationService가 이 신호를 받아서
+     *  한다(scrubDraftContactFromAnalyses).
+     *
+     *  '지금 동의가 false'와 '동의를 철회했다'를 구분해야 한다. 화면은 상담을 저장할 때마다
+     *  동의 필드를 함께 보내므로, false를 그냥 철회로 보면 아직 동의를 받기 전 단계의 상담을
+     *  저장할 때마다 사본이 지워진다 — 동의 화면이 미리 채워 줄 값이 그때 사라진다. */
+    public boolean applyPrivacyConsent(Boolean consented, String source) {
         boolean agreed = Boolean.TRUE.equals(consented);
+        boolean revoked = Boolean.TRUE.equals(this.privacyConsent) && !agreed;
         this.privacyConsent = agreed;
         this.privacyConsentAt = agreed ? LocalDateTime.now() : null;
         this.privacyConsentSource = agreed ? source : null;
+        return revoked;
     }
 
     /** 동의가 없으면 주소·전화번호를 저장하지 않는다. 화면에서도 막지만, 이 API를 직접
