@@ -27,6 +27,46 @@ const CORE_ELIGIBILITY_LABEL = {
   판단보류: '검토 필요',
 };
 
+// ai-api가 실제로 수행한 출력 검증 결과를 사람이 읽는 세 가지 상태로 바꿉니다.
+// 응답이 없는 예전 분석은 '미실행'으로 두어, 로컬 mock의 통과 표시를 실제 결과처럼
+// 보이지 않게 합니다.
+function mapOutputValidation(raw) {
+  if (!raw || raw.status !== 'available') {
+    return {
+      available: false,
+      format: null,
+      grounded: null,
+      hallucinationRisk: null,
+      formatLabel: '검증 미실행',
+      evidenceLabel: '검증 미실행',
+      riskLabel: '검증 미실행',
+      decision: null,
+    };
+  }
+
+  const unsupported = Array.isArray(raw.unsupported_assertions) ? raw.unsupported_assertions : [];
+  const conflicts = Array.isArray(raw.explicit_conflicts) ? raw.explicit_conflicts : [];
+  const format = raw.schema_valid === true;
+  const grounded = raw.low_support_ratio === 0 && unsupported.length === 0;
+  const decision = raw.decision || 'review_required';
+  const hallucinationRisk = decision === 'high_risk' || conflicts.length > 0
+    ? 'high'
+    : decision === 'review_required'
+      ? 'review'
+      : 'low';
+
+  return {
+    available: true,
+    format,
+    grounded,
+    hallucinationRisk,
+    formatLabel: format ? '통과' : '확인 필요',
+    evidenceLabel: grounded ? '근거 확인' : '근거 보강 필요',
+    riskLabel: hallucinationRisk === 'high' ? '높음' : hallucinationRisk === 'review' ? '검토 필요' : '낮음',
+    decision,
+  };
+}
+
 function extractCoreErrorMessage(bodyText, fallback) {
   try {
     const parsed = bodyText ? JSON.parse(bodyText) : null;
@@ -732,6 +772,7 @@ function mapReliefReviewDetail(rawChecklist) {
 
 export function mapCoreAnalysisResponse(coreAnalysis = {}) {
   const extractedJson = coreAnalysis.extracted_json || {};
+  const verification = mapOutputValidation(extractedJson.output_validation);
   const emergencyRatio = typeof extractedJson.case_emergency_ratio === 'number'
     ? extractedJson.case_emergency_ratio
     : null;
@@ -757,6 +798,7 @@ export function mapCoreAnalysisResponse(coreAnalysis = {}) {
     timelineIssue: classifyTimelineIssue(coreAnalysis.timeline_json),
     clusterResult: coreAnalysis.cluster_result_json || [],
     extractedJson,
+    verification,
     status: coreAnalysis.status || '',
     analysisId: coreAnalysis.analysis_id || coreAnalysis.id || '',
   };

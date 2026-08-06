@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">AI 출력 검증 주요 라운드 이진 F1 추이</title>
+  <desc id="desc">Round 63, 69, 71의 이진 F1 비교 막대그래프</desc>
+  <rect width="1600" height="900" fill="#ffffff"/>
+  <text x="100" y="100" font-family="Arial, sans-serif" font-size="44" font-weight="700" fill="#172033">AI 출력 검증 — 주요 라운드 이진 F1</text>
+  <text x="100" y="145" font-family="Arial, sans-serif" font-size="22" fill="#536174">Round 71 최종 독립 검증: 안전/비안전 F1 100%, 3단계 일치 96.67%</text>
+  <line x1="185" y1="710" x2="1480" y2="710" stroke="#2d3748" stroke-width="3"/>
+  <line x1="185" y1="210" x2="185" y2="710" stroke="#2d3748" stroke-width="3"/>
+  <g font-family="Arial, sans-serif" font-size="20" fill="#536174" text-anchor="end">
+    <text x="165" y="716">0.0</text><text x="165" y="616">0.2</text><text x="165" y="516">0.4</text><text x="165" y="416">0.6</text><text x="165" y="316">0.8</text><text x="165" y="216">1.0</text>
+  </g>
+  <g stroke="#d8dee8" stroke-width="2"><line x1="185" y1="610" x2="1480" y2="610"/><line x1="185" y1="510" x2="1480" y2="510"/><line x1="185" y1="410" x2="1480" y2="410"/><line x1="185" y1="310" x2="1480" y2="310"/><line x1="185" y1="210" x2="1480" y2="210"/></g>
+  <g font-family="Arial, sans-serif" text-anchor="middle">
+    <rect x="300" y="424.3" width="150" height="285.7" rx="8" fill="#6f83a6"/><text x="375" y="402" font-size="30" font-weight="700" fill="#172033">57.14%</text><text x="375" y="755" font-size="27" fill="#172033">Round 1</text>
+    <rect x="540" y="265.6" width="150" height="444.4" rx="8" fill="#2374ab"/><text x="615" y="243" font-size="30" font-weight="700" fill="#172033">88.89%</text><text x="615" y="755" font-size="27" fill="#172033">Round 2</text>
+    <rect x="780" y="298.2" width="150" height="411.8" rx="8" fill="#4c8b61"/><text x="855" y="276" font-size="30" font-weight="700" fill="#172033">82.35%</text><text x="855" y="755" font-size="27" fill="#172033">Round 20</text>
+    <rect x="1020" y="210" width="150" height="500" rx="8" fill="#b78424"/><text x="1095" y="188" font-size="30" font-weight="700" fill="#172033">100.00%</text><text x="1095" y="755" font-size="27" fill="#172033">Round 51*</text>
+    <rect x="1260" y="222.8" width="150" height="487.2" rx="8" fill="#8a5a9e"/><text x="1335" y="201" font-size="30" font-weight="700" fill="#172033">97.44%</text><text x="1335" y="755" font-size="27" fill="#172033">Round 63</text>
+  </g>
+  <rect x="100" y="810" width="1400" height="1" fill="#cbd5e1"/>
+  <text x="100" y="850" font-family="Arial, sans-serif" font-size="20" fill="#536174">* Round 51은 사람이 아닌 설계 라벨을 사용한 임계값 분기 로직 검증이며, 운영 승격 근거와 구분한다.</text>
+</svg>

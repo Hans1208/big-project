@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720" role="img" aria-labelledby="title desc">
+  <title id="title">최종 운영 의사결정</title>
+  <desc id="desc">Round 20 최종 Recall 기준 미달에 따른 shadow 모드 유지와 향후 도입 조건</desc>
+  <rect width="1400" height="720" fill="#0f172a"/>
+  <text x="80" y="88" fill="#f8fafc" font-family="Arial, sans-serif" font-size="40" font-weight="700">최종 운영 의사결정</text>
+  <text x="80" y="132" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="21">Round 71 최종 독립 검증 기반 제한적 운영 후보 승격 판단</text>
+  <rect x="80" y="205" width="350" height="260" rx="20" fill="#1e293b"/>
+  <text x="120" y="267" fill="#f8fafc" font-family="Arial, sans-serif" font-size="28" font-weight="700">최종 결과</text>
+  <text x="120" y="322" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="21">Precision 100%</text>
+  <text x="120" y="360" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="21">Recall / F1 100%</text>
+  <text x="120" y="398" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="21">3단계 일치 96.67%</text>
+  <path d="M455 334 H630" stroke="#f59e0b" stroke-width="7" marker-end="url(#arrow)"/>
+  <rect x="655" y="205" width="350" height="260" rx="20" fill="#166534"/>
+  <text x="695" y="278" fill="#dcfce7" font-family="Arial, sans-serif" font-size="30" font-weight="700">제한적 운영 후보</text>
+  <text x="695" y="327" fill="#bbf7d0" font-family="Arial, sans-serif" font-size="20">safe만 통과 후보로 표시</text>
+  <text x="695" y="365" fill="#bbf7d0" font-family="Arial, sans-serif" font-size="20">위험·검토 필요는 사람 검토</text>
+  <path d="M1030 334 H1180" stroke="#38bdf8" stroke-width="7" marker-end="url(#arrow)"/>
+  <rect x="1205" y="205" width="115" height="260" rx="20" fill="#164e63"/>
+  <text x="1227" y="292" fill="#cffafe" font-family="Arial, sans-serif" font-size="22" font-weight="700">Shadow</text>
+  <text x="1225" y="332" fill="#a5f3fc" font-family="Arial, sans-serif" font-size="18">사람 검토</text>
+  <text x="1227" y="362" fill="#a5f3fc" font-family="Arial, sans-serif" font-size="18">지원</text>
+  <rect x="80" y="545" width="1240" height="90" rx="18" fill="#1e293b"/>
+  <text x="118" y="583" fill="#f8fafc" font-family="Arial, sans-serif" font-size="22" font-weight="700">재검토 조건</text>
+  <text x="118" y="616" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="19">비식별 실제 상담 데이터 + 신규 홀드아웃 + Recall ≥ 80% + safe 오탐률 ≤ 15% + 3단계 일치율 유지</text>
+  <defs><marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#f59e0b"/></marker></defs>
+</svg>

@@ -4838,7 +4838,7 @@ textarea:focus-visible,
 .callAudioVisualizerRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: var(--text-sub);
 }
 
@@ -4867,6 +4867,43 @@ textarea:focus-visible,
 
 .callAudioVisualizerFill.mic { background: var(--accent-strong); }
 .callAudioVisualizerFill.remote { background: var(--success-solid); }
+
+.callAudioVisualizerToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-muted);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, color .12s ease, transform .06s ease;
+}
+
+.callAudioVisualizerToggle:hover {
+  border-color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent-strong) 12%, transparent);
+}
+
+.callAudioVisualizerToggle:active {
+  transform: scale(0.94);
+}
+
+.callAudioVisualizerToggle[aria-pressed="true"] {
+  border-color: var(--danger-solid);
+  color: #fff;
+  background: var(--danger-solid);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger-solid) 22%, transparent);
+}
+
+.callAudioVisualizerToggle[aria-pressed="true"]:hover {
+  background: var(--danger-solid);
+  border-color: var(--danger-solid);
+}
 
 /* '분석 시작' 전용 버튼. 활성=성공 그린, 비활성=회색 + 버튼 바로 아래 상시 캡션
    (툴팁이 아니라 항상 보이는 문구로 왜 눌리지 않는지 알려줍니다). */

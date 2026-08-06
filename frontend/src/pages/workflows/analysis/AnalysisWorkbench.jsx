@@ -990,9 +990,15 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
           <>
           <div className="resultInlineRow">
                 <h3>AI 응답 검증</h3>
-                <span className={`statusChip ${analysis.verification?.format ? 'tone-success' : 'tone-danger'}`}>형식 검증 {analysis.verification?.format ? '통과' : '오류'}</span>
-                <span className={`statusChip ${analysis.verification?.grounded ? 'tone-success' : 'tone-warn'}`}>근거 검증 {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 부족 (첨부자료 없음)'}</span>
-                <span className={`statusChip ${analysis.verification?.hallucinationRisk ? 'tone-danger' : 'tone-success'}`}>환각 탐지 {analysis.verification?.hallucinationRisk ? '위험 - 원문 내용 부족' : '이상 없음'}</span>
+                <span className={`statusChip ${analysis.verification?.format === true ? 'tone-success' : analysis.verification?.format === false ? 'tone-danger' : 'tone-muted'}`}>
+                  형식: {analysis.verification?.formatLabel || '검증 미실행'}
+                </span>
+                <span className={`statusChip ${analysis.verification?.grounded === true ? 'tone-success' : analysis.verification?.grounded === false ? 'tone-warn' : 'tone-muted'}`}>
+                  근거: {analysis.verification?.evidenceLabel || '검증 미실행'}
+                </span>
+                <span className={`statusChip ${analysis.verification?.hallucinationRisk === 'high' ? 'tone-danger' : analysis.verification?.hallucinationRisk === 'review' ? 'tone-warn' : analysis.verification?.hallucinationRisk === 'low' ? 'tone-success' : 'tone-muted'}`}>
+                  환각 위험: {analysis.verification?.riskLabel || '검증 미실행'}
+                </span>
               </div>
               <div className="resultInlineRow">
                 <h3>받은 자료</h3>
