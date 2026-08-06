@@ -33,6 +33,7 @@ export function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSu
   const eligibilityHelperText = getEligibilityHelperText(isLegalAidApplicant, eligibilityEvidenceSubmitted);
   return (
     <>
+      <div className="eligibilityUploadRow">
       <section className="eligibilityPanel">
         <div className="eligibilityHeader">
           <div>
@@ -77,7 +78,7 @@ export function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSu
           {eligibilityHelperText}
         </p>
       </section>
-      <div className="workflowColumns uploadFileWorkspace">
+      <section className="eligibilityPanel uploadFilesPanel">
         <div className="uploadDropzoneColumn">
           <h3><UploadCloud size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 상담 자료 추가</h3>
           <p className="helperText">녹취 · 이미지 · 문서를 함께 분석합니다. 저장하면 업로드됩니다.</p>
@@ -97,6 +98,7 @@ export function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSu
             )) : <p>아직 추가한 파일이 없습니다.</p>}
           </div>
         </div>
+      </section>
       </div>
     </>
   );
