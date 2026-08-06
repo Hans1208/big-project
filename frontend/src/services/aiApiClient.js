@@ -137,6 +137,38 @@ export function recommendPrecedents(analysis, { topK = 5 } = {}) {
   }, PRECEDENT_TIMEOUT_MS);
 }
 
+// 유사 상담사례 검색·추천 (ai-api /consultations). 색인은 공단이 공개한 상담 Q&A에서
+// 가사 분야만 추린 1,664건입니다. 법령이 '조문', 판례가 '법원 판단'이라면 여기는
+// '공단이 실제로 답변한 기록'이라, 같은 질문에 이미 나간 답이 있으면 그게 가장 빠릅니다.
+//
+// 카드 키는 법령·판례와 같습니다(id/title/content/effective_date/similarity_percent/source).
+// title 자리에는 상담 질문이, content 자리에는 답변이 들어옵니다.
+const CONSULTATION_TIMEOUT_MS = 60_000;
+
+// 상담원이 직접 넣은 검색어로 유사 상담사례를 찾습니다.
+export function searchConsultations({ query, topK = 5 }) {
+  return requestJson('/consultations/search', {
+    method: 'POST',
+    body: JSON.stringify({ query, top_k: topK }),
+  }, CONSULTATION_TIMEOUT_MS);
+}
+
+// 상담 분석 결과로 유사 상담사례를 추천합니다. 법령·판례와 달리 근거(reason)가
+// 오지 않습니다 — 상담사례는 질문 한 줄이 곧 그 설명이라, 설명을 붙이려고 LLM을
+// 한 번 더 부르면 응답만 느려집니다(ai-api routers/consultations.py 참고).
+export function recommendConsultations(analysis, { topK = 3 } = {}) {
+  return requestJson('/consultations/recommend', {
+    method: 'POST',
+    body: JSON.stringify({
+      case_type: analysis?.caseType || analysis?.case_type || '',
+      case_subtype: analysis?.caseSubtype || analysis?.case_subtype || '',
+      summary: analysis?.summary || '',
+      extracted_json: analysis?.extractedJson || analysis?.extracted_json || {},
+      top_k: topK,
+    }),
+  }, CONSULTATION_TIMEOUT_MS);
+}
+
 // 카드에 실린 본문은 검색에 걸린 '조각 하나'입니다. 색인이 조문은 800자씩,
 // 판례는 판시사항/판결요지/판례내용으로 쪼개 담기 때문입니다. 조각이 문장 중간에서
 // 시작하거나 끝나는 일이 흔한데 화면에는 잘렸다는 표시가 없어서, 끝까지 읽고
@@ -157,6 +189,15 @@ export function fetchPrecedentFullText({ id, precedentId = '' }) {
     method: 'POST',
     body: JSON.stringify({ id, precedent_id: precedentId || null }),
   }, PRECEDENT_TIMEOUT_MS);
+}
+
+// 상담 답변도 목록 카드에는 앞부분만 실립니다. 답변이 긴 상담은 결론이 뒤에 있어서
+// 발췌만 읽으면 반대로 이해할 수 있습니다.
+export function fetchConsultationFullText(id) {
+  return requestJson('/consultations/full-text', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  }, CONSULTATION_TIMEOUT_MS);
 }
 
 export { AI_API_BASE_URL };
