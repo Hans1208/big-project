@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
-import { Gavel, Scale } from 'lucide-react';
+import { Gavel, MessagesSquare, Scale } from 'lucide-react';
 import { WorkPageHeader, InlineEmptyNotice } from '../../../components/common.jsx';
 import { caseOptions } from '../shared/caseHelpers.js';
+import { referenceTypeMeta } from '../shared/referenceTypes.js';
 import { CasePicker } from '../components/CasePicker.jsx';
+
+// 종류별 아이콘. 라벨·날짜표기와 달리 아이콘은 lucide 컴포넌트라 shared 모듈에
+// 두면 그 파일이 React에 묶입니다 — 화면 쪽에만 둡니다.
+const REFERENCE_ICONS = {
+  statute: Scale,
+  precedent: Gavel,
+  similar: MessagesSquare,
+};
 
 // 담아둔 법령·판례를 상담별로 확인하는 화면.
 //
@@ -20,18 +29,19 @@ function formatLegalDate(value) {
 }
 
 function ReferenceLine({ item, isOpen, onToggle }) {
-  const isPrecedent = item.type === 'precedent';
+  const meta = referenceTypeMeta(item.type);
+  const Icon = REFERENCE_ICONS[item.type] || Scale;
   return (
     <li className="adoptedReferenceLine">
       <span className="adoptedReferenceTitle">
-        {isPrecedent
-          ? <Gavel size={13} strokeWidth={2.2} aria-hidden="true" />
-          : <Scale size={13} strokeWidth={2.2} aria-hidden="true" />}
+        <Icon size={13} strokeWidth={2.2} aria-hidden="true" />
         {item.title}
       </span>
       <span className="adoptedReferenceMeta">
         {item.source || ''}
-        {item.date ? ` · ${isPrecedent ? '선고' : '시행'} ${formatLegalDate(item.date)}` : ''}
+        {/* 상담사례는 기준일이 비어 있는 경우가 많습니다 — 원본 Q&A에 날짜가
+            없는 항목이 있어서입니다. 없으면 이 줄 자체를 그리지 않습니다. */}
+        {item.date ? ` · ${meta.dateLabel} ${formatLegalDate(item.date)}` : ''}
         {/* AI 추천을 채택한 것인지 직접 찾은 것인지 남깁니다. 검토 근거를 나중에
             다시 볼 때, 사람이 찾아낸 것과 AI가 올려준 것은 무게가 다릅니다. */}
         {item.selected_by === 'llm' ? ' · AI 추천 채택' : ''}
@@ -42,7 +52,7 @@ function ReferenceLine({ item, isOpen, onToggle }) {
       {item.content ? (
         <>
           <button className="referenceCardToggle" type="button" onClick={onToggle}>
-            {isOpen ? '접기' : (isPrecedent ? '판시사항 보기' : '조문 전문 보기')}
+            {isOpen ? '접기' : meta.bodyToggleLabel}
           </button>
           {isOpen ? <p className="adoptedReferenceBody">{item.content}</p> : null}
         </>
@@ -65,8 +75,10 @@ export function AdoptedReferencePanel({ consultations = [] }) {
   const adopted = Array.isArray(selectedCase?.analysis?.recommendation?.adopted)
     ? selectedCase.analysis.recommendation.adopted
     : [];
-  const statutes = adopted.filter((item) => item.type !== 'precedent');
+  // type이 없는 예전 저장본은 법령으로 봅니다(자료가 법령뿐이던 시절에 담은 것).
+  const statutes = adopted.filter((item) => !item.type || item.type === 'statute');
   const precedents = adopted.filter((item) => item.type === 'precedent');
+  const similars = adopted.filter((item) => item.type === 'similar');
 
   // 다른 상담에 담아둔 것이 있으면 알려줍니다. 이 상담이 비어 있을 때 "저장이
   // 안 됐나" 싶어 검색 화면으로 되돌아가는 일을 줄입니다.
@@ -95,6 +107,7 @@ export function AdoptedReferencePanel({ consultations = [] }) {
             <span><small>사건 유형</small><strong>{selectedCase.analysis?.caseType || selectedCase.type || '미분류'}</strong></span>
             <span><small>법령</small><strong>{statutes.length}건</strong></span>
             <span><small>판례</small><strong>{precedents.length}건</strong></span>
+            <span><small>상담사례</small><strong>{similars.length}건</strong></span>
           </div>
         ) : null}
         {/* 법령과 판례를 섞어 쌓으면 무엇이 몇 건인지 세어가며 봐야 합니다. 둘은
@@ -103,15 +116,16 @@ export function AdoptedReferencePanel({ consultations = [] }) {
         {adopted.length ? (
           <div className="adoptedReferenceGroups">
             {[
-              { key: 'statute', title: '법령', items: statutes },
-              { key: 'precedent', title: '판례', items: precedents },
-            ].filter((group) => group.items.length).map((group) => (
+              { key: 'statute', items: statutes },
+              { key: 'precedent', items: precedents },
+              { key: 'similar', items: similars },
+            ].filter((group) => group.items.length).map((group) => {
+              const GroupIcon = REFERENCE_ICONS[group.key] || Scale;
+              return (
               <section className="adoptedReferenceGroup" key={group.key}>
                 <h3>
-                  {group.key === 'precedent'
-                    ? <Gavel size={15} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" />
-                    : <Scale size={15} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" />}
-                  {group.title} <span className="statusChip tone-muted">{group.items.length}건</span>
+                  <GroupIcon size={15} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" />
+                  {referenceTypeMeta(group.key).label} <span className="statusChip tone-muted">{group.items.length}건</span>
                 </h3>
                 <ul className="adoptedReferenceItems">
                   {group.items.map((item) => (
@@ -124,7 +138,8 @@ export function AdoptedReferencePanel({ consultations = [] }) {
                   ))}
                 </ul>
               </section>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <InlineEmptyNotice>
