@@ -304,6 +304,9 @@ class ConsultAnalyzeResponse(BaseModel):
     related_precedents: List[dict] = Field(
         default_factory=list
     )
+    related_consultations: List[dict] = Field(
+        default_factory=list
+    )
     case_analysis: CaseAnalysisPayload
     relief_review_checklist: ReliefReviewChecklist
     missing_items: List[MissingItemWithDocuments]

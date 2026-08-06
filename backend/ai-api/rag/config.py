@@ -17,6 +17,7 @@ COLLECTION_NAME = "legal_documents"
 LEGAL_FORMS_COLLECTION_NAME = "legal_forms"
 LEGAL_STATUTES_COLLECTION_NAME = "legal_statutes"
 LEGAL_PRECEDENTS_COLLECTION_NAME = "legal_precedents"
+LEGAL_CONSULTATIONS_COLLECTION_NAME = "legal_consultations"
 
 # 데이터 파일
 CLASSIFICATION_PATH = DATA_DIR / "case_classification.json"
