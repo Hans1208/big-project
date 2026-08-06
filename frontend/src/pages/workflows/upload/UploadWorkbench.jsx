@@ -33,6 +33,7 @@ export function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSu
   const eligibilityHelperText = getEligibilityHelperText(isLegalAidApplicant, eligibilityEvidenceSubmitted);
   return (
     <>
+      <div className="eligibilityUploadRow">
       <section className="eligibilityPanel">
         <div className="eligibilityHeader">
           <div>
@@ -98,6 +99,7 @@ export function EligibilityAndFilesSection({ legalAidType, eligibilityEvidenceSu
           </div>
         </div>
       </section>
+      </div>
     </>
   );
 }

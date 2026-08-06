@@ -720,6 +720,25 @@ button:disabled:active {
   background: var(--accent-tint);
 }
 
+/* 무료 법률구조 대상 확인(좌) · 상담 자료 추가(우)를 가로 1:1로 나란히 배치합니다. */
+.uploadPanel .eligibilityUploadRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+  margin: 16px 0 20px;
+}
+
+.uploadPanel .eligibilityUploadRow > .eligibilityPanel {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .uploadPanel .eligibilityUploadRow {
+    grid-template-columns: 1fr;
+  }
+}
+
 .eligibilityHeader {
   display: flex;
   align-items: flex-start;
