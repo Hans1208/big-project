@@ -1605,6 +1605,83 @@ def _fill_names_in_narrative(doc, replacements: list) -> tuple:
     return filled, written
 
 
+# 사망 표시와 이름 자리표시자 사이에 낄 수 있는 글자. 공백·괄호·콜론과 '망'
+# 한 글자만 허용한다("피상속인 망 △△△"). 여기에 다른 한글이 끼면 그건 서식
+# 제작자가 넣은 예시 인물의 성씨다 — "소외 망 김□□"의 '김'. 그대로 채우면
+# "망 김백승현"처럼 성이 둘인 없는 사람이 만들어진다(실측: 친생자관계부존재확인
+# 청구의 소에서 11곳이 그렇게 나왔다). 성씨가 붙어 있으면 그 자리는 우리
+# 사망자가 아니라 서식의 등장인물이므로 아예 건드리지 않는다.
+_DECEASED_SLOT_GAP_RE = re.compile(r"^[\s망:：()（）]{0,4}$")
+
+# 자리표시자 바로 뒤에 이런 글자가 오면 사람 이름칸이 아니라 주소칸이다 —
+# "유언자 ○○시 ○○구 ○○길"을 채우면 "유언자 백승현시"가 된다(실측).
+# 조사로도 쓰이는 '가'·'로'는 넣지 않는다("망 ○○○가 사망하여"를 막게 된다).
+_ADDRESS_UNIT_RE = re.compile(r"^(시|도|군|구|읍|면|동|리|길|번지|아파트|호)")
+
+
+def _fill_deceased_name_slots(doc, extracted: dict) -> tuple:
+    """"망 △△△"처럼 사망 표시 바로 뒤에 남은 이름칸을 사망자 이름으로 채운다.
+
+    상속재산포기 심판청구서에서 사건본인(사망자) 칸에는 백승현이 들어갔는데
+    청구취지·청구원인의
+
+        청구인들의 망 △△△에 대한 재산상속포기 신고는 이를 수리한다.
+        청구인들은 피상속인 망 △△△의 재산상속인으로서 …
+
+    는 비어 있었다. 두 갈래가 다 막혀 있어서다 —
+      · _fill_names_in_narrative는 라벨이 PERSON_LABELS에 있어야 채우는데
+        이 줄의 라벨은 '청구인들의망'으로 잡혀 목록에 없다.
+      · _fill_known_role_names는 '망'이 앞에 붙으면 청구인·상대방을 넣지 않고
+        (그게 맞다 — 산 청구인이 자기 상속을 포기하는 문서가 된다),
+        사망자 이름을 넣으려면 줄에 '사건본인'이라는 글자가 있어야 하는데 없다.
+
+    여기서는 사망 표시 바로 뒤에 붙은 자리표시자만 본다. 그 자리의 주인은
+    정의상 사망자라, 사람이 뒤바뀔 여지가 없다. 사이에 예시 성씨가 끼었거나
+    (_DECEASED_SLOT_GAP_RE) 뒤가 주소칸이면(_ADDRESS_UNIT_RE) 건너뛴다.
+
+    추측이 아니라 옮겨 적기다 — 추출정보에 사망자로 명시된 이름만 쓰고,
+    후보가 둘 이상이면 누구인지 못 고르므로 아예 손대지 않는다.
+
+    반환: (채운 자리 수, 바뀐 문단 텍스트 집합)"""
+    names = _known_names_by_role(extracted, DECEASED_KEY_RE)
+    if len(names) != 1:
+        return 0, set()
+    name = next(iter(names))
+
+    filled, written = 0, set()
+    for sec in doc.sections:
+        for p in sec.paragraphs:
+            runs = getattr(p, "runs", [])
+            if not runs:
+                continue
+            text = "".join(getattr(x, "text", "") or "" for x in runs)
+            # 이미 그 이름이 있는 줄은 건드리지 않는다(사건본인란 등).
+            if name in text or not NAME_PLACEHOLDER_RE.search(text):
+                continue
+            parts, cursor = [], 0
+            for label in DECEASED_LABEL_RE.finditer(text):
+                if label.end() < cursor:
+                    continue
+                slot = NAME_PLACEHOLDER_RE.search(text, max(cursor, label.end()))
+                if not slot:
+                    continue
+                if not _DECEASED_SLOT_GAP_RE.match(text[label.end():slot.start()]):
+                    continue
+                if _ADDRESS_UNIT_RE.match(text[slot.end():]):
+                    continue
+                parts.append(text[cursor:slot.start()])
+                parts.append(name)
+                cursor = slot.end()
+            if not parts:
+                continue
+            parts.append(text[cursor:])
+            new_text = "".join(parts)
+            if new_text != text and _set_paragraph_text(p, new_text):
+                filled += 1
+                written.add(new_text)
+    return filled, written
+
+
 # 관계어는 이름이 아니다. 상담에 이름이 없을 때 GPT가 이 자리에 자주 넣는다.
 RELATION_WORDS = {
     "형", "누나", "동생", "여동생", "남동생", "오빠", "언니", "누이",
@@ -2395,6 +2472,12 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
     narr_filled, narr_texts = _fill_names_in_narrative(doc, reps)
     applied += narr_filled
 
+    # 청구취지·청구원인의 "망 △△△"처럼 사망 표시 뒤에 남은 이름칸을 채운다.
+    # 문장은 건드리지 않는다 — 청구취지는 정형 문구라 다시 쓰면 청구가 사라진다.
+    deceased_filled, deceased_texts = _fill_deceased_name_slots(doc, extracted)
+    applied += deceased_filled
+    narr_texts = set(narr_texts) | deceased_texts
+
     # 값이 다 들어간 뒤, 사람 수보다 칸이 적으면 마지막 칸을 복제해 늘린다.
     # (상속인 4명인데 성명칸·배분항목이 3벌뿐인 협의서 등)
     grown_texts, grown_slots = _grow_name_slot_groups(doc, people)
@@ -2502,6 +2585,8 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="")
             # 역할별 이름으로 코드가 직접 채운 칸 수(서명란 등)와,
             # 역할을 몰라 채우지 않고 비워둔 이름칸 수.
             "role_filled": role_filled,
+            # 사망 표시 뒤 이름칸("망 △△△")에 사망자 이름을 채운 횟수.
+            "deceased_filled": deceased_filled,
             # 상담원이 확인한 이름으로 분석값을 고친 횟수.
             # 0이 계속 나오면 core-api가 이름을 안 보내고 있다는 신호다.
             "name_corrections": name_corrections,
