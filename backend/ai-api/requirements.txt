@@ -76,3 +76,4 @@ python-hwpx==4.2.0
 google-genai==2.14.0
 chromadb==1.5.9
 sentence-transformers==5.6.1
+jsonschema>=4.0

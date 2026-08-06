@@ -122,7 +122,7 @@ public class AiAnalysisService {
         // 화면에서 고친 뒤 '구조대상 판정'이나 '누락자료 점검'을 누르면, 저장 버튼을 누르지도
         // 않았는데 그 행이 AI 값으로 되돌아간다.
         AiAnalysis analysis = new AiAnalysis(consultation, summary, caseType, caseSubtype, urgencyLevel, eligible,
-                buildExtractedJson(caseAnalysis, aiResponse.consultExtracted()),
+                buildExtractedJson(caseAnalysis, aiResponse.consultExtracted(), aiResponse.outputValidation()),
                 aiResponse.missingItems().toString(), checklist.toString(),
                 null, null, timelineJson, null, null, aiResponse.rawInput().toString());
 
@@ -426,17 +426,30 @@ public class AiAnalysisService {
     // 사건분류와 STT 원문뿐이라, 초안 생성 LLM이 오타 섞인 대화록에서 이름을 눈치로
     // 뽑아 쓰게 된다 — 실제로 유언에 반대하는 형이 유언자 자리에 들어간 적이 있다.
     // analysis 층은 그 형을 '상대방(형)', 피상속인은 '미상'으로 정확히 구분해 준다.
-    private String buildExtractedJson(JsonNode caseAnalysis, JsonNode consultExtracted) {
+    private String buildExtractedJson(
+            JsonNode caseAnalysis,
+            JsonNode consultExtracted,
+            JsonNode outputValidation) {
         boolean hasStructured = consultExtracted != null && consultExtracted.isObject();
         if (!hasStructured) {
             // 구조화 분석이 실패(503 등)하면 그래프 결과만이라도 남긴다.
-            return toJsonText(caseAnalysis);
+            ObjectNode fallback = objectMapper.createObjectNode();
+            if (caseAnalysis != null && caseAnalysis.isObject()) {
+                fallback.setAll((ObjectNode) caseAnalysis);
+            }
+            if (outputValidation != null && !outputValidation.isNull()) {
+                fallback.set("output_validation", outputValidation);
+            }
+            return fallback.toString();
         }
         ObjectNode merged = objectMapper.createObjectNode();
         if (caseAnalysis != null && caseAnalysis.isObject()) {
             merged.setAll((ObjectNode) caseAnalysis);
         }
         merged.setAll((ObjectNode) consultExtracted);
+        if (outputValidation != null && !outputValidation.isNull()) {
+            merged.set("output_validation", outputValidation);
+        }
         return merged.toString();
     }
 

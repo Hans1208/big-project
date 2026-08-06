@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="780" viewBox="0 0 1400 780" role="img" aria-labelledby="title desc">
+  <title id="title">Round 1부터 Round 20까지의 검증 여정</title>
+  <desc id="desc">기반 구축, 사실충돌 보정, 관계 사실 검증, 최종 홀드아웃으로 이어지는 검증 흐름</desc>
+  <rect width="1400" height="780" fill="#0f172a"/>
+  <text x="80" y="88" fill="#f8fafc" font-family="Arial, sans-serif" font-size="40" font-weight="700">Round 1~20 검증 여정</text>
+  <text x="80" y="132" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="21">개선 데이터와 독립 홀드아웃을 분리해 과적합을 통제</text>
+  <path d="M130 405 H1270" stroke="#64748b" stroke-width="5"/>
+  <g font-family="Arial, sans-serif">
+    <circle cx="170" cy="405" r="24" fill="#2563eb"/><text x="143" y="353" fill="#dbeafe" font-size="22" font-weight="700">1~2</text><text x="105" y="462" fill="#e2e8f0" font-size="18">기반 모델</text><text x="84" y="490" fill="#94a3b8" font-size="16">Schema·E5·MLP</text>
+    <circle cx="390" cy="405" r="24" fill="#0f766e"/><text x="363" y="353" fill="#ccfbf1" font-size="22" font-weight="700">3~5</text><text x="307" y="462" fill="#e2e8f0" font-size="18">사실충돌 진단</text><text x="286" y="490" fill="#94a3b8" font-size="16">날짜·금액·확정</text>
+    <circle cx="610" cy="405" r="24" fill="#0f766e"/><text x="583" y="353" fill="#ccfbf1" font-size="22" font-weight="700">6~8</text><text x="532" y="462" fill="#e2e8f0" font-size="18">독립·경계 검증</text><text x="506" y="490" fill="#94a3b8" font-size="16">Round 8: 100%</text>
+    <circle cx="830" cy="405" r="24" fill="#854d0e"/><text x="797" y="353" fill="#fef3c7" font-size="22" font-weight="700">9~17</text><text x="742" y="462" fill="#e2e8f0" font-size="18">관계 사실 확장</text><text x="740" y="490" fill="#94a3b8" font-size="16">대리·후견·조정</text>
+    <circle cx="1050" cy="405" r="24" fill="#dc2626"/><text x="1017" y="353" fill="#fee2e2" font-size="22" font-weight="700">18</text><text x="953" y="462" fill="#e2e8f0" font-size="18">개선 재생성</text><text x="940" y="490" fill="#94a3b8" font-size="16">일치 40.00%</text>
+    <circle cx="1230" cy="405" r="24" fill="#7c3aed"/><text x="1197" y="353" fill="#ede9fe" font-size="22" font-weight="700">19~20</text><text x="1144" y="462" fill="#e2e8f0" font-size="18">독립·최종 평가</text><text x="1138" y="490" fill="#94a3b8" font-size="16">93.33% → 80.00%</text>
+  </g>
+  <rect x="85" y="585" width="1230" height="100" rx="18" fill="#1e293b"/>
+  <text x="120" y="627" fill="#f8fafc" font-family="Arial, sans-serif" font-size="23" font-weight="700">검증 원칙</text>
+  <text x="120" y="663" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="19">개선 라운드에서 미탐·오탐 유형을 발견 → 새 문장·새 ID의 독립 홀드아웃으로 확인 → Round 20 결과는 재보정하지 않고 최종 고정</text>
+  <text x="80" y="738" fill="#94a3b8" font-family="Arial, sans-serif" font-size="17">Round 11~17은 기존 기록에 라운드별 확정 집계가 없어 최종 수치 비교에서 제외</text>
+  <text x="80" y="850" font-family="Arial, sans-serif" font-size="20" fill="#536174">Round 71 최종 독립 검증 완료 · 제한적 운영 후보 승격 권고</text>
+</svg>

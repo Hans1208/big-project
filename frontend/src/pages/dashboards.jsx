@@ -1190,9 +1190,9 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
             </div>
             <div>
               <strong>AI 응답 검증</strong>
-              <span>형식: {analysis.verification?.format ? '통과' : '확인 필요'}</span>
-              <span>근거: {analysis.verification?.grounded ? '첨부자료 근거 확인' : '근거 보강 필요'}</span>
-              <span>환각 위험: {analysis.verification?.hallucinationRisk ? '확인 필요' : '낮음'}</span>
+              <span>형식: {analysis.verification?.formatLabel || '검증 미실행'}</span>
+              <span>근거: {analysis.verification?.evidenceLabel || '검증 미실행'}</span>
+              <span>환각 위험: {analysis.verification?.riskLabel || '검증 미실행'}</span>
             </div>
           </div>
         </CollapsibleSection>
