@@ -306,11 +306,13 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
         if (cancelled) return;
         hydrateConsultationsWithCoreAnalyses(results, candidateCases);
         setReviews((currentReviews) => {
-          const known = new Set(
-            currentReviews
-              .filter((item) => item.coreId && item.coreAnalysisId)
-              .map((item) => `${item.coreId}:${item.coreAnalysisId}`),
-          );
+          // 한 상담에 SUBMITTED_FOR_REVIEW 분석이 여러 건 올라온 경우 같은 건을 두 번
+          // 처리하지 않기 위한 것입니다. 예전에는 여기에 '이미 reviews에 있는 건'까지
+          // 미리 담아 두고 건너뛰었는데, 그러면 검토 요청 뒤에 저장된 내용이 변호사
+          // 화면에 영영 반영되지 않았습니다 — 상담원이 법령·판례를 담아 저장해도
+          // '담아둔 법령·판례 없음'으로 남았습니다(DB에는 들어가 있는데도).
+          // 이미 있는 건은 건너뛰는 대신, 아래 merge에서 분석 내용만 갱신합니다.
+          const known = new Set();
           // requestLegalReview는 상담(target.id) 하나당 review 행 하나만 유지합니다(재요청 시
           // 새로 추가하지 않고 기존 행을 덮어씀). 여기서도 같은 규칙을 지켜야 합니다 — 그렇지 않으면
           // 반려/수정 요청 후 상담원이 새 분석을 다시 제출했을 때, 이전 분석의 review 행을 그대로 둔 채
@@ -353,7 +355,25 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
           });
           if (!upsertsByConsultationId.size) return currentReviews;
           const existingIds = new Set(currentReviews.map((item) => item.id));
-          const merged = currentReviews.map((item) => upsertsByConsultationId.get(item.id) || item);
+          const merged = currentReviews.map((item) => {
+            const next = upsertsByConsultationId.get(item.id);
+            if (!next) return item;
+            // 같은 분석 건이 이미 화면에 있으면 진행 상태(승인/반려, 담당 변호사,
+            // 요청일)는 이 브라우저 것이 최신이므로 그대로 두고, 서버에 저장된
+            // 분석 내용만 최신으로 바꿔 끼웁니다. 통째로 덮으면 변호사가 방금 내린
+            // 결정이 '검토 대기'로 되돌아갑니다.
+            if (String(item.coreAnalysisId) === String(next.coreAnalysisId)) {
+              return {
+                ...item,
+                type: next.type,
+                summary: next.summary,
+                urgency: next.urgency,
+                eligibility: next.eligibility,
+                analysis: next.analysis,
+              };
+            }
+            return next;
+          });
           const brandNew = Array.from(upsertsByConsultationId.entries())
             .filter(([id]) => !existingIds.has(id))
             .map(([, review]) => review);
@@ -600,6 +620,13 @@ function DashboardPage({ role, currentUser, onUpdateProfile, onLogout, users, on
           analysis: { ...(item.analysis || {}), ...analysis },
           coreAnalysisId: analysisId || item.coreAnalysisId,
         }
+        : item)));
+      // 이미 검토 요청이 올라간 상담이면 변호사 화면이 들고 있는 사본도 같이 고칩니다.
+      // 그 사본은 검토 요청을 누른 그 순간의 스냅샷이라, 뒤에 담은 법령·판례는 서버에만
+      // 들어가고 변호사 화면에는 안 보였습니다. 서버에서 다시 읽어오는 경로는 상담 목록이
+      // 바뀔 때만 도는데, 같은 브라우저에서 역할만 바꾸면 그 경로가 돌지 않습니다.
+      setReviews((items) => items.map((item) => (item.id === consultation.id
+        ? { ...item, analysis: { ...(item.analysis || {}), ...analysis } }
         : item)));
       return { ok: true, synced: true, message: '분석 결과가 저장되었습니다.' };
     } catch (error) {
