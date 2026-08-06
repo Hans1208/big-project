@@ -48,8 +48,13 @@ public class AiApiClient {
     //
     // Map.of는 null을 넣으면 NPE가 나므로 빈 문자열로 바꿔 보낸다. 이름을 아직
     // 안 적은 상담이 흔해서(통화 중 접수) null이 실제로 자주 들어온다.
+    // applicantAddress/applicantPhone은 서식 작성 동의를 받고 받아둔 값이다. 법원 서식의
+    // 당사자 주소는 송달을 위한 법정 필수 기재사항이라, 이게 비면 상담원이 초안을 받아
+    // 손으로 다시 채워야 한다. 동의가 없으면 Consultation이 아예 값을 갖지 않으므로
+    // 여기로도 빈 문자열이 넘어간다 — 이 계층에서 동의를 다시 검사하지 않는 이유다.
     public JsonNode generateDraft(String formName, JsonNode extractedJson, String summary,
-                                  String applicantName, String opponentName) {
+                                  String applicantName, String opponentName,
+                                  String applicantAddress, String applicantPhone) {
         return restClient.post()
                 .uri("/forms/draft")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -58,7 +63,9 @@ public class AiApiClient {
                         "extracted", extractedJson,
                         "summary", summary,
                         "applicant_name", applicantName == null ? "" : applicantName,
-                        "opponent_name", opponentName == null ? "" : opponentName
+                        "opponent_name", opponentName == null ? "" : opponentName,
+                        "applicant_address", applicantAddress == null ? "" : applicantAddress,
+                        "applicant_phone", applicantPhone == null ? "" : applicantPhone
                 ))
                 .retrieve()
                 .body(JsonNode.class);

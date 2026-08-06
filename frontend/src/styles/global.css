@@ -12430,6 +12430,14 @@ textarea:focus-visible,
   margin-bottom: 14px;
   padding: 12px;
   border-radius: var(--r-card);
+  /* 상담 선택 드롭다운(.casePickerPopover)이 아래 카드에 덮이지 않게 합니다.
+     이 줄은 원래 sticky여서 z-index를 함께 갖고 있었는데, 스크롤을 따라오지 않게
+     sticky를 걷어낼 때 z-index도 같이 빠졌습니다. 그때부터 드롭다운을 열면
+     바로 아래 '상담받은 사람' 카드가 목록을 가렸습니다.
+     스티키는 되돌리지 않고 쌓임 순서만 되살립니다 — position이 없으면 z-index가
+     듣지 않으므로 relative만 붙입니다. */
+  position: relative;
+  z-index: 18;
 }
 
 .analysisPanel > .analysisCaseMeta {
@@ -17195,4 +17203,79 @@ body:has(.analysisPanel) {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+}
+
+/* ── 서식에 넣을 주소·전화번호 (DraftContactConsent) ──
+ *
+ * 개인정보를 받는 칸이라 다른 카드와 섞여 보이면 안 됩니다. 상담원이 "여기는
+ * 내담자에게 안내하고 동의를 받아야 하는 자리"라는 것을 한눈에 알아야 합니다.
+ * 그래서 경고색이 아니라 강조색 띠를 왼쪽에 둡니다 — 오류가 아니라 절차입니다. */
+.draftConsentPanel {
+  box-shadow: inset 4px 0 0 var(--accent), 0 0 0 1px var(--border);
+}
+
+.draftConsentCheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.draftConsentCheck input {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.draftConsentCheck > span {
+  display: grid;
+  gap: 3px;
+}
+
+.draftConsentCheck strong {
+  font-size: var(--fs-body);
+}
+
+.draftConsentCheck small,
+.draftConsentPanel .helperText {
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.5;
+}
+
+/* 상담원이 내담자에게 읽어줄 문구. 목록으로 두어 한 줄씩 짚어가며 읽을 수 있게 합니다. */
+.draftConsentScript {
+  margin: 10px 0 0;
+  padding: 10px 12px 10px 26px;
+  border-radius: var(--r-control);
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+  line-height: 1.7;
+}
+
+.draftConsentFields {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* 주소는 길고 전화번호는 짧습니다. 같은 너비로 두면 주소칸이 답답합니다. */
+.draftConsentFields .field:first-of-type {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 760px) {
+  .draftConsentFields {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+
+  .draftConsentFields .helperText {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
 }

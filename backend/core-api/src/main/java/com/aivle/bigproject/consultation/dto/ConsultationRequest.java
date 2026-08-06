@@ -25,6 +25,18 @@ public record ConsultationRequest(
         String type,
         String legalAidType,
         Boolean eligibilityEvidenceSubmitted,
+        // 서식 작성용 개인정보. 법원 서식의 당사자 주소는 송달을 위한 법정 필수
+        // 기재사항이라 이게 없으면 초안이 성립하지 않는다.
+        //
+        // 이 셋은 세트로 움직인다 — 동의가 없으면 주소·전화번호는 저장되지 않는다
+        // (Consultation.applyDraftContactInfo). 화면에서도 막지만 이 API를 직접
+        // 부르면 그 검사를 지나칠 수 있어 서버에서도 본다.
+        String clientAddress,
+        String clientPhone,
+        Boolean privacyConsent,
+        // 어느 채널에서 받은 동의인지(call / inperson). 개인정보 보호법 시행령
+        // 제17조가 인정하는 동의 방법이 채널마다 달라, 나중에 입증할 때 필요하다.
+        String privacyConsentSource,
         List<AttachmentRegistration> attachments
 ) {
     // 프론트가 S3에 직접 올린 뒤, "어디에 올렸는지"만 상담 생성 시 같이 넘기는 첨부파일 메타데이터.
