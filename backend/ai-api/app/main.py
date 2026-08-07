@@ -11,17 +11,28 @@ AI 기능 본체는 app/ai/ 아래에 파이프라인 순서대로 나뉘어 있
   forms    서식 추천·초안·검증
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai.stt.multimodal import get_whisper_model
+from app.health.rag import router as rag_health_router
 from app.routers import consult, consultations, forms, precedents, statutes
 
 app = FastAPI(title="AI API")
 
+# .env(app/ai/config.py의 load_dotenv()가 채워둠)의 CORS_ALLOWED_ORIGINS를 읽는다.
+# 운영 배포 전 반드시 이 환경변수를 실제 프론트엔드 도메인으로 교체할 것. 여러 개는 콤마로 구분.
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite 개발 서버
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,6 +43,7 @@ app.add_middleware(
 # 예전에는 /analysis 라우터가 따로 있었지만 프론트도 core-api도 부르지 않는 상태로 남아 있었고,
 # GET 쪽은 상담 id와 무관하게 계약 예시(contracts/ai_analysis_mock.json)를 그대로 돌려줘서
 # 실제 분석 결과로 오해할 수 있었다.
+app.include_router(rag_health_router)
 app.include_router(consult.router)
 app.include_router(forms.router)
 app.include_router(statutes.router)

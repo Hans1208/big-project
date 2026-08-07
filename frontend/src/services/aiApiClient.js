@@ -1,7 +1,8 @@
 // backend/ai-api(FastAPI) 서버와 통신하는 실제 HTTP 클라이언트입니다.
 // legalAidApi.js가 "백엔드 연동 전 임시 목업"이라면, 이 파일은 "실제 백엔드에 연결되는 창구" 역할을 합니다.
-// 개발 중에는 Vite 프록시(/ai-api)를 통해 호출해 localhost/127.0.0.1 차이와 CORS 문제를 피합니다.
-const AI_API_BASE_URL = import.meta.env.VITE_AI_API_BASE_URL || '/ai-api';
+// ai-api도 프론트와 같은 도메인 뒤 리버스 프록시(로컬은 Vite /ai-api, 운영은 nginx/ALB 등)로 서빙되므로
+// 항상 상대경로로 호출한다. 이러면 브라우저 입장에서 같은 오리진이라 localhost/127.0.0.1 차이나 CORS 문제가 없다.
+const AI_API_BASE_URL = '/ai-api';
 
 // 엔드포인트별 요청 제한 시간(ms). 지정하지 않으면 기본값을 씁니다.
 const DEFAULT_TIMEOUT_MS = 30_000;

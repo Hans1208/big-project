@@ -1,6 +1,8 @@
 import { readTextStorage, storageKeys } from './storage.js';
 
-const CORE_API_BASE_URL = import.meta.env.VITE_CORE_API_BASE_URL || '/core-api';
+// core-api는 프론트와 같은 도메인 뒤 리버스 프록시(로컬은 Vite, 운영은 nginx/ALB 등)로 서빙되므로
+// 항상 상대경로로 호출한다. 절대 URL로 바꾸면 브라우저가 직접 크로스오리진 요청을 하게 되어 CORS가 걸린다.
+const CORE_API_BASE_URL = '/core-api';
 
 const CORE_API_ERROR_CODE = {
   CONNECTION_FAILED: 'CORE_CONNECTION_FAILED',

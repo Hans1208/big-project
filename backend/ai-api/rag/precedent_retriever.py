@@ -10,7 +10,9 @@ from rag.config import (
     CHROMA_DB_DIR,
     LEGAL_PRECEDENTS_COLLECTION_NAME,
 )
-from rag.embedding_service import EmbeddingService
+from rag.embedding_service import (
+    get_default_embedding_service,
+)
 from rag.vector_store import ChromaVectorStore
 
 
@@ -192,7 +194,7 @@ class PrecedentRetriever:
     ) -> None:
         if embedding_service is None:
             embedding_service = (
-                EmbeddingService()
+                get_default_embedding_service()
             )
 
         if vector_store is None:

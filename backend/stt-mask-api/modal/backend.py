@@ -99,6 +99,8 @@ class Backend:
 
     @modal.asgi_app()
     def web(self):
+        import os
+
         import torch
         from fastapi import FastAPI, File, UploadFile
         from fastapi.middleware.cors import CORSMiddleware
@@ -107,9 +109,17 @@ class Backend:
 
         web_app = FastAPI()
 
+        # 운영 배포 전 반드시 CORS_ALLOWED_ORIGINS 환경변수(Modal Secret 등)로
+        # 실제 프론트엔드 도메인으로 교체할 것. 여러 개는 콤마로 구분.
+        cors_origins = [
+            origin.strip()
+            for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+            if origin.strip()
+        ]
+
         web_app.add_middleware(
             CORSMiddleware,
-            allow_origins=["http://localhost:5173"],  # Vite 개발 서버 (상담원 화면 대면상담 녹음)
+            allow_origins=cors_origins,
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],

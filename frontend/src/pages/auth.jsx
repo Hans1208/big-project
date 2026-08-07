@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BadgeCheck, Clock, FileText, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, Clock, FileText, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { roleOptions, today } from '../constants.jsx';
 import { caseCategories, legalAidBranchOffices } from '../data/domain.js';
 
@@ -37,6 +37,33 @@ export function validatePassword(password = '', email = '') {
 function buildOrganization(branch, department) {
   const trimmedDepartment = (department || '').trim();
   return trimmedDepartment ? `${branch} / ${trimmedDepartment}` : branch;
+}
+
+// 비밀번호 칸에 표시/숨김 토글을 붙입니다. 타이핑한 값을 확인할 방법이 없어 오타로 로그인·가입이
+// 반복 실패하는 문제를 줄이기 위한 것으로, 로그인·회원가입의 비밀번호 입력칸 전부가 같은 방식을 씁니다.
+function PasswordInput({ value, onChange, placeholder, ariaInvalid, ariaDescribedby }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="passwordFieldControl">
+      <input
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedby}
+      />
+      <button
+        type="button"
+        className="passwordVisibilityToggle"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? '비밀번호 숨기기' : '비밀번호 표시'}
+        aria-pressed={visible}
+      >
+        {visible ? <EyeOff size={16} strokeWidth={2.2} aria-hidden="true" /> : <Eye size={16} strokeWidth={2.2} aria-hidden="true" />}
+      </button>
+    </div>
+  );
 }
 
 function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberId, onRememberChange, onLoginChange, onRegister, onForgotPassword, onQuickLogin, consultations = [] }) {
@@ -79,7 +106,9 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
                 가사법 4대 분류 · 전국 {legalAidBranchOffices.length}개 지부 우선 운영
               </p>
             </div>
-            <div className="heroPreviewCard" aria-hidden="true">
+            {/* 점·막대는 장식이라 각자 aria-hidden으로 숨기지만, 라벨·수치(진행 중 3건 등)는
+                실제 정보라 카드 전체를 가리지 않고 그대로 읽히게 둡니다. */}
+            <div className="heroPreviewCard">
               <div className="heroPreviewHeader">
                 <strong>오늘의 상담 현황</strong>
                 <span className="heroPreviewDate">{formatDotDate(today)}</span>
@@ -129,8 +158,7 @@ function LoginPage({ loginForm, loginError, loginNotice, loginPending, rememberI
             </label>
             <label className="field">
               <span>비밀번호</span>
-              <input
-                type="password"
+              <PasswordInput
                 value={loginForm.password}
                 onChange={(event) => onLoginChange('password', event.target.value)}
                 placeholder="비밀번호 입력"
@@ -275,16 +303,18 @@ function RegisterPage({ onComplete, onBack, registerError = '', registerPending 
           <div className="formGrid">
             <label className="field">
               <span>비밀번호</span>
-              <input
+              <PasswordInput
                 value={form.password}
                 onChange={(e) => update('password', e.target.value)}
-                type="password"
                 placeholder="비밀번호 입력"
-                aria-invalid={Boolean(passwordRuleError)}
-                aria-describedby="register-password-rule"
+                ariaInvalid={Boolean(passwordRuleError)}
+                ariaDescribedby="register-password-rule"
               />
             </label>
-            <label className="field"><span>비밀번호 확인</span><input value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} type="password" placeholder="비밀번호 확인" /></label>
+            <label className="field">
+              <span>비밀번호 확인</span>
+              <PasswordInput value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} placeholder="비밀번호 확인" />
+            </label>
           </div>
           {/* 규칙은 입력 전에도 보이게 항상 띄웁니다. 틀린 뒤에야 알려주면 몇 번씩 다시 만들게 됩니다. */}
           <p className="fieldHint" id="register-password-rule">{PASSWORD_RULE_TEXT}</p>
