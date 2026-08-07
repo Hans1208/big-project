@@ -359,7 +359,7 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
         </div>
         {mode === '직접 검색' ? (
           <div className="referenceSearchBox">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`${label} 검색어`} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`${label} 검색어`} aria-label={`${label} 검색어`} />
             <button type="button" disabled={ragLoading}
               onClick={() => (isRagTab ? runRagQuery('직접 검색') : setSearched(true))}>
               {ragLoading ? '검색 중…' : '검색'}
@@ -458,7 +458,7 @@ export function SearchWorkbench({ consultations, onAnalysisSaved, onNotify }) {
                   <span>{item.referenceLabel ? `[${item.referenceLabel}] ` : ''}{item.title}</span>
                   <strong aria-label="빼기">×</strong>
                 </button>
-              )) : <p>선택된 자료가 없습니다.</p>}
+              )) : <InlineEmptyNotice>선택된 자료가 없습니다.</InlineEmptyNotice>}
             </div>
           </div>
         </div>

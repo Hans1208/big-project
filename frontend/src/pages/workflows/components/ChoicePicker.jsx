@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
+import { useDismissOnOutsideOrEscape } from '../../../hooks/useDismissOnOutsideOrEscape.js';
 
 function normalizeChoiceOptions(options) {
   return options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option));
@@ -12,8 +13,11 @@ function matchesChoiceQuery(option, query) {
 }
 
 export function ChoicePicker({ options, value, onChange, placeholder = '선택하세요', disabled = false }) {
+  const containerRef = useRef(null);
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  useDismissOnOutsideOrEscape(containerRef, open, () => setOpen(false));
   const normalizedOptions = normalizeChoiceOptions(options);
   const selected = normalizedOptions.find((option) => String(option.value) === String(value));
   const filteredOptions = normalizedOptions.filter((option) => matchesChoiceQuery(option, query));
@@ -25,13 +29,14 @@ export function ChoicePicker({ options, value, onChange, placeholder = '선택�
   };
 
   return (
-    <div className="choicePicker">
+    <div className="choicePicker" ref={containerRef}>
       <button
         className="choicePickerButton"
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
+        aria-controls={open ? listId : undefined}
       >
         <span className="choicePickerText">
           <strong>{selected?.label || placeholder}</strong>
@@ -50,7 +55,7 @@ export function ChoicePicker({ options, value, onChange, placeholder = '선택�
               placeholder="항목 검색"
             />
           </label>
-          <div className="choicePickerList">
+          <div className="choicePickerList" id={listId} aria-label="선택 항목 목록">
             {filteredOptions.length ? filteredOptions.map((option) => (
               <button
                 className={String(option.value) === String(value) ? 'choicePickerItem active' : 'choicePickerItem'}

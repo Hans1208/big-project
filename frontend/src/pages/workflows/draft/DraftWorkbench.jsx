@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ClipboardList, FileText, ListChecks, Sparkles, CheckCircle2, Star, Send, Plus, Download } from 'lucide-react';
 import { useToast } from '../../../components/feedback.jsx';
 import { useAsyncAction } from '../../../components/loading.jsx';
@@ -224,23 +224,28 @@ export function DraftWorkbench({ consultations, currentUser, role, onUpdateConsu
   // 추천 목록을 켜면 그 결과를, 끄면 전체 서식을 바탕으로 아래 3단계 필터를 겁니다.
   const baseTemplates = scopeToCase ? recommendTemplates(draftCaseType) : legalTemplateSeed;
 
-  const filteredTemplates = baseTemplates.filter((item) => {
+  // 서식이 최대 291개라 이 filter+sort를 매 렌더마다 다시 돌리면(메모 입력 같은 무관한 상태
+  // 변경에도 재실행됩니다) 느린 기기에서 눈에 띄게 밀립니다. 실제로 결과가 바뀌는 값(대상
+  // 서식 목록·필터·검색어·즐겨찾기·AI 추천)이 그대로면 이전 계산을 그대로 재사용합니다.
+  const filteredTemplates = useMemo(() => baseTemplates.filter((item) => {
     const matchesMajor = majorFilter === '전체' || item.caseCategory === majorFilter;
     const matchesMinor = minorFilter === '전체' || item.caseType === minorFilter;
     const matchesSearch = !searchText.trim() || item.templateName.includes(searchText.trim());
     return matchesMajor && matchesMinor && matchesSearch;
-  });
+  }), [baseTemplates, majorFilter, minorFilter, searchText]);
   // AI 추천(recommend-forms) 결과가 있으면 즐겨찾기보다도 먼저 보여줍니다 — 지금 이 사건에
   // 대해 실제로 추천된 서식이라 가장 눈에 잘 띄어야 합니다. rank가 있으면 그 순서를 따릅니다.
-  const aiRecommendationRank = new Map(aiRecommendations.map((item, index) => [item.form_name, item.rank ?? index]));
-  const templates = [...filteredTemplates].sort((a, b) => {
-    const aRank = aiRecommendationRank.has(a.templateName) ? aiRecommendationRank.get(a.templateName) : Infinity;
-    const bRank = aiRecommendationRank.has(b.templateName) ? aiRecommendationRank.get(b.templateName) : Infinity;
-    if (aRank !== bRank) return aRank - bRank;
-    const aFav = favorites.includes(a.templateName) ? 0 : 1;
-    const bFav = favorites.includes(b.templateName) ? 0 : 1;
-    return aFav - bFav;
-  });
+  const templates = useMemo(() => {
+    const aiRecommendationRank = new Map(aiRecommendations.map((item, index) => [item.form_name, item.rank ?? index]));
+    return [...filteredTemplates].sort((a, b) => {
+      const aRank = aiRecommendationRank.has(a.templateName) ? aiRecommendationRank.get(a.templateName) : Infinity;
+      const bRank = aiRecommendationRank.has(b.templateName) ? aiRecommendationRank.get(b.templateName) : Infinity;
+      if (aRank !== bRank) return aRank - bRank;
+      const aFav = favorites.includes(a.templateName) ? 0 : 1;
+      const bFav = favorites.includes(b.templateName) ? 0 : 1;
+      return aFav - bFav;
+    });
+  }, [filteredTemplates, aiRecommendations, favorites]);
   const selectedTemplate = templates.find((item) => item.templateName === template) || templates[0];
 
   // 상담/분석에서 추출된 값을 서식 필드에 자동 매핑하고, 값이 없는 항목은 '누락'으로 표시합니다.
@@ -545,6 +550,7 @@ export function DraftWorkbench({ consultations, currentUser, role, onUpdateConsu
                                   value={reviewContentDraft}
                                   onChange={(event) => setReviewContentDraft(event.target.value)}
                                   placeholder="서식 초안 내용을 입력하거나 고치세요."
+                                  aria-label="서식 초안 내용 편집"
                                 />
                               </div>
                               <div className="draftViewPane">
@@ -559,6 +565,7 @@ export function DraftWorkbench({ consultations, currentUser, role, onUpdateConsu
                               value={reviewNoteText}
                               onChange={(event) => setReviewNoteText(event.target.value)}
                               placeholder="내부 검토 메모 (선택)"
+                              aria-label="내부 검토 메모"
                             />
                             <div className="inlineControls">
                               <button type="button" onClick={cancelDocumentReview} disabled={reviewPending}>취소</button>
@@ -643,6 +650,7 @@ export function DraftWorkbench({ consultations, currentUser, role, onUpdateConsu
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value)}
                     placeholder="서식명 검색"
+                    aria-label="서식명 검색"
                   />
                 </div>
                 <p className="templateCount">

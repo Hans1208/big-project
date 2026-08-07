@@ -3,6 +3,7 @@ import { PhoneCall, Check, Mic, Clock, Info, Sparkles, MessageSquareText, Headph
 import { buildSuggestedQuestions, formatCallDuration } from '../shared/formatters.js';
 import { CallLiveIndicator } from '../components/CallLiveIndicator.jsx';
 import { CallAudioVisualizer } from '../components/CallAudioVisualizer.jsx';
+import { CollapsibleSection } from '../../../components/common.jsx';
 
 export function RealtimeCallControl({
   hasCase,
@@ -99,7 +100,7 @@ export function RealtimeMemoCard({ selectedCase, onUpdateConsultation, field = '
     <article className="realtimeTranscriptCard">
       <div className="realtimeTranscriptHead">
         <h3><MessageSquareText size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 실시간 상담 메모</h3>
-        <span className={`statusChip ${charCount ? 'tone-info' : 'tone-muted'}`}>
+        <span className={`statusChip ${charCount ? 'tone-info' : 'tone-muted'}`} role="status" aria-live="polite">
           {charCount ? <Check size={12} strokeWidth={2.4} aria-hidden="true" /> : <Clock size={12} strokeWidth={2.4} aria-hidden="true" />}
           {charCount ? `${charCount}자 기록됨` : '작성 전'}
         </span>
@@ -147,12 +148,17 @@ export function RealtimeSuggestedQuestions({ memoText }) {
     setAskedQuestions((current) => current.includes(question) ? current.filter((item) => item !== question) : [...current, question]);
   };
 
+  // 통화 중 지금 당장 해야 하는 일은 메모 입력이고, 이 추천 질문은 참고용 보조 자료입니다.
+  // 예전엔 항상 펼쳐진 채로 메모 카드와 같은 무게로 나란히 있어, 질문이 몇 개만 있어도
+  // 화면이 한 번에 다 봐야 할 것처럼 빽빽해 보였습니다. 접어두고 제목만 보이게 해
+  // 필요할 때 한 번 눌러 펼치는 참고 자료로 낮춥니다(내용·기능은 그대로, 클릭 한 번 거리).
   return (
-    <article className="realtimeQuestionsCard">
-      <div className="realtimeTranscriptHead">
-        <h3><Sparkles size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> AI 추천 추가 질문</h3>
-        <span className="statusChip tone-info"><Info size={12} strokeWidth={2.4} aria-hidden="true" />통화 중 참고용</span>
-      </div>
+    <CollapsibleSection
+      className="realtimeQuestionsCard"
+      icon={Sparkles}
+      title="AI 추천 추가 질문"
+      badge={<span className="statusChip tone-info"><Info size={12} strokeWidth={2.4} aria-hidden="true" />통화 중 참고용</span>}
+    >
       <p className="helperText">메모 기반 질문 후보 · 상담원이 선택</p>
       <div className="realtimeQuestionList">
         {suggestions.map((question) => {
@@ -171,7 +177,7 @@ export function RealtimeSuggestedQuestions({ memoText }) {
           );
         })}
       </div>
-    </article>
+    </CollapsibleSection>
   );
 }
 
@@ -216,7 +222,7 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
     <section className="realtimeWorkbenchPanel roleAccent-counselor" aria-label="실시간 상담 메모">
       <div className="realtimeWorkbenchHeader">
         <div className="realtimeHeaderTags">
-          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
+          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담 진행</span>
           <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
         </div>
       </div>
