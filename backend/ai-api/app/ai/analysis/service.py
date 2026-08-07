@@ -158,6 +158,37 @@ def analyze(consult_text: str) -> ConsultAnalysis:
     )
 
 
+# 서식 작성용으로 뽑는 키들.
+#
+# 계약(contracts/README_ai_analysis_contract.md 4절)은 extracted_json을 '유연
+# key-value'로 두고 당사자·금액·날짜·사건개요를 '권장' 키로만 적어 두었는데,
+# 출력 검증 스키마(aioutputvalidation/schema/ai_analysis.schema.json)는 그 넷을
+# required + additionalProperties:false로 못박아 두었다. 그래서 아래 셋을 그대로
+# 넘기면 "Additional properties are not allowed"로 모든 분석이 형식 오류가 된다
+# (실측 1건). 스키마를 계약대로 완화하는 게 맞지만 그건 검증 모델 쪽 결정이라,
+# 그때까지 검증기에 넘기는 사본에서만 뺀다.
+#
+# 저장·화면에 쓰는 원본은 건드리지 않는다 — 동의 화면이 이 값으로 주소·전화칸을
+# 미리 채운다(DraftContactConsent).
+DRAFT_CONTACT_KEYS = ("주소", "전화번호", "개인정보동의")
+
+
+def without_draft_contact(output: dict) -> dict:
+    """출력 검증에 넘길 사본에서 서식용 연락처 키를 뺀다. 원본은 그대로 둔다."""
+    if not isinstance(output, dict):
+        return output
+    extracted = output.get("extracted_json")
+    if not isinstance(extracted, dict):
+        return output
+    if not any(k in extracted for k in DRAFT_CONTACT_KEYS):
+        return output
+    return {
+        **output,
+        "extracted_json": {k: v for k, v in extracted.items()
+                           if k not in DRAFT_CONTACT_KEYS},
+    }
+
+
 # "주소(서울시 …)"처럼 괄호로 덧붙인 모양. 값을 지우면 빈 괄호가 남으므로 괄호째 지운다.
 _CONTACT_PAREN_RE = "[(（][^)）]*{}[^)）]*[)）]"
 
