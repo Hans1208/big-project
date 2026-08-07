@@ -13,9 +13,17 @@ from transformers import pipeline
 
 app = FastAPI()
 
+# 운영 배포 전 반드시 CORS_ALLOWED_ORIGINS 환경변수로 실제 프론트엔드 도메인으로 교체할 것.
+# 여러 개는 콤마로 구분. 미설정 시 로컬 Vite 개발 서버(5173) 기준으로 동작한다.
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite 개발 서버 (상담원 화면 대면상담 녹음)
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
