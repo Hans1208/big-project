@@ -1,4 +1,7 @@
 import asyncio
+import logging
+
+from time import perf_counter
 
 from fastapi import APIRouter
 
@@ -15,6 +18,9 @@ from app.ai.consult.schemas import (
 from app.ai.stt import extract as stt_extract
 
 
+logger = logging.getLogger(__name__)
+
+
 router = APIRouter(
     prefix="/consult",
     tags=["consult"],
@@ -29,6 +35,7 @@ async def analyze_consult(
     payload: RawInput,
 ) -> dict:
     """Run the consultation analysis pipeline once."""
+    request_started = perf_counter()
     content = payload.content.model_dump()
 
     # 1) Extract text from attached files.
@@ -39,10 +46,25 @@ async def analyze_consult(
             )
         )
     )
-    extracted = await asyncio.to_thread(
-        stt_extract.extract_all,
-        file_links,
-    )
+    extract_started = perf_counter()
+
+    try:
+        extracted = await asyncio.to_thread(
+            stt_extract.extract_all,
+            file_links,
+        )
+    finally:
+        logger.info(
+            (
+                "consult_analyze_stage "
+                "stage=extract "
+                "elapsed_ms=%.2f"
+            ),
+            (
+                perf_counter()
+                - extract_started
+            ) * 1000,
+        )
 
     # 2) Existing analysis and consult graphs may use raw
     # consultation text according to their existing contract.
@@ -53,10 +75,25 @@ async def analyze_consult(
             extracted.text,
         )
     )
-    analysis = await asyncio.to_thread(
-        analysis_service.analyze,
-        consult_text,
-    )
+    analysis_started = perf_counter()
+
+    try:
+        analysis = await asyncio.to_thread(
+            analysis_service.analyze,
+            consult_text,
+        )
+    finally:
+        logger.info(
+            (
+                "consult_analyze_stage "
+                "stage=analysis "
+                "elapsed_ms=%.2f"
+            ),
+            (
+                perf_counter()
+                - analysis_started
+            ) * 1000,
+        )
 
     # 판정 계층도 같은 원문을 본다. 주민등록번호·전화번호는 여기서도 지운다 -
     # 구조대상 판단과 누락자료 목록에 번호가 실려 나갈 이유가 없고, 실측에서
@@ -84,36 +121,118 @@ async def analyze_consult(
     }
 
     # The graph and RAG search are independent.
-    # Run the async graph and blocking RAG search
-    # concurrently without weakening the RAG
-    # anonymized-text privacy boundary.
-    result, legal_sources = (
-        await asyncio.gather(
-            run_consult_analysis(
+    # Run both concurrently and record their
+    # timings separately.
+    async def run_graph_with_timing():
+        graph_started = perf_counter()
+
+        try:
+            return await run_consult_analysis(
                 graph_state
-            ),
-            asyncio.to_thread(
+            )
+        finally:
+            logger.info(
+                (
+                    "consult_analyze_stage "
+                    "stage=consult_graph "
+                    "elapsed_ms=%.2f"
+                ),
+                (
+                    perf_counter()
+                    - graph_started
+                ) * 1000,
+            )
+
+    async def run_rag_with_timing():
+        rag_started = perf_counter()
+
+        try:
+            return await asyncio.to_thread(
                 collect_related_legal_sources,
                 content=content,
                 top_n=5,
-            ),
+            )
+        finally:
+            logger.info(
+                (
+                    "consult_analyze_stage "
+                    "stage=rag "
+                    "elapsed_ms=%.2f"
+                ),
+                (
+                    perf_counter()
+                    - rag_started
+                ) * 1000,
+            )
+
+    result, legal_sources = (
+        await asyncio.gather(
+            run_graph_with_timing(),
+            run_rag_with_timing(),
         )
     )
 
     # Output validation may load and execute
     # local model code, so keep it off the
     # event-loop thread as well.
-    output_validation = (
-        await asyncio.to_thread(
-            validate_consultation_output,
-            analysis_output=(
-                analysis_service
-                .without_draft_contact(
-                    analysis.output
-                )
-            ),
-            legal_sources=legal_sources,
+    validation_started = perf_counter()
+
+    try:
+        output_validation = (
+            await asyncio.to_thread(
+                validate_consultation_output,
+                analysis_output=(
+                    analysis_service
+                    .without_draft_contact(
+                        analysis.output
+                    )
+                ),
+                legal_sources=legal_sources,
+            )
         )
+    finally:
+        logger.info(
+            (
+                "consult_analyze_stage "
+                "stage=output_validation "
+                "elapsed_ms=%.2f"
+            ),
+            (
+                perf_counter()
+                - validation_started
+            ) * 1000,
+        )
+
+    logger.info(
+        (
+            "consult_analyze_completed "
+            "total_ms=%.2f "
+            "statutes=%d "
+            "precedents=%d "
+            "consultations=%d"
+        ),
+        (
+            perf_counter()
+            - request_started
+        ) * 1000,
+        len(
+            legal_sources.get(
+                "related_statutes"
+            )
+            or []
+        ),
+        len(
+            legal_sources.get(
+                "related_precedents"
+            )
+            or []
+        ),
+        len(
+            legal_sources.get(
+                "related_consultations"
+            )
+            or []
+        ),
     )
 
     return {
