@@ -11,6 +11,8 @@ AI 기능 본체는 app/ai/ 아래에 파이프라인 순서대로 나뉘어 있
   forms    서식 추천·초안·검증
 """
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,9 +21,17 @@ from app.routers import consult, consultations, forms, precedents, statutes
 
 app = FastAPI(title="AI API")
 
+# .env(app/ai/config.py의 load_dotenv()가 채워둠)의 CORS_ALLOWED_ORIGINS를 읽는다.
+# 운영 배포 전 반드시 이 환경변수를 실제 프론트엔드 도메인으로 교체할 것. 여러 개는 콤마로 구분.
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite 개발 서버
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
