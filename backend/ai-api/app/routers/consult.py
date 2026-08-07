@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter
 
 from app.ai.analysis import service as analysis_service
@@ -37,8 +39,9 @@ async def analyze_consult(
             )
         )
     )
-    extracted = stt_extract.extract_all(
-        file_links
+    extracted = await asyncio.to_thread(
+        stt_extract.extract_all,
+        file_links,
     )
 
     # 2) Existing analysis and consult graphs may use raw
@@ -50,8 +53,9 @@ async def analyze_consult(
             extracted.text,
         )
     )
-    analysis = analysis_service.analyze(
-        consult_text
+    analysis = await asyncio.to_thread(
+        analysis_service.analyze,
+        consult_text,
     )
 
     # 판정 계층도 같은 원문을 본다. 주민등록번호·전화번호는 여기서도 지운다 -
@@ -63,32 +67,53 @@ async def analyze_consult(
         "summary": scrub(content.get("summary", "")),
         "details": scrub(content.get("details", "")),
     }
-    result = await run_consult_analysis(
-        {
-            "content": safe_content,
-            "extracted": {
-                # texts/text는 첨부에서 뽑은 본문이라 지운다.
-                # details는 파일별 처리 상태(파일명·성공여부)라 본문이 없다.
-                "texts": [scrub(t) for t in (extracted.texts or [])],
-                "details": extracted.details,
-                "text": scrub(extracted.text or ""),
-            },
-        }
-    )
 
-    # 3) RAG has a stricter privacy boundary.
-    # It reads only content.anonymized_text and never
-    # falls back to summary, details, or attachment text.
-    legal_sources = (
-        collect_related_legal_sources(
-            content=content,
-            top_n=5,
+    graph_state = {
+        "content": safe_content,
+        "extracted": {
+            "texts": [
+                scrub(text)
+                for text
+                in (extracted.texts or [])
+            ],
+            "details": extracted.details,
+            "text": scrub(
+                extracted.text or ""
+            ),
+        },
+    }
+
+    # The graph and RAG search are independent.
+    # Run the async graph and blocking RAG search
+    # concurrently without weakening the RAG
+    # anonymized-text privacy boundary.
+    result, legal_sources = (
+        await asyncio.gather(
+            run_consult_analysis(
+                graph_state
+            ),
+            asyncio.to_thread(
+                collect_related_legal_sources,
+                content=content,
+                top_n=5,
+            ),
         )
     )
-    # 서식 작성용 연락처 키는 빼고 넘긴다(analysis_service.without_draft_contact 주석 참고).
-    output_validation = validate_consultation_output(
-        analysis_output=analysis_service.without_draft_contact(analysis.output),
-        legal_sources=legal_sources,
+
+    # Output validation may load and execute
+    # local model code, so keep it off the
+    # event-loop thread as well.
+    output_validation = (
+        await asyncio.to_thread(
+            validate_consultation_output,
+            analysis_output=(
+                analysis_service
+                .without_draft_contact(
+                    analysis.output
+                )
+            ),
+            legal_sources=legal_sources,
+        )
     )
 
     return {
