@@ -988,6 +988,10 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         ) : null}
         {analyzed ? (
           <>
+          {/* 스키마 오류가 하나라도 있으면 validator가 환각 위험을 무조건 '높음'으로
+              내린다(if errors or probability >= threshold: decision = "high_risk").
+              그래서 형식과 환각 위험이 늘 함께 빨갛게 뜬다 — 환각을 의심하기 전에
+              형식부터 보면 된다. */}
           <div className="resultInlineRow">
                 <h3>AI 응답 검증</h3>
                 <span className={`statusChip ${analysis.verification?.format === true ? 'tone-success' : analysis.verification?.format === false ? 'tone-danger' : 'tone-muted'}`}>
