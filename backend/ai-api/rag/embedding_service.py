@@ -1,6 +1,8 @@
-﻿"""로컬 Sentence Transformer 기반 임베딩 서비스."""
+"""로컬 Sentence Transformer 기반 임베딩 서비스."""
 
 from __future__ import annotations
+
+from functools import lru_cache
 
 from typing import Any, Sequence
 
@@ -70,3 +72,8 @@ class EmbeddingService:
         )
 
         return vectors[0].tolist()
+
+@lru_cache(maxsize=1)
+def get_default_embedding_service() -> EmbeddingService:
+    """Return the process-wide lazy embedding service."""
+    return EmbeddingService()

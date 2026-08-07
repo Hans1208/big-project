@@ -1,3 +1,8 @@
+import asyncio
+import logging
+
+from time import perf_counter
+
 from fastapi import APIRouter
 
 from app.ai.analysis import service as analysis_service
@@ -11,6 +16,9 @@ from app.ai.consult.schemas import (
     RawInput,
 )
 from app.ai.stt import extract as stt_extract
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -27,6 +35,7 @@ async def analyze_consult(
     payload: RawInput,
 ) -> dict:
     """Run the consultation analysis pipeline once."""
+    request_started = perf_counter()
     content = payload.content.model_dump()
 
     # 1) Extract text from attached files.
@@ -37,9 +46,25 @@ async def analyze_consult(
             )
         )
     )
-    extracted = stt_extract.extract_all(
-        file_links
-    )
+    extract_started = perf_counter()
+
+    try:
+        extracted = await asyncio.to_thread(
+            stt_extract.extract_all,
+            file_links,
+        )
+    finally:
+        logger.info(
+            (
+                "consult_analyze_stage "
+                "stage=extract "
+                "elapsed_ms=%.2f"
+            ),
+            (
+                perf_counter()
+                - extract_started
+            ) * 1000,
+        )
 
     # 2) Existing analysis and consult graphs may use raw
     # consultation text according to their existing contract.
@@ -50,9 +75,25 @@ async def analyze_consult(
             extracted.text,
         )
     )
-    analysis = analysis_service.analyze(
-        consult_text
-    )
+    analysis_started = perf_counter()
+
+    try:
+        analysis = await asyncio.to_thread(
+            analysis_service.analyze,
+            consult_text,
+        )
+    finally:
+        logger.info(
+            (
+                "consult_analyze_stage "
+                "stage=analysis "
+                "elapsed_ms=%.2f"
+            ),
+            (
+                perf_counter()
+                - analysis_started
+            ) * 1000,
+        )
 
     # 판정 계층도 같은 원문을 본다. 주민등록번호·전화번호는 여기서도 지운다 -
     # 구조대상 판단과 누락자료 목록에 번호가 실려 나갈 이유가 없고, 실측에서
@@ -63,32 +104,135 @@ async def analyze_consult(
         "summary": scrub(content.get("summary", "")),
         "details": scrub(content.get("details", "")),
     }
-    result = await run_consult_analysis(
-        {
-            "content": safe_content,
-            "extracted": {
-                # texts/text는 첨부에서 뽑은 본문이라 지운다.
-                # details는 파일별 처리 상태(파일명·성공여부)라 본문이 없다.
-                "texts": [scrub(t) for t in (extracted.texts or [])],
-                "details": extracted.details,
-                "text": scrub(extracted.text or ""),
-            },
-        }
-    )
 
-    # 3) RAG has a stricter privacy boundary.
-    # It reads only content.anonymized_text and never
-    # falls back to summary, details, or attachment text.
-    legal_sources = (
-        collect_related_legal_sources(
-            content=content,
-            top_n=5,
+    graph_state = {
+        "content": safe_content,
+        "extracted": {
+            "texts": [
+                scrub(text)
+                for text
+                in (extracted.texts or [])
+            ],
+            "details": extracted.details,
+            "text": scrub(
+                extracted.text or ""
+            ),
+        },
+    }
+
+    # The graph and RAG search are independent.
+    # Run both concurrently and record their
+    # timings separately.
+    async def run_graph_with_timing():
+        graph_started = perf_counter()
+
+        try:
+            return await run_consult_analysis(
+                graph_state
+            )
+        finally:
+            logger.info(
+                (
+                    "consult_analyze_stage "
+                    "stage=consult_graph "
+                    "elapsed_ms=%.2f"
+                ),
+                (
+                    perf_counter()
+                    - graph_started
+                ) * 1000,
+            )
+
+    async def run_rag_with_timing():
+        rag_started = perf_counter()
+
+        try:
+            return await asyncio.to_thread(
+                collect_related_legal_sources,
+                content=content,
+                top_n=5,
+            )
+        finally:
+            logger.info(
+                (
+                    "consult_analyze_stage "
+                    "stage=rag "
+                    "elapsed_ms=%.2f"
+                ),
+                (
+                    perf_counter()
+                    - rag_started
+                ) * 1000,
+            )
+
+    result, legal_sources = (
+        await asyncio.gather(
+            run_graph_with_timing(),
+            run_rag_with_timing(),
         )
     )
-    # 서식 작성용 연락처 키는 빼고 넘긴다(analysis_service.without_draft_contact 주석 참고).
-    output_validation = validate_consultation_output(
-        analysis_output=analysis_service.without_draft_contact(analysis.output),
-        legal_sources=legal_sources,
+
+    # Output validation may load and execute
+    # local model code, so keep it off the
+    # event-loop thread as well.
+    validation_started = perf_counter()
+
+    try:
+        output_validation = (
+            await asyncio.to_thread(
+                validate_consultation_output,
+                analysis_output=(
+                    analysis_service
+                    .without_draft_contact(
+                        analysis.output
+                    )
+                ),
+                legal_sources=legal_sources,
+            )
+        )
+    finally:
+        logger.info(
+            (
+                "consult_analyze_stage "
+                "stage=output_validation "
+                "elapsed_ms=%.2f"
+            ),
+            (
+                perf_counter()
+                - validation_started
+            ) * 1000,
+        )
+
+    logger.info(
+        (
+            "consult_analyze_completed "
+            "total_ms=%.2f "
+            "statutes=%d "
+            "precedents=%d "
+            "consultations=%d"
+        ),
+        (
+            perf_counter()
+            - request_started
+        ) * 1000,
+        len(
+            legal_sources.get(
+                "related_statutes"
+            )
+            or []
+        ),
+        len(
+            legal_sources.get(
+                "related_precedents"
+            )
+            or []
+        ),
+        len(
+            legal_sources.get(
+                "related_consultations"
+            )
+            or []
+        ),
     )
 
     return {

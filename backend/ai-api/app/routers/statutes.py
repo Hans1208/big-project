@@ -33,14 +33,9 @@ RECOMMEND_TOP_K = 5
 # explainer에 맡긴다. 조문 평균 본문이 175자라 30건이어도 프롬프트는 6천 자
 # 안쪽이고, LLM 호출 횟수는 그대로 한 번이다.
 RECOMMEND_CANDIDATE_K = 30
-# '직접 검색'은 상담원이 검색어를 넣어 찾는 것이라, 우리가 몇 건까지만 보라고
-# 자를 이유가 없다 - 찾는 것이 101위였을 때 "없다"고 결론내게 된다. 색인이 가진
-# 만큼 다 내주고, 어디까지 볼지는 화면에서 스크롤로 정하게 한다.
-#
-# 색인 크기(조문 2,289청크 / 판례 342건)보다 크게 잡아 사실상 상한이 없게 둔다.
-# 그래도 값을 남겨두는 것은, 잘못된 요청 하나가 서버를 통째로 붙잡는 것을 막기
-# 위해서다.
-MAX_TOP_K = 3000
+# Cap direct searches so one oversized request cannot monopolize the server.
+# The normal default remains 20; only excessive requests are reduced.
+MAX_TOP_K = 100
 
 
 def _to_card(row: dict) -> dict:

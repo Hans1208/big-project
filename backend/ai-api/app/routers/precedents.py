@@ -31,10 +31,9 @@ router = APIRouter(prefix="/precedents", tags=["precedents"])
 SEARCH_TOP_K = 20
 RECOMMEND_TOP_K = 5
 RECOMMEND_CANDIDATE_K = 30
-# 직접 검색은 건수를 우리가 자르지 않는다(statutes.py의 같은 상수 주석 참고).
-# 색인 전체가 판례 342건이라 그보다 크게 잡아 사실상 상한을 없앤다. 값을
-# 남겨두는 것은 잘못된 요청 하나가 서버를 붙잡는 것을 막기 위해서다.
-MAX_TOP_K = 3000
+# Cap direct searches so one oversized request cannot monopolize the server.
+# The normal default remains 20; only excessive requests are reduced.
+MAX_TOP_K = 100
 
 # 사건 단위 중복 제거로 줄어드는 몫을 미리 더 받는다. 한 사건이 판시사항·요약·
 # 전문으로 서너 청크가 되므로, 청크를 그만큼 더 받아야 사건 수가 채워진다.

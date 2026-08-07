@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ai.stt.multimodal import get_whisper_model
+from app.health.rag import router as rag_health_router
 from app.routers import consult, consultations, forms, precedents, statutes
 
 app = FastAPI(title="AI API")
@@ -42,6 +43,7 @@ app.add_middleware(
 # 예전에는 /analysis 라우터가 따로 있었지만 프론트도 core-api도 부르지 않는 상태로 남아 있었고,
 # GET 쪽은 상담 id와 무관하게 계약 예시(contracts/ai_analysis_mock.json)를 그대로 돌려줘서
 # 실제 분석 결과로 오해할 수 있었다.
+app.include_router(rag_health_router)
 app.include_router(consult.router)
 app.include_router(forms.router)
 app.include_router(statutes.router)
