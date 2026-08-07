@@ -21,7 +21,18 @@ public class CallRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(CallRegistry.class);
 
+    // 실제 외부 통화 없이도 오퍼레이터 오디오 파이프라인(티켓 발급 → WS 연결 → 마이크 전송)을
+    // 확인할 수 있도록 항상 열려 있는 디버그 전용 callId. 외부 레그가 없어서 relayToExternal이
+    // 이 callId를 특별 취급해 오퍼레이터가 보낸 오디오를 그대로 되돌려 보낸다(서버 에코).
+    public static final String DEBUG_LOOPBACK_CALL_ID = "debug-loopback";
+
     private final Map<String, Call> calls = new ConcurrentHashMap<>();
+
+    public CallRegistry() {
+        // externalSession 없이 등록해둔다 — registerExternalCall이 putIfAbsent라서 이후 이
+        // callId로 진짜 외부 연결이 들어와도 거부되고, 이 항목은 항상 목록에 남는다.
+        calls.put(DEBUG_LOOPBACK_CALL_ID, new Call(DEBUG_LOOPBACK_CALL_ID, null));
+    }
 
     // 같은 callId로 이미 통화가 있으면 등록을 거부한다(중복 연결).
     boolean registerExternalCall(String callId, WebSocketSession externalSession) {
@@ -64,6 +75,10 @@ public class CallRegistry {
     }
 
     void relayToExternal(String callId, ByteBuffer payload) {
+        if (DEBUG_LOOPBACK_CALL_ID.equals(callId)) {
+            relayToOperator(callId, payload);
+            return;
+        }
         Call call = calls.get(callId);
         if (call != null) {
             sendQuietly(call.externalSession(), payload);
