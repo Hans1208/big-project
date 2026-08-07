@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
+import { FileCheck2, IdCard, Mic } from 'lucide-react';
 import { useToast } from '../../../components/feedback.jsx';
 import { uploadCategoryOptions, uploadCategoryAccept, fileMatchesCategory } from '../shared/attachmentHelpers.js';
+
+const uploadCategoryIcons = {
+  '녹취록': Mic,
+  '신분증': IdCard,
+  '증빙자료': FileCheck2,
+};
 
 export function FileDropzone({ category, onCategoryChange, onAddFiles }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -41,15 +48,21 @@ export function FileDropzone({ category, onCategoryChange, onAddFiles }) {
         <div className="fileDropzoneStep">
           <div className="fileCategoryChoices" role="group" aria-label="자료 유형 선택">
             {uploadCategoryOptions.map((option) => (
-              <button
-                className={category === option ? 'active' : ''}
-                type="button"
-                key={option}
-                aria-pressed={category === option}
-                onClick={() => { onCategoryChange(option); setFileError(''); }}
-              >
-                {option}
-              </button>
+              (() => {
+                const CategoryIcon = uploadCategoryIcons[option] || FileCheck2;
+                return (
+                  <button
+                    className={category === option ? 'active' : ''}
+                    type="button"
+                    key={option}
+                    aria-pressed={category === option}
+                    onClick={() => { onCategoryChange(option); setFileError(''); }}
+                  >
+                    <CategoryIcon size={14} strokeWidth={2.2} aria-hidden="true" />
+                    {option}
+                  </button>
+                );
+              })()
             ))}
           </div>
         </div>

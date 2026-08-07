@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { X, FileText } from 'lucide-react';
 import {
   fetchConsultationFullText, fetchPrecedentFullText, fetchStatuteFullText,
@@ -16,6 +16,8 @@ import { friendlyErrorMessage } from '../../../components/common.jsx';
 // 그래서 '전문 보기'는 카드 안에서 펼치지 않고, 서버에서 문서 전체를 다시 받아
 // 이 창에 띄웁니다. 목록을 벗어나지 않으면서 원문을 끝까지 읽을 수 있습니다.
 export function FullTextModal({ item, referenceType, onClose }) {
+  const closeButtonRef = useRef(null);
+  const titleId = useId();
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [text, setText] = useState('');
   const [message, setMessage] = useState('');
@@ -58,6 +60,10 @@ export function FullTextModal({ item, referenceType, onClose }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
   if (!item) return null;
 
   return (
@@ -66,15 +72,15 @@ export function FullTextModal({ item, referenceType, onClose }) {
         className="modal fullTextModal"
         role="dialog"
         aria-modal="true"
-        aria-label={`${item.title} 원문`}
+        aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="fullTextModalHead">
           <div>
-            <h2><FileText size={16} strokeWidth={2.2} aria-hidden="true" /> {item.title}</h2>
+            <h2 id={titleId}><FileText size={16} strokeWidth={2.2} aria-hidden="true" /> {item.title}</h2>
             <p>{item.source}{item.effectiveDate ? ` · ${item.effectiveDate}` : ''}</p>
           </div>
-          <button type="button" className="fullTextModalClose" onClick={onClose} aria-label="닫기">
+          <button type="button" className="fullTextModalClose" onClick={onClose} aria-label="닫기" ref={closeButtonRef}>
             <X size={18} strokeWidth={2.4} aria-hidden="true" />
           </button>
         </div>

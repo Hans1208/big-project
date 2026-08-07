@@ -57,14 +57,29 @@ function buildTranscriptChunk(segments, field) {
 // 이어붙이면 이전 상담 내용과 새 상담 내용이 뒤섞입니다. 그렇다고 묻지도 않고 지우면 실수로
 // 다시 누른 경우 되돌릴 수 없이 날아갑니다 — 그래서 확인 팝업을 거칩니다.
 function RestartRecordingConfirmModal({ onConfirm, onCancel }) {
+  const confirmButtonRef = useRef(null);
+  useEffect(() => {
+    confirmButtonRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCancel]);
   return (
-    <div className="modalBackdrop" role="presentation">
-      <div className="modal">
-        <div className="modalHeader"><h2>녹음 재시작</h2></div>
+    <div className="modalBackdrop" role="presentation" onClick={onCancel}>
+      <div
+        className="modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="restart-recording-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modalHeader"><h2 id="restart-recording-title">녹음 재시작</h2></div>
         <p>녹음을 재시작하면 기존 녹음자료들이 사라집니다.</p>
         <div className="restartConfirmActions">
           <button className="restartConfirmButton" type="button" onClick={onCancel}>아니오</button>
-          <button className="restartConfirmButton" type="button" onClick={onConfirm}>네</button>
+          <button className="restartConfirmButton" type="button" ref={confirmButtonRef} onClick={onConfirm}>네</button>
         </div>
       </div>
     </div>
