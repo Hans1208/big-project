@@ -85,7 +85,11 @@ async def analyze_consult(
             top_n=5,
         )
     )
-    output_validation = validate_consultation_output(analysis_output=analysis.output, legal_sources=legal_sources)
+    # 서식 작성용 연락처 키는 빼고 넘긴다(analysis_service.without_draft_contact 주석 참고).
+    output_validation = validate_consultation_output(
+        analysis_output=analysis_service.without_draft_contact(analysis.output),
+        legal_sources=legal_sources,
+    )
 
     return {
         **result,
