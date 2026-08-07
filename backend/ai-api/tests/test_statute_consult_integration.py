@@ -22,6 +22,9 @@ class FakeAnalysis:
         ),
     }
     timeline = []
+    # 출력 검증(validate_consultation_output)이 읽는 원본 분석 결과.
+    # 이 스텁이 안 갖고 있으면 라우터가 AttributeError로 죽는다.
+    output = None
 
     def to_dict(self):
         return {
