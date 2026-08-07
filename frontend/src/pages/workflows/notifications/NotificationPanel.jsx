@@ -45,16 +45,16 @@ export function NotificationPanel({ role, currentUser, notifications = [], onRea
           <div className="notificationList">
             {roleNotifications.map((item) => {
               const unread = !item.readBy?.includes(role) && !item.readBy?.includes(notificationKey);
+              // 예전엔 이 <article> 전체가 role="button"이면서 그 안에 진짜 <button>(삭제)이
+              // 또 있어, 스크린리더가 "버튼 안에 버튼"을 읽는 잘못된 구조였습니다. 마우스로는
+              // 여전히 행 어디를 눌러도 열리도록 onClick만 남기고(역할 없는 일반 클릭이라
+              // 문제 없음), 키보드·스크린리더 사용자를 위한 진짜 버튼을 "바로 처리/내용 보기"
+              // 자리에 따로 둡니다 — 삭제 버튼과 나란한 형제 버튼이라 중첩되지 않습니다.
               return (
                 <article
                   className={unread ? 'notificationItem unread' : 'notificationItem read'}
                   key={item.id}
-                  role="button"
-                  tabIndex={0}
                   onClick={() => onOpenNotification?.(item)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') onOpenNotification?.(item);
-                  }}
                 >
                   <div className="notificationItemTop">
                     <strong className="notificationItemTitle">
@@ -66,7 +66,13 @@ export function NotificationPanel({ role, currentUser, notifications = [], onRea
                   </div>
                   <p className="notificationItemMessage">{item.message}</p>
                   <div className="notificationActions">
-                    <span className="notificationState">{unread ? '바로 처리 ›' : '내용 보기'}</span>
+                    <button
+                      type="button"
+                      className="notificationState"
+                      onClick={(event) => { event.stopPropagation(); onOpenNotification?.(item); }}
+                    >
+                      {unread ? '바로 처리 ›' : '내용 보기'}
+                    </button>
                     <button className="notificationDelete" type="button" onClick={(event) => handleDelete(event, item, unread)}><Trash2 size={12} strokeWidth={2.4} aria-hidden="true" /> 삭제</button>
                   </div>
                 </article>

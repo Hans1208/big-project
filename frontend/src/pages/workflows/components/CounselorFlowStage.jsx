@@ -1,5 +1,5 @@
 import React from 'react';
-import { Radio, FileAudio2, ChevronRight } from 'lucide-react';
+import { Radio, FileAudio2, ChevronRight, Check } from 'lucide-react';
 
 // 오른쪽 2단계 카드는 예전엔 왼쪽 문단이 말로 설명하는 내용을 그림으로 다시 보여주기만 해서
 // 있으나 마나 했습니다. 지금은 '지금 여기' 표시뿐 아니라, 지금 있지 않은 단계를 눌러 바로
@@ -21,6 +21,7 @@ export function CounselorFlowStage({ current = 'realtime', onNavigate }) {
       detail: '통화 후 자료 정리 · 변호사 검토 전달',
     },
   ];
+  const activeIndex = Math.max(0, stages.findIndex((stage) => stage.key === current));
 
   return (
     <section className="flowStageBanner" aria-label="상담원 업무 단계">
@@ -39,10 +40,11 @@ export function CounselorFlowStage({ current = 'realtime', onNavigate }) {
         {stages.map((stage, index) => {
           const Icon = stage.icon;
           const active = current === stage.key;
+          const complete = index < activeIndex;
           const canNavigate = !active && Boolean(onNavigate);
           return (
             <article
-              className={active ? 'flowStageStep active' : canNavigate ? 'flowStageStep linkable' : 'flowStageStep'}
+              className={`flowStageStep${active ? ' active' : ''}${complete ? ' complete' : ''}${canNavigate ? ' linkable' : ''}`}
               key={stage.key}
               {...(canNavigate ? {
                 role: 'button',
@@ -51,7 +53,9 @@ export function CounselorFlowStage({ current = 'realtime', onNavigate }) {
                 onKeyDown: (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onNavigate(); } },
               } : {})}
             >
-              <span className="flowStageIndex">{index + 1}</span>
+              <span className="flowStageIndex" aria-label={complete ? `${index + 1}단계 완료` : `${index + 1}단계`}>
+                {complete ? <Check size={15} strokeWidth={3} aria-hidden="true" /> : index + 1}
+              </span>
               <div className="flowStageText">
                 <strong><Icon size={15} strokeWidth={2.2} /> {stage.title}</strong>
                 <small>{stage.detail}</small>

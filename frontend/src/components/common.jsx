@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Bell,
+  BookMarked,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -28,6 +29,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useConfirm } from './feedback.jsx';
+import { useDismissOnOutsideOrEscape } from '../hooks/useDismissOnOutsideOrEscape.js';
 import { statusAll, today } from '../constants.jsx';
 import { getDaysInMonth, getRecentYears, months, toIsoDate, weekDays } from '../utils/date.js';
 import { statusChipClass } from '../utils/statusTone.js';
@@ -103,6 +105,7 @@ function workPageHeaderIcon(title) {
   if (!title) return null;
   if (title.includes('서식')) return FileText;
   if (title.includes('법령') || title.includes('판례')) return Scale;
+  if (title.includes('담은 자료')) return BookMarked;
   if (title.includes('알림')) return Bell;
   // 메뉴의 '내 정보'(프로필) 항목이 이미 UserRound를 쓰므로 페이지 제목도 맞춥니다.
   if (title.includes('내 정보')) return UserRound;
@@ -218,9 +221,11 @@ function InlineEmptyNotice({ children, action }) {
 }
 
 function CalendarPicker({ selectedDate, onChange }) {
+  const containerRef = useRef(null);
   const [year, setYear] = useState(Number(selectedDate.slice(0, 4)));
   const [month, setMonth] = useState(Number(selectedDate.slice(5, 7)));
   const [openMode, setOpenMode] = useState(null);
+  useDismissOnOutsideOrEscape(containerRef, Boolean(openMode), () => setOpenMode(null));
   const selectedDay = Number(selectedDate.slice(8, 10));
   const availableYears = getRecentYears();
   const minYear = Math.min(...availableYears);
@@ -271,7 +276,7 @@ function CalendarPicker({ selectedDate, onChange }) {
   };
 
   return (
-    <div className="dateControls calendarControls">
+    <div className="dateControls calendarControls" ref={containerRef}>
       <div className="calendarPickerUnit">
         <button className={`calendarButton${openMode === 'year' ? ' active' : ''}`} type="button" onClick={() => setOpenMode((mode) => mode === 'year' ? null : 'year')}>{year}년</button>
         {openMode === 'year' ? (
@@ -535,13 +540,31 @@ function statusToneIcon(status) {
 }
 
 function HitlConfirmModal({ title = 'AI 분석 결과 최종 확인', actionLabel = '작업 진행', caseInfo, onConfirm, onCancel, nested = false }) {
+  const confirmButtonRef = useRef(null);
+  // feedback.jsx의 ConfirmDialog와 같은 이유입니다: 창이 뜨면 기본 버튼에 포커스를 옮기고,
+  // Esc로 취소할 수 있게 합니다. 이 모달은 되돌릴 수 없는 작업(검토 결과 확정 등)의
+  // 마지막 확인창이라 키보드/스크린리더로도 정확히 닫고 확정할 수 있어야 합니다.
+  useEffect(() => {
+    confirmButtonRef.current?.focus();
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event) => { if (event.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCancel]);
   // nested: 이미 열려 있는 다른 모달(예: 변호사 검토 모달) 위에 겹쳐 뜨는 경우입니다.
   // 화면 정중앙에 새로 뜨면 방금 스크롤해서 누른 '검토 확정' 버튼 위치에서 멀리 떨어져
   // 갑자기 위로 튀어 보이므로, 이때는 화면 아래쪽에 가깝게 띄워 버튼 근처에서 나타나게 합니다.
   return (
-    <div className={`modalBackdrop${nested ? ' modalBackdropNested' : ''}`} role="presentation">
-      <div className="modal hitlConfirmModal">
-        <div className="modalHeader"><h2><ShieldCheck size={18} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> {title}</h2></div>
+    <div className={`modalBackdrop${nested ? ' modalBackdropNested' : ''}`} role="presentation" onClick={onCancel}>
+      <div
+        className="modal hitlConfirmModal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="hitl-confirm-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modalHeader"><h2 id="hitl-confirm-title"><ShieldCheck size={18} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> {title}</h2></div>
         {caseInfo ? <p className="hitlConfirmCase">{caseInfo}</p> : null}
         <div className="hitlConfirmNotice">
           <strong>AI 결과는 참고용입니다.</strong>
@@ -554,7 +577,7 @@ function HitlConfirmModal({ title = 'AI 분석 결과 최종 확인', actionLabe
         </ul>
         <div className="inlineControls statusConfirmActions">
           <button className="smallButton light" type="button" onClick={onCancel}>취소</button>
-          <button className="primaryButton hitlSubmitButton" type="button" onClick={onConfirm}>{actionLabel}</button>
+          <button className="primaryButton hitlSubmitButton" type="button" ref={confirmButtonRef} onClick={onConfirm}>{actionLabel}</button>
         </div>
       </div>
     </div>
@@ -580,43 +603,69 @@ function HitlConfirmModal({ title = 'AI 분석 결과 최종 확인', actionLabe
 // 동작 자체를 없애 항상 펼쳐진 상태로 고정합니다(제목이 버튼이 아니라 그냥 텍스트가 되고,
 // 화살표도 없어집니다). 나머지 부수적인 섹션은 기존처럼 접었다 펼 수 있는 아코디언으로 두어,
 // "중요한 건 바로 보이고 부수적인 건 눌러야 보인다"는 위계를 명확히 합니다.
-function CollapsibleSection({ icon: Icon, title, defaultOpen = false, badge, className = '', id, onToggle, confirmed, onToggleConfirm, pinned = false, children }) {
-  const [open, setOpen] = useState(defaultOpen || pinned);
+// open을 넘기면 바깥에서 이 섹션의 펼침 상태를 직접 정합니다("확인하고 다음으로" 버튼이
+// 다른 섹션을 대신 펼쳐야 하는 HITL 검토 화면처럼). 안 넘기면 예전처럼 이 컴포넌트가 스스로
+// 펼침 상태를 들고 있어, 기존에 이 컴포넌트를 쓰던 화면들은 전혀 바뀌지 않습니다.
+function CollapsibleSection({ icon: Icon, title, defaultOpen = false, badge, className = '', id, open: controlledOpen, onToggle, confirmed, onToggleConfirm, pinned = false, children }) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen || pinned);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
   const isOpen = pinned || open;
   useEffect(() => {
     if (isOpen && onToggleConfirm && !confirmed) onToggleConfirm(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
   const wrapperClass = ['collapsibleSection', className, isOpen ? 'is-open' : '', pinned ? 'is-pinned' : ''].filter(Boolean).join(' ');
+  const toggle = () => {
+    const next = !open;
+    if (!isControlled) setInternalOpen(next);
+    onToggle?.(next);
+  };
+  // 확인 배지 클릭은 펼치기/접기와 다른 동작이라, 이 배지를 눌렀을 때는 바깥 헤더의 토글이
+  // 같이 실행되지 않도록 막습니다(정보 확인 ≠ 섹션 접기).
+  const stopAndToggleConfirm = (event) => {
+    event.stopPropagation();
+    onToggleConfirm(!confirmed);
+  };
+  const confirmBadge = onToggleConfirm && !pinned ? (
+    <span
+      role="button"
+      tabIndex={0}
+      className={`collapsibleSectionConfirm${confirmed ? ' is-confirmed' : ''}`}
+      aria-pressed={confirmed}
+      aria-label={confirmed ? '확인함' : '확인'}
+      title={confirmed ? '확인함' : '확인'}
+      onClick={stopAndToggleConfirm}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          stopAndToggleConfirm(event);
+        }
+      }}
+    >
+      {confirmed ? <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden="true" /> : <Circle size={14} strokeWidth={2.4} aria-hidden="true" />}
+    </span>
+  ) : null;
   return (
     <div className={wrapperClass} id={id}>
-      <div className="collapsibleSectionHeader">
-        {pinned ? (
+      {pinned ? (
+        <div className="collapsibleSectionHeader">
           <h3 className="collapsibleSectionStaticTitle">{Icon ? <Icon size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> : null}{title}</h3>
-        ) : (
-          <button type="button" className="collapsibleSectionToggle" onClick={() => { setOpen((current) => { const next = !current; onToggle?.(next); return next; }); }} aria-expanded={open}>
-            <h3>{Icon ? <Icon size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> : null}{title}</h3>
-          </button>
-        )}
-        <span className="collapsibleSectionMeta">
-          {badge}
-          {/* pinned 섹션은 항상 펼쳐져 내용이 바로 보이므로 "확인함" 표시가 굳이 필요 없다는
-              피드백을 받아, 접었다 펼 수 있는 아코디언 섹션에서만 확인 배지를 보여줍니다. */}
-          {onToggleConfirm && !pinned ? (
-            <button
-              type="button"
-              className={`collapsibleSectionConfirm${confirmed ? ' is-confirmed' : ''}`}
-              aria-pressed={confirmed}
-              aria-label={confirmed ? '확인함' : '확인'}
-              title={confirmed ? '확인함' : '확인'}
-              onClick={() => onToggleConfirm(!confirmed)}
-            >
-              {confirmed ? <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden="true" /> : <Circle size={14} strokeWidth={2.4} aria-hidden="true" />}
-            </button>
-          ) : null}
-          {pinned ? null : <ChevronDown size={16} strokeWidth={2.2} className="collapsibleSectionChevron" aria-hidden="true" />}
-        </span>
-      </div>
+          <span className="collapsibleSectionMeta">{badge}</span>
+        </div>
+      ) : (
+        // 예전엔 제목 글자 위(.collapsibleSectionToggle)만 눌러야 펼쳐지고, 오른쪽 배지·화살표
+        // 자리를 누르면 아무 반응이 없었습니다. "화살표를 눌렀는데 왜 안 펼쳐지지" 피드백을 받아,
+        // 확인 배지를 뺀 헤더 줄 전체를 하나의 버튼으로 묶어 어디를 눌러도 펼쳐지게 합니다.
+        <button type="button" className="collapsibleSectionHeader collapsibleSectionToggle" onClick={toggle} aria-expanded={open}>
+          <h3>{Icon ? <Icon size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> : null}{title}</h3>
+          <span className="collapsibleSectionMeta">
+            {badge}
+            {confirmBadge}
+            <ChevronDown size={16} strokeWidth={2.2} className="collapsibleSectionChevron" aria-hidden="true" />
+          </span>
+        </button>
+      )}
       <div className="collapsibleSectionBody">
         <div className="collapsibleSectionBodyInner">{children}</div>
       </div>

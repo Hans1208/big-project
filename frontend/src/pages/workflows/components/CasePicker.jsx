@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 import { caseOptions, matchesCasePickerQuery, casePickerDateLabel } from '../shared/caseHelpers.js';
+import { useDismissOnOutsideOrEscape } from '../../../hooks/useDismissOnOutsideOrEscape.js';
 
 export function CasePicker({ consultations, value, onChange, placeholder = '사건을 선택하세요' }) {
+  const containerRef = useRef(null);
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  useDismissOnOutsideOrEscape(containerRef, open, () => setOpen(false));
   const options = caseOptions(consultations);
   const matchedSelection = options.find((item) => String(item.id) === String(value));
   const selected = matchedSelection || options[0];
@@ -23,12 +27,13 @@ export function CasePicker({ consultations, value, onChange, placeholder = '사�
   };
 
   return (
-    <div className="casePicker">
+    <div className="casePicker" ref={containerRef}>
       <button
         className="casePickerButton"
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
+        aria-controls={open ? listId : undefined}
       >
         <span className="casePickerButtonText">
           <strong>{hasSelectableCase ? selected.caseNo : placeholder}</strong>
@@ -48,7 +53,7 @@ export function CasePicker({ consultations, value, onChange, placeholder = '사�
               placeholder="사건번호, 이름, 제목 검색"
             />
           </label>
-          <div className="casePickerList">
+          <div className="casePickerList" id={listId} aria-label="상담 선택 목록">
             {filteredOptions.length ? filteredOptions.map((item) => (
               <button
                 className={String(item.id) === String(value) ? 'casePickerItem active' : 'casePickerItem'}

@@ -3,6 +3,8 @@ import { PhoneCall, Check, Mic, Clock, Info, Sparkles, MessageSquareText, Headph
 import { buildSuggestedQuestions, formatCallDuration } from '../shared/formatters.js';
 import { CallLiveIndicator } from '../components/CallLiveIndicator.jsx';
 import { CallAudioVisualizer } from '../components/CallAudioVisualizer.jsx';
+import { CollapsibleSection } from '../../../components/common.jsx';
+import { InPersonSttPreview } from './InPersonAnalysisPanel.jsx';
 
 export function RealtimeCallControl({
   hasCase,
@@ -99,7 +101,7 @@ export function RealtimeMemoCard({ selectedCase, onUpdateConsultation, field = '
     <article className="realtimeTranscriptCard">
       <div className="realtimeTranscriptHead">
         <h3><MessageSquareText size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> 실시간 상담 메모</h3>
-        <span className={`statusChip ${charCount ? 'tone-info' : 'tone-muted'}`}>
+        <span className={`statusChip ${charCount ? 'tone-info' : 'tone-muted'}`} role="status" aria-live="polite">
           {charCount ? <Check size={12} strokeWidth={2.4} aria-hidden="true" /> : <Clock size={12} strokeWidth={2.4} aria-hidden="true" />}
           {charCount ? `${charCount}자 기록됨` : '작성 전'}
         </span>
@@ -147,12 +149,17 @@ export function RealtimeSuggestedQuestions({ memoText }) {
     setAskedQuestions((current) => current.includes(question) ? current.filter((item) => item !== question) : [...current, question]);
   };
 
+  // 통화 중 지금 당장 해야 하는 일은 메모 입력이고, 이 추천 질문은 참고용 보조 자료입니다.
+  // 예전엔 항상 펼쳐진 채로 메모 카드와 같은 무게로 나란히 있어, 질문이 몇 개만 있어도
+  // 화면이 한 번에 다 봐야 할 것처럼 빽빽해 보였습니다. 접어두고 제목만 보이게 해
+  // 필요할 때 한 번 눌러 펼치는 참고 자료로 낮춥니다(내용·기능은 그대로, 클릭 한 번 거리).
   return (
-    <article className="realtimeQuestionsCard">
-      <div className="realtimeTranscriptHead">
-        <h3><Sparkles size={16} strokeWidth={2.2} className="sectionIcon" aria-hidden="true" /> AI 추천 추가 질문</h3>
-        <span className="statusChip tone-info"><Info size={12} strokeWidth={2.4} aria-hidden="true" />통화 중 참고용</span>
-      </div>
+    <CollapsibleSection
+      className="realtimeQuestionsCard"
+      icon={Sparkles}
+      title="AI 추천 추가 질문"
+      badge={<span className="statusChip tone-info"><Info size={12} strokeWidth={2.4} aria-hidden="true" />통화 중 참고용</span>}
+    >
       <p className="helperText">메모 기반 질문 후보 · 상담원이 선택</p>
       <div className="realtimeQuestionList">
         {suggestions.map((question) => {
@@ -171,7 +178,7 @@ export function RealtimeSuggestedQuestions({ memoText }) {
           );
         })}
       </div>
-    </article>
+    </CollapsibleSection>
   );
 }
 
@@ -216,7 +223,7 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
     <section className="realtimeWorkbenchPanel roleAccent-counselor" aria-label="실시간 상담 메모">
       <div className="realtimeWorkbenchHeader">
         <div className="realtimeHeaderTags">
-          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담원 업무</span>
+          <span className="roleIdentityBadge roleIdentityBadge-counselor"><Headphones size={12} strokeWidth={2.4} aria-hidden="true" /> 상담 진행</span>
           <span className="flowStageEyebrow"><Radio size={13} strokeWidth={2.4} aria-hidden="true" /> 실시간 상담</span>
         </div>
       </div>
@@ -246,6 +253,21 @@ export function RealtimeAnalysisPanel({ selectedCase, onUpdateConsultation, call
               {hasCase ? <RealtimeSuggestedQuestions memoText={selectedCase?.memo || ''} /> : null}
             </div>
             <RealtimeMemoCard selectedCase={selectedCase} onUpdateConsultation={onUpdateConsultation} />
+            {/* 메모칸은 상담원이 손보는 원문이라 그대로 두고, 가려진 결과는 따로 보여줍니다.
+                전화상담에는 이 카드가 없어서 "대면은 가려지는데 전화는 주민번호가 그대로
+                보인다"는 상태였습니다 — 자동 STT가 없어 마스킹본이 늘 비어 있던 시절의
+                흔적입니다. 지금은 직접 적은 메모도 core-api가 가립니다
+                (ConsultationService.maskedOrRedact → stt-mask-api /redact).
+                '상담 저장'을 눌러야 채워지므로, 저장 전에는 안내 문구가 뜹니다. */}
+            {hasCase ? (
+              <InPersonSttPreview
+                maskedText={selectedCase?.memoMasked || ''}
+                rawText={selectedCase?.memo || ''}
+                status="done"
+                title="개인정보 가림 결과"
+                emptyText="‘상담 저장’을 누르면 개인정보를 가린 내용이 여기에 표시됩니다."
+              />
+            ) : null}
           </div>
         </div>
       </div>

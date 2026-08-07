@@ -622,6 +622,7 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
                                           value={contentDraft}
                                           onChange={(event) => setContentDraft(event.target.value)}
                                           placeholder="서류 내용을 입력하거나 수정하세요."
+                                          aria-label="서류 내용 편집"
                                         />
                                       </div>
                                       <div className="draftViewPane">
@@ -662,6 +663,7 @@ function DocumentReviewQueuePanel({ candidateCases, currentUser }) {
                                   value={noteText}
                                   onChange={(event) => setNoteText(event.target.value)}
                                   placeholder="내부 검토 메모 (선택)"
+                                  aria-label="내부 검토 메모"
                                 />
                                 <div className="inlineControls documentReviewActions">
                                   <button className="reviewCancelButton" type="button" onClick={cancelReview} disabled={pending}>취소</button>
@@ -970,6 +972,22 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
   // 시작하므로 처음부터 '확인함'으로 봅니다. 나머지는 상담원이 헤더를 눌러 펼쳐야 표시됩니다.
   const [viewedSectionIds, setViewedSectionIds] = useState(() => new Set());
   const markSectionViewed = (id) => setViewedSectionIds((current) => (current.has(id) ? current : new Set(current).add(id)));
+  // 아코디언 5개(분석 확인~타임라인)를 나열만 해두면 "어느 걸 먼저 봐야 하나" 감이 안 온다는
+  // 의견을 받아, 순서를 하나 정해두고 각 섹션 끝에 "확인하고 다음으로" 버튼을 둡니다. 눌러도
+  // 새 창을 띄우거나 다른 섹션에 못 가게 막지는 않습니다 — 오른쪽 빠른 이동으로 언제든 건너뛰거나
+  // 이미 지나온 섹션을 다시 열어 대조해볼 수 있어야, 검토 중 항목끼리 비교하는 작업이 안 막힙니다.
+  const hitlAccordionOrder = ['hitlSectionAnalysis', 'hitlSectionMissing', 'hitlSectionPrivacy', 'hitlSectionEvidence', 'hitlTimelineSection'];
+  const [activeAccordionId, setActiveAccordionId] = useState(null);
+  const goToNextHitlSection = (currentId) => {
+    markSectionViewed(currentId);
+    const nextId = hitlAccordionOrder[hitlAccordionOrder.indexOf(currentId) + 1];
+    setActiveAccordionId(nextId || null);
+    setActiveQuickNavId(nextId || currentId);
+    const targetId = nextId || 'hitlSectionFinalCheck';
+    // 접힘/펼침 애니메이션(220ms)이 끝나기 전에 스크롤하면 다음 섹션이 아직 제자리로 오지
+    // 않은 채로 화면이 멈춰, 눈대중으로 다시 스크롤해야 하는 경우가 있어 애니메이션 뒤로 미룹니다.
+    window.setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 240);
+  };
   const summaryEdited = editedSummary.trim() !== (analysis.summary || '').trim();
   // 확정은 core-api 호출이 끝나야 화면이 넘어갑니다(decideReview가 await 후 setActiveReview(null)).
   // 그동안 아무 표시가 없으면 안 눌린 줄 알고 '검토 확정'을 다시 누르게 되고, 그 사이 첫 요청은
@@ -998,7 +1016,7 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
           담습니다 — 카드는 이 화면 전체에 하나만 있습니다. */}
       <section className="hitlReviewPanel">
         <div className="workflowIntro hitlWorkflowIntro roleAccent-lawyer">
-          <span className="roleIdentityBadge roleIdentityBadge-lawyer"><Scale size={12} strokeWidth={2.4} aria-hidden="true" /> 변호사 검토</span>
+          <span className="roleIdentityBadge roleIdentityBadge-lawyer"><Scale size={12} strokeWidth={2.4} aria-hidden="true" /> 검토하기</span>
           <h1>법률구조 최종 검토 <span className="statusChip tone-info">검토 진행중</span></h1>
           <p>{review.caseNo} · {review.type} · {review.title}</p>
         </div>
@@ -1048,7 +1066,7 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
           <LawyerReviewBrief review={review} analysis={analysis} attachments={attachmentItems} />
         </CollapsibleSection>
 
-        <CollapsibleSection className="hitlSection" id="hitlSectionAnalysis" icon={ClipboardList} title="상담 분석 확인" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionAnalysis'); if (nextOpen) markSectionViewed('hitlSectionAnalysis'); }}>
+        <CollapsibleSection className="hitlSection" id="hitlSectionAnalysis" icon={ClipboardList} title="상담 분석 확인" open={activeAccordionId === 'hitlSectionAnalysis'} onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionAnalysis'); setActiveAccordionId(nextOpen ? 'hitlSectionAnalysis' : null); if (nextOpen) markSectionViewed('hitlSectionAnalysis'); }}>
           <div className="resultCard lawyerAnalysisCard">
             <div className="lawyerAnalysisHeader">
               <strong>검토 요청에 포함된 상담 분석</strong>
@@ -1100,9 +1118,14 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
             {/* 승소·집행 가능성, 구조 타당성 신호 — 상담원 화면과 같은 컴포넌트로 그려서 표시가 어긋나지 않게 합니다. */}
             {analysis.reliefReview ? <ReliefReviewSummary review={analysis.reliefReview} /> : null}
           </div>
+          <div className="hitlSectionNextRow">
+            <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextHitlSection('hitlSectionAnalysis')}>
+              확인하고 다음으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          </div>
         </CollapsibleSection>
 
-        <CollapsibleSection className="hitlSection" id="hitlSectionMissing" icon={AlertTriangle} title="누락 자료와 확인 항목" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionMissing'); if (nextOpen) markSectionViewed('hitlSectionMissing'); }}>
+        <CollapsibleSection className="hitlSection" id="hitlSectionMissing" icon={AlertTriangle} title="누락 자료와 확인 항목" open={activeAccordionId === 'hitlSectionMissing'} onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionMissing'); setActiveAccordionId(nextOpen ? 'hitlSectionMissing' : null); if (nextOpen) markSectionViewed('hitlSectionMissing'); }}>
           <div className="resultCard hitlEvidenceGrid">
             <div>
               <strong>누락 자료</strong>
@@ -1128,9 +1151,14 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               )) : <span>확인할 항목이 없습니다.</span>}
             </div>
           </div>
+          <div className="hitlSectionNextRow">
+            <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextHitlSection('hitlSectionMissing')}>
+              확인하고 다음으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          </div>
         </CollapsibleSection>
 
-        <CollapsibleSection className="hitlSection" id="hitlSectionPrivacy" icon={EyeOff} title="개인정보가 가려진 상담 내용" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionPrivacy'); if (nextOpen) markSectionViewed('hitlSectionPrivacy'); }}>
+        <CollapsibleSection className="hitlSection" id="hitlSectionPrivacy" icon={EyeOff} title="개인정보가 가려진 상담 내용" open={activeAccordionId === 'hitlSectionPrivacy'} onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionPrivacy'); setActiveAccordionId(nextOpen ? 'hitlSectionPrivacy' : null); if (nextOpen) markSectionViewed('hitlSectionPrivacy'); }}>
           {/* 'STT'·'마스킹'은 개발팀 용어라 변호사에게는 '통화 내용 텍스트'·'개인정보 가림'으로 풀어 씁니다. */}
           <div className="resultCard lawyerSttGrid">
             <div>
@@ -1143,9 +1171,14 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               <span>원문에는 민감정보가 포함될 수 있으므로 검증 목적으로만 확인합니다.</span>
             </div>
           </div>
+          <div className="hitlSectionNextRow">
+            <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextHitlSection('hitlSectionPrivacy')}>
+              확인하고 다음으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          </div>
         </CollapsibleSection>
 
-        <CollapsibleSection className="hitlSection" id="hitlSectionEvidence" icon={Scale} title="검토 근거" onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionEvidence'); if (nextOpen) markSectionViewed('hitlSectionEvidence'); }}>
+        <CollapsibleSection className="hitlSection" id="hitlSectionEvidence" icon={Scale} title="검토 근거" open={activeAccordionId === 'hitlSectionEvidence'} onToggle={(nextOpen) => { setActiveQuickNavId('hitlSectionEvidence'); setActiveAccordionId(nextOpen ? 'hitlSectionEvidence' : null); if (nextOpen) markSectionViewed('hitlSectionEvidence'); }}>
           <div className="resultCard lawyerEvidenceBundle">
             {/* 변호사가 '법령·판례' 화면에서 담아 저장한 자료입니다. 그 화면은 검색을
                 하러 들어가는 곳이라, 검토 중에 무엇을 근거로 삼았는지 확인하려면
@@ -1195,9 +1228,14 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
               <span>환각 위험: {analysis.verification?.riskLabel || '검증 미실행'}</span>
             </div>
           </div>
+          <div className="hitlSectionNextRow">
+            <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextHitlSection('hitlSectionEvidence')}>
+              확인하고 다음으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          </div>
         </CollapsibleSection>
 
-        <CollapsibleSection className="hitlSection" id="hitlTimelineSection" icon={Clock} title="사실관계 타임라인" onToggle={(nextOpen) => { setActiveQuickNavId('hitlTimelineSection'); if (nextOpen) markSectionViewed('hitlTimelineSection'); }}>
+        <CollapsibleSection className="hitlSection" id="hitlTimelineSection" icon={Clock} title="사실관계 타임라인" open={activeAccordionId === 'hitlTimelineSection'} onToggle={(nextOpen) => { setActiveQuickNavId('hitlTimelineSection'); setActiveAccordionId(nextOpen ? 'hitlTimelineSection' : null); if (nextOpen) markSectionViewed('hitlTimelineSection'); }}>
           <div className="resultCard lawyerTimeline">
             {/* ai-api가 만드는 timeline_json 항목은 {날짜, 내용} 키를 씁니다
                 (backend/ai-api/app/schemas/analysis.py의 TimelineItem).
@@ -1215,6 +1253,11 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
                 </span>
               );
             }) : <p className="emptyTimelineNotice">확인된 타임라인 자료가 없습니다.</p>}
+          </div>
+          <div className="hitlSectionNextRow">
+            <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextHitlSection('hitlTimelineSection')}>
+              확인하고 제출 확인으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+            </button>
           </div>
         </CollapsibleSection>
 
@@ -1345,11 +1388,16 @@ function HitlReviewPage({ review, reviewer, onDecide, onClose }) {
           ) : null}
 
           {/* 반려·수정요청 등 일부 결정에만 열리는 '사유'와 달리, 코멘트는 승인을 포함한 모든 결정에서
-              남길 수 있습니다. 상담원에게 참고용으로 함께 전달됩니다. */}
-          <label className="field hitlCommentField">
-            <span>코멘트 (선택)</span>
-            <textarea value={lawyerComment} onChange={(event) => setLawyerComment(event.target.value)} placeholder="결정과 별개로 상담원에게 남길 코멘트가 있으면 적어주세요." />
-          </label>
+              남길 수 있습니다. 상담원에게 참고용으로 함께 전달됩니다.
+              결정을 아직 안 고른 시점엔 입력할 수 없는 칸(무엇에 대한 코멘트인지 아직 없음)이라,
+              페이지를 열자마자부터 계속 떠 있으면 결정 카드 5개와 함께 한꺼번에 눈에 들어와
+              더 빽빽해 보입니다. 결정을 하나 고른 뒤부터만 보여 그 시점의 정보량을 줄입니다. */}
+          {decision ? (
+            <label className="field hitlCommentField">
+              <span>코멘트 (선택)</span>
+              <textarea value={lawyerComment} onChange={(event) => setLawyerComment(event.target.value)} placeholder="결정과 별개로 상담원에게 남길 코멘트가 있으면 적어주세요." />
+            </label>
+          ) : null}
 
           {reasonRequired ? <p className="formError">{decision} 결정에는 사유 입력이 필요합니다.</p> : null}
           {decision && !allChecked ? <p className="formError">법률 판단 항목을 모두 확인해야 결정을 확정할 수 있습니다.</p> : null}
@@ -1899,12 +1947,14 @@ function AdminOpsPanel({ currentUser }) {
   // 화면에는 한국 시간 기준으로 보기 좋게 바꿔서 보여줍니다.
   const formatAuditTimestamp = (value) => {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value || '-';
-    return date.toLocaleString('ko-KR', {
+    if (Number.isNaN(date.getTime())) return { date: value || '-', time: '', label: value || '-' };
+    const dateLabel = date.toLocaleDateString('ko-KR', {
       year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-      hour12: false,
     });
+    const timeLabel = date.toLocaleTimeString('ko-KR', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    });
+    return { date: dateLabel, time: timeLabel, label: `${dateLabel} ${timeLabel}` };
   };
   // 로그인/로그아웃 기록은 대상(target)에 사건번호 대신 역할 키(admin/lawyer/counselor)가 들어있어,
   // 다른 화면과 같은 한글 라벨(관리자/변호사/상담원)로 통일해 보여줍니다.
@@ -1934,66 +1984,104 @@ function AdminOpsPanel({ currentUser }) {
           title="운영 관리"
           description="감사 기록과 주요 서비스 연결 상태를 확인하세요."
         />
-        <div className="workflowColumns">
-          <div>
-            <h3>감사 로그</h3>
-            <div className={`adminTableScroll${auditRows.length > VISIBLE_ROW_COUNT ? ' tableScroll' : ''}`}>
+        <div className="adminOperationsLayout">
+          <section className="adminAuditPanel" aria-labelledby="admin-audit-title">
+            <div className="adminPanelHeading">
+              <div>
+                <h3 id="admin-audit-title">감사 로그</h3>
+                <p>최근 수행된 운영 작업을 시간순으로 확인합니다.</p>
+              </div>
+              <span className="adminPanelCount">최근 {auditRows.length}건</span>
+            </div>
+            <div className="adminTableScroll">
               <table className="dataTable auditTable">
-                <thead><tr><th>일시</th><th>주체</th><th>작업</th><th>대상</th><th>상세</th></tr></thead>
+                <colgroup><col className="auditTimeColumn" /><col className="auditActorColumn" /><col /></colgroup>
+                <thead><tr><th>일시</th><th>주체</th><th>작업 내용</th></tr></thead>
                 <tbody>
-                  {auditRows.map((row) => <tr key={`${row.action}-${row.target}-${row.id}`}><td>{formatAuditTimestamp(row.createdAt || today)}</td><td>{row.actor}</td><td>{row.action}</td><td>{formatAuditTarget(row.target)}</td><td>{formatAuditDetail(row)}</td></tr>)}
-                  {auditRows.length > VISIBLE_ROW_COUNT ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - auditRows.length)} columns={5} isEmpty={auditRows.length === 0} emptyLabel="감사 로그 없음" />}
+                  {auditRows.map((row) => {
+                    const timestamp = formatAuditTimestamp(row.createdAt || today);
+                    const target = formatAuditTarget(row.target);
+                    const detail = formatAuditDetail(row);
+                    const activityDetail = [target, detail !== '-' ? detail : ''].filter(Boolean).join(' · ');
+                    return (
+                      <tr key={`${row.action}-${row.target}-${row.id}`}>
+                        <td><time className="auditTimestamp" dateTime={row.createdAt || undefined} title={timestamp.label}><span>{timestamp.date}</span>{timestamp.time ? <strong>{timestamp.time}</strong> : null}</time></td>
+                        <td><span className="auditActor" title={row.actor}>{row.actor}</span></td>
+                        <td><div className="auditActivity"><strong>{row.action}</strong>{activityDetail ? <span title={activityDetail}>{activityDetail}</span> : null}</div></td>
+                      </tr>
+                    );
+                  })}
+                  {auditRows.length > VISIBLE_ROW_COUNT ? null : <EmptyRows count={Math.max(0, VISIBLE_ROW_COUNT - auditRows.length)} columns={3} isEmpty={auditRows.length === 0} emptyLabel="감사 로그 없음" />}
                 </tbody>
               </table>
             </div>
-          </div>
-          <div>
-            <h3>서식 개정 모니터링</h3>
-            <div className="resultCard">
-              <p>helplaw24에서 우리가 쓰는 서식(친족·상속·가사소송·가족관계등록 291건)이 바뀌었는지 점검합니다. 버튼을 누를 때 점검하며, 서식 파일을 자동으로 바꾸지는 않고 무엇이 바뀌었는지 알려주기만 합니다.</p>
-              <strong>
-                상태: <span className={`statusChip tone-${templateStatus.tone}`}>{templateStatus.label}</span>
-              </strong>
-              {templateResult?.changes?.totalChanged ? (
-                <FormRevisionChanges changes={templateResult.changes} />
-              ) : null}
+          </section>
+
+          <section className="adminServicePanel" aria-labelledby="admin-service-title">
+            <div className="adminPanelHeading">
+              <div>
+                <h3 id="admin-service-title">서비스 점검</h3>
+                <p>필요한 항목만 실행해 연결 상태와 변경 내용을 확인합니다.</p>
+              </div>
             </div>
-            <button className="primaryButton" type="button" onClick={runTemplateCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'template' ? '확인하는 중…' : '서식 개정 확인'}</button>
-            {templateResult?.changes?.totalChanged ? (
-              <button className="secondaryButton" type="button" onClick={runTemplateAcknowledge} disabled={Boolean(runningCheck)}>{runningCheck === 'templateAck' ? '처리하는 중…' : '확인 완료 (기준 갱신)'}</button>
-            ) : null}
-            <h3>AI API 서버 연결 상태</h3>
-            <div className="resultCard">
-              <p>AI 분석 기능이 정상적으로 연결되어 있는지 확인합니다.</p>
-              <strong>
-                상태: <span className={`statusChip tone-${aiApiStatus.tone}`}>{aiApiStatus.label}</span>
-              </strong>
-            </div>
-            <button className="primaryButton" type="button" onClick={runAiApiHealthCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'ai' ? '확인하는 중…' : 'AI 분석 연결 확인'}</button>
-            <h3>상담 데이터 연결 상태</h3>
-            <div className="resultCard apiStatusCard">
-              <p>상담 및 사용자 데이터가 정상적으로 연결되어 있는지 확인합니다.</p>
-              <strong>
-                상태: <span className={`statusChip tone-${coreApiStatus.tone}`}>{coreApiStatus.label}</span>
-              </strong>
-              {coreApiStatus.tone === 'success' ? (
-                <div className="apiMetricGrid">
-                  <span>사용자 {coreApiStatus.users}명</span>
-                  <span>상담 {coreApiStatus.consultations}건</span>
+
+            <div className="adminServiceList">
+              <article className="adminServiceCheck">
+                <div className="adminServiceContent">
+                  <h4>서식 개정 모니터링</h4>
+                  <p>사용 중인 291개 서식의 변경 사항을 확인합니다. 서식 파일은 자동으로 바꾸지 않습니다.</p>
+                  <strong>상태: <span className={`statusChip tone-${templateStatus.tone}`}>{templateStatus.label}</span></strong>
+                  {templateResult?.changes?.totalChanged ? <FormRevisionChanges changes={templateResult.changes} /> : null}
                 </div>
-              ) : null}
-              {coreApiStatus.detail ? <p className="helperText">{coreApiStatus.detail}</p> : null}
+                <div className="adminServiceActions">
+                  <button className="adminServiceAction" type="button" onClick={runTemplateCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'template' ? '확인하는 중…' : '변경 확인'}</button>
+                  {templateResult?.changes?.totalChanged ? (
+                    <button className="adminServiceAction secondary" type="button" onClick={runTemplateAcknowledge} disabled={Boolean(runningCheck)}>{runningCheck === 'templateAck' ? '처리하는 중…' : '기준 갱신'}</button>
+                  ) : null}
+                </div>
+              </article>
+
+              <article className="adminServiceCheck">
+                <div className="adminServiceContent">
+                  <h4>AI 분석 연결</h4>
+                  <p>AI 분석 기능이 현재 프론트엔드에서 호출 가능한지 확인합니다.</p>
+                  <strong>상태: <span className={`statusChip tone-${aiApiStatus.tone}`}>{aiApiStatus.label}</span></strong>
+                </div>
+                <div className="adminServiceActions">
+                  <button className="adminServiceAction" type="button" onClick={runAiApiHealthCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'ai' ? '확인하는 중…' : '연결 확인'}</button>
+                </div>
+              </article>
+
+              <article className="adminServiceCheck">
+                <div className="adminServiceContent">
+                  <h4>상담 데이터 연결</h4>
+                  <p>상담 및 사용자 데이터에 정상적으로 접근할 수 있는지 확인합니다.</p>
+                  <strong>상태: <span className={`statusChip tone-${coreApiStatus.tone}`}>{coreApiStatus.label}</span></strong>
+                  {coreApiStatus.tone === 'success' ? (
+                    <div className="apiMetricGrid">
+                      <span>사용자 {coreApiStatus.users}명</span>
+                      <span>상담 {coreApiStatus.consultations}건</span>
+                    </div>
+                  ) : null}
+                  {coreApiStatus.detail ? <p className="helperText">{coreApiStatus.detail}</p> : null}
+                </div>
+                <div className="adminServiceActions">
+                  <button className="adminServiceAction" type="button" onClick={runCoreApiHealthCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'core' ? '확인하는 중…' : '연결 확인'}</button>
+                </div>
+              </article>
+
+              <article className="adminServiceCheck">
+                <div className="adminServiceContent">
+                  <h4>서버 감사 로그 검증</h4>
+                  <p>서버가 남긴 감사 로그 해시체인의 위변조 여부를 확인합니다.</p>
+                  <strong>상태: <span className={`statusChip tone-${serverAuditStatus.tone}`}>{serverAuditStatus.label}</span></strong>
+                </div>
+                <div className="adminServiceActions">
+                  <button className="adminServiceAction" type="button" onClick={runServerAuditCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'serverAudit' ? '검증하는 중…' : '로그 검증'}</button>
+                </div>
+              </article>
             </div>
-            <button className="primaryButton" type="button" onClick={runCoreApiHealthCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'core' ? '확인하는 중…' : '상담 데이터 연결 확인'}</button>
-            <h3>서버 감사 로그 검증</h3>
-            <div className="resultCard">
-              <p>상담 조회·AI 분석 실행/수정·검토 승인/반려·문서 다운로드를 서버가 직접 남긴 감사 로그(해시체인)의 위변조 여부를 확인합니다.</p>
-              <strong>
-                상태: <span className={`statusChip tone-${serverAuditStatus.tone}`}>{serverAuditStatus.label}</span>
-              </strong>
-            </div>
-            <button className="primaryButton" type="button" onClick={runServerAuditCheck} disabled={Boolean(runningCheck)}>{runningCheck === 'serverAudit' ? '검증하는 중…' : '서버 감사 로그 검증'}</button>
-          </div>
+          </section>
         </div>
       </section>
     </main>
@@ -2060,20 +2148,33 @@ function buildDonutArcs(visibleSegments, total, gapPercent) {
     const trimmedPercent = Math.max(0, percent - gapPercent);
     const dashOffset = 100 - cumulativePercent;
     cumulativePercent += percent;
-    return { key: segment.key, className: segment.toneClass, dashArray: `${trimmedPercent} ${100 - trimmedPercent}`, dashOffset };
+    return { key: segment.key, index: segment.index, className: segment.toneClass, dashArray: `${trimmedPercent} ${100 - trimmedPercent}`, dashOffset };
   });
 }
 
-function DonutChart({ total, segments }) {
-  const visibleSegments = segments.filter((segment) => segment.value > 0);
+function DonutChart({ total, segments, hoveredIndex, onHoverChange }) {
+  const visibleSegments = segments
+    .map((segment, index) => ({ ...segment, index }))
+    .filter((segment) => segment.value > 0);
   const arcs = buildDonutArcs(visibleSegments, total, visibleSegments.length > 1 ? 2.4 : 0);
   const summary = segments.map((segment) => `${segment.label} ${segment.value}건`).join(', ');
   return (
-    <div className="donutChart" role="img" aria-label={`전체 ${total}건 중 ${summary}`}>
+    <div className={`donutChart${hoveredIndex !== null ? ' has-hovered-segment' : ''}`} role="img" aria-label={`전체 ${total}건 중 ${summary}`}>
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <circle className="donutTrack" cx="50" cy="50" r="40" pathLength="100" />
         {arcs.map((arc) => (
-          <circle key={arc.key} className={`donutArc ${arc.className}`} cx="50" cy="50" r="40" pathLength="100" strokeDasharray={arc.dashArray} strokeDashoffset={arc.dashOffset} />
+          <circle
+            key={arc.key}
+            className={`donutArc ${arc.className}${hoveredIndex === arc.index ? ' is-hovered' : ''}`}
+            cx="50"
+            cy="50"
+            r="40"
+            pathLength="100"
+            strokeDasharray={arc.dashArray}
+            strokeDashoffset={arc.dashOffset}
+            onMouseEnter={() => onHoverChange?.(arc.index)}
+            onMouseLeave={() => onHoverChange?.(null)}
+          />
         ))}
       </svg>
       <div className="donutCenter">
@@ -2084,6 +2185,7 @@ function DonutChart({ total, segments }) {
 }
 
 function DonutChartMock({ reviews, serverStats }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
   const serverBreakdown = serverStats?.analysis_status_breakdown && typeof serverStats.analysis_status_breakdown === 'object'
     ? serverStats.analysis_status_breakdown
     : null;
@@ -2105,15 +2207,26 @@ function DonutChartMock({ reviews, serverStats }) {
     <section className="chartPanel">
       <h2>분석 처리 현황</h2>
       <div className="donutWrap">
-        <DonutChart total={total} segments={segments} />
+        <DonutChart total={total} segments={segments} hoveredIndex={hoveredIndex} onHoverChange={setHoveredIndex} />
         <ul className="legendList">
           <li className="legendTotalRow">전체 <strong>{total}건</strong> 접수</li>
-          {segments.map((segment) => (
-            <li className="legendRow" key={segment.key}>
+          {segments.map((segment, index) => (
+            <li key={segment.key}>
+              <button
+                className={`legendRow${hoveredIndex === index ? ' is-hovered' : ''}`}
+                type="button"
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onFocus={() => setHoveredIndex(index)}
+                onBlur={() => setHoveredIndex(null)}
+                aria-pressed={hoveredIndex === index}
+                aria-label={`${segment.label} ${segment.value}건, ${total ? Math.round((segment.value / total) * 100) : 0}% 강조`}
+              >
               <span className={`legendDot ${segment.toneClass}`} />
               <span className="legendLabel">{segment.label}</span>
               <span className="legendValue">{segment.value}건</span>
               <span className="legendPercent">{total ? Math.round((segment.value / total) * 100) : 0}%</span>
+              </button>
             </li>
           ))}
         </ul>

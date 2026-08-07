@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck, ClipboardList, Info, Check, PhoneCall, Paperclip, EyeOff,
-  Scale, ListChecks, Sparkles, Clock, CheckCircle2, FolderOpen,
+  Scale, ListChecks, Sparkles, Clock, CheckCircle2, FolderOpen, ChevronRight,
 } from 'lucide-react';
 import { today } from '../../../constants.jsx';
 import { useToast } from '../../../components/feedback.jsx';
@@ -315,6 +315,17 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
   // 저장하지 않는 화면 전용 상태입니다. 사건을 바꾸면(selectCase/포커스 진입) 같이 비웁니다.
   const [confirmedSections, setConfirmedSections] = useState({});
   const toggleSectionConfirmed = (key) => setConfirmedSections((current) => ({ ...current, [key]: !current[key] }));
+  // 왼쪽 컬럼(개인정보 가림 ~ 체크리스트 AI 분석 결과)에도 변호사 검토 화면과 같은 "확인하고
+  // 다음으로" 흐름을 붙입니다. 오른쪽 레일(누락 자료 확인 등)은 코치 피드백으로 이미 접기
+  // 자체를 없앤 참고용 목록이라 여기에는 적용하지 않습니다 — 컬럼이 다르면 쓰임도 다릅니다.
+  const leftAccordionOrder = ['stt', 'eligibility', ...(analysis?.reliefReviewDetail ? ['reliefDetail'] : []), 'reliefResult'];
+  const [activeLeftAccordionId, setActiveLeftAccordionId] = useState(null);
+  const goToNextLeftSection = (currentKey) => {
+    const nextKey = leftAccordionOrder[leftAccordionOrder.indexOf(currentKey) + 1];
+    setActiveLeftAccordionId(nextKey || null);
+    const targetId = nextKey ? `analysisLeftSection-${nextKey}` : 'analysisLeftSection-checklist';
+    window.setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 240);
+  };
   const [pendingHitlAction, setPendingHitlAction] = useState(null);
   const activeReviewAction = selectedCase?.reviewAction && !selectedCase.reviewAction.resolved ? selectedCase.reviewAction : null;
   // focusedConsultationId(대시보드/알림에서 특정 사건으로 바로 진입)로 들어왔을 때 한 번만
@@ -976,7 +987,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
               </div>
 
         {selectedCase ? (
-          <div className="analysisProgressPanel">
+          <div className="analysisProgressPanel" role="status" aria-live="polite" aria-label="상담 분석 진행 상태">
             <span className={analyzed ? 'statusChip tone-success' : 'statusChip tone-muted'}>{analyzed ? '분석 완료' : '분석 전'}</span>
             {/* 분석 전에는 저장할 대상이 없으므로 주의색(주황) 대신 중립색으로 '저장 전'을 보여주고,
                 분석을 마쳐 저장할 내용이 생겼을 때만 '저장 필요'(주황)로 주의를 끕니다. */}
@@ -988,6 +999,17 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
         ) : null}
         {analyzed ? (
           <>
+          {/* 검증·자료 3줄이 컨트롤바·배너와 함께 늘 한꺼번에 펼쳐져 있어 분석 직후 화면이
+              빽빽하다는 지적을 받아, 아래 다른 결과 섹션들과 같은 접기 방식으로 묶습니다.
+              방금 분석을 마친 직후 바로 확인하는 내용이라 기본은 펼친 채로 시작하되,
+              다 확인했으면 접어서 화면을 정리할 수 있게 합니다. */}
+          <CollapsibleSection icon={ShieldCheck} title="검증·자료 확인" defaultOpen className="analysisVerificationSection">
+          {/* 세 칩은 함께 읽어야 한다. 스키마 오류가 하나라도 있으면 validator가 근거
+              점수와 무관하게 환각 위험을 '높음'으로 못박고(if errors or probability >=
+              threshold), 대조할 근거가 0건일 때도 유사도가 전부 0.0이 되어 같은 결론에
+              이른다. 둘 다 '지어냈다'는 뜻이 아니다 — 형식과 근거를 먼저 보면 된다.
+              (ai-api가 저장 형식을 검증 스키마 모양으로 통역하고, 근거가 없으면 아예
+               판정하지 않도록 고쳐 두었다 — output_validation/service.py 참고) */}
           <div className="resultInlineRow">
                 <h3>AI 응답 검증</h3>
                 <span className={`statusChip ${analysis.verification?.format === true ? 'tone-success' : analysis.verification?.format === false ? 'tone-danger' : 'tone-muted'}`}>
@@ -1025,7 +1047,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                   </span>
                 )) : <span className="resultInlineEmpty">첨부파일 없음 · 메모만 분석</span>}
               </div>
-          
+          </CollapsibleSection>
           <div className="analysisControlBar">
             
             <div>
@@ -1151,7 +1173,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
               <CollapsibleSection icon={Sparkles} title="AI 분석 요약" pinned confirmed={Boolean(confirmedSections.summary)} onToggleConfirm={() => toggleSectionConfirmed('summary')}>
                 <div className="resultCard"><SummaryBulletList text={analysis.summary} /></div>
               </CollapsibleSection>
-              <CollapsibleSection icon={EyeOff} title="개인정보는 자동으로 가려집니다" confirmed={Boolean(confirmedSections.stt)} onToggleConfirm={() => toggleSectionConfirmed('stt')}>
+              <CollapsibleSection id="analysisLeftSection-stt" icon={EyeOff} title="개인정보는 자동으로 가려집니다" open={activeLeftAccordionId === 'stt'} onToggle={(nextOpen) => setActiveLeftAccordionId(nextOpen ? 'stt' : null)} confirmed={Boolean(confirmedSections.stt)} onToggleConfirm={() => toggleSectionConfirmed('stt')}>
                 <div className="resultCard">
                   <div className="segmented compactSegmented">
                     <button type="button" className={showMaskedStt ? 'active' : ''} onClick={() => setShowMaskedStt(true)}>개인정보 가림</button>
@@ -1161,8 +1183,13 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                   <p className="sttPreviewText">{showMaskedStt ? analysis.sttPreview?.masked : analysis.sttPreview?.original}</p>
                   <p className="helperText">기본값: 개인정보 가림 · 원문: 오류 확인용</p>
                 </div>
+                <div className="hitlSectionNextRow">
+                  <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextLeftSection('stt')}>
+                    확인하고 다음으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                </div>
               </CollapsibleSection>
-              <CollapsibleSection icon={Scale} title="무료 법률구조 대상 검토" confirmed={Boolean(confirmedSections.eligibility)} onToggleConfirm={() => toggleSectionConfirmed('eligibility')}>
+              <CollapsibleSection id="analysisLeftSection-eligibility" icon={Scale} title="무료 법률구조 대상 검토" open={activeLeftAccordionId === 'eligibility'} onToggle={(nextOpen) => setActiveLeftAccordionId(nextOpen ? 'eligibility' : null)} confirmed={Boolean(confirmedSections.eligibility)} onToggleConfirm={() => toggleSectionConfirmed('eligibility')}>
               <div className={analysis.aiLinked?.eligibility ? 'resultCard aiLinkedCard' : 'resultCard'}>
                 {analysis.aiLinked?.eligibility ? (
                   <div className="fieldSyncNotice">
@@ -1194,15 +1221,25 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                   <label className="miniField">무료 법률구조 대상<select value={analysis.eligibility} onChange={(event) => setAnalysis({ ...analysis, eligibility: event.target.value })}><option>검토 필요</option><option>구조 가능</option><option>부적합</option><option>보류</option></select></label>
                 </div>
               </div>
+              <div className="hitlSectionNextRow">
+                <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextLeftSection('eligibility')}>
+                  확인하고 다음으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+                </button>
+              </div>
               </CollapsibleSection>
               {analysis.reliefReviewDetail ? (
-                <CollapsibleSection icon={ListChecks} title="체크리스트 AI 분석 상세" confirmed={Boolean(confirmedSections.reliefDetail)} onToggleConfirm={() => toggleSectionConfirmed('reliefDetail')}>
+                <CollapsibleSection id="analysisLeftSection-reliefDetail" icon={ListChecks} title="체크리스트 AI 분석 상세" open={activeLeftAccordionId === 'reliefDetail'} onToggle={(nextOpen) => setActiveLeftAccordionId(nextOpen ? 'reliefDetail' : null)} confirmed={Boolean(confirmedSections.reliefDetail)} onToggleConfirm={() => toggleSectionConfirmed('reliefDetail')}>
                   <div className="resultCard">
                     <ReliefReviewDetailTabs detail={analysis.reliefReviewDetail} />
                   </div>
+                  <div className="hitlSectionNextRow">
+                    <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextLeftSection('reliefDetail')}>
+                      확인하고 다음으로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+                    </button>
+                  </div>
                 </CollapsibleSection>
               ) : null}
-              <CollapsibleSection icon={Sparkles} title="체크리스트 AI 분석 결과" confirmed={Boolean(confirmedSections.reliefResult)} onToggleConfirm={() => toggleSectionConfirmed('reliefResult')}>
+              <CollapsibleSection id="analysisLeftSection-reliefResult" icon={Sparkles} title="체크리스트 AI 분석 결과" open={activeLeftAccordionId === 'reliefResult'} onToggle={(nextOpen) => setActiveLeftAccordionId(nextOpen ? 'reliefResult' : null)} confirmed={Boolean(confirmedSections.reliefResult)} onToggleConfirm={() => toggleSectionConfirmed('reliefResult')}>
                 <div className="resultCard">
                   {analysis.reliefReviewDetail ? (
                     <ReliefLawyerSummaryCard detail={analysis.reliefReviewDetail} />
@@ -1210,8 +1247,13 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                     <InlineEmptyNotice>AI 분석 결과 없음 · 분석을 다시 실행하세요</InlineEmptyNotice>
                   )}
                 </div>
+                <div className="hitlSectionNextRow">
+                  <button type="button" className="smallButton light hitlSectionNextButton" onClick={() => goToNextLeftSection('reliefResult')}>
+                    확인하고 체크리스트로 <ChevronRight size={14} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                </div>
               </CollapsibleSection>
-              <CollapsibleSection icon={ListChecks} title="체크리스트" pinned confirmed={Boolean(confirmedSections.checklist)} onToggleConfirm={() => toggleSectionConfirmed('checklist')}>
+              <CollapsibleSection id="analysisLeftSection-checklist" icon={ListChecks} title="체크리스트" pinned confirmed={Boolean(confirmedSections.checklist)} onToggleConfirm={() => toggleSectionConfirmed('checklist')}>
                 <div className="resultCard checklistBox">
                   {(analysis.checklist || []).map((item, index) => {
                     const note = checklistItemNote(item, analysis.reliefReviewDetail);
@@ -1307,7 +1349,7 @@ export function AnalysisWorkbench({ consultations, onCreateConsultation, onUpdat
                     : <InlineEmptyNotice>{timelineEmptyMessage(analysis.timelineIssue)}</InlineEmptyNotice>}
                 </div>
                 <div className="inlineControls compactInline">
-                  <input value={timelineText} onChange={(event) => setTimelineText(event.target.value)} placeholder="타임라인 항목" />
+                  <input value={timelineText} onChange={(event) => setTimelineText(event.target.value)} placeholder="타임라인 항목" aria-label="타임라인 항목 추가" />
                   <button type="button" onClick={() => {
                     if (!timelineText.trim()) return;
                     setAnalysis({ ...analysis, timeline: [...(analysis.timeline || []), { date: today, text: timelineText }] });
