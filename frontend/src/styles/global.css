@@ -890,6 +890,39 @@ button:disabled:active {
   font-size: var(--fs-lg);
 }
 
+/* 비밀번호 표시/숨김 토글. 입력칸 자체는 .field input 규칙을 그대로 쓰고, 오른쪽에
+   아이콘 버튼 하나만 겹쳐 올립니다(새 색 없이 기존 아이콘 버튼과 같은 회색 톤). */
+.passwordFieldControl {
+  position: relative;
+}
+
+.passwordFieldControl input {
+  padding-right: 44px;
+}
+
+.passwordVisibilityToggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.passwordVisibilityToggle:hover {
+  background: var(--surface);
+  color: var(--text-main);
+}
+
 .field input::placeholder {
   color: var(--text-placeholder);
 }
@@ -3889,6 +3922,9 @@ button:disabled:active {
 }
 
 .fileCategoryChoices button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 36px;
   padding: 5px 12px;
   border: 1px solid var(--border);
@@ -7476,6 +7512,7 @@ textarea:focus-visible,
   text-decoration: none;
 }
 .favoriteToggle {
+  position: relative;
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
@@ -7487,6 +7524,15 @@ textarea:focus-visible,
   font-weight: 700;
   color: var(--text-muted);
   cursor: pointer;
+}
+
+/* 서식 291개 목록에서 별표를 눌러 즐겨찾기하는 손가락 터치가 22px 원 안에 자주 빗나갑니다.
+   보이는 아이콘 크기는 그대로 두고, 실제로 누를 수 있는 영역만 최소 44px로 넓힙니다
+   (::after는 투명해서 화면에는 아무 변화가 없습니다). */
+.favoriteToggle::after {
+  content: '';
+  position: absolute;
+  inset: -11px;
 }
 
 .favoriteToggle:hover {
@@ -7732,8 +7778,14 @@ textarea:focus-visible,
   line-height: 1.5;
 }
 
+/* 스크린리더에 "버튼 안에 버튼"으로 읽히던 문제를 없애면서 <span>이던 자리를 실제
+   <button>으로 바꿨습니다. 브라우저 기본 버튼 테두리·커서만 지워 예전 <span> 모양 그대로
+   보이게 합니다(색·배경·크기는 아래 기존 규칙을 그대로 물려받음). */
 .notificationState {
   display: inline-flex;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
   border-radius: var(--r-pill);
   padding: 4px 8px;
   background: var(--surface-muted);
@@ -8002,7 +8054,17 @@ textarea:focus-visible,
   fill: none;
   stroke-width: 13;
   stroke-linecap: round;
-  transition: stroke-dasharray 0.4s ease;
+  cursor: pointer;
+  transition: opacity 180ms ease, stroke-width 180ms ease;
+}
+
+.donutChart.has-hovered-segment .donutArc {
+  opacity: 0.28;
+}
+
+.donutChart.has-hovered-segment .donutArc.is-hovered {
+  opacity: 1;
+  stroke-width: 15;
 }
 
 .donutArc.tone-success {
@@ -8068,10 +8130,29 @@ textarea:focus-visible,
 .legendRow {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 8px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   font-size: var(--fs-md);
   font-weight: 700;
   color: var(--text-main);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.legendRow:hover,
+.legendRow.is-hovered {
+  background: var(--surface-subtle);
+}
+
+.legendRow:focus-visible {
+  outline: 3px solid var(--accent-tint);
+  outline-offset: 2px;
 }
 
 .legendDot {
@@ -8091,6 +8172,13 @@ textarea:focus-visible,
 
 .legendDot.tone-warn {
   background: var(--color-warn);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donutArc,
+  .legendRow {
+    transition: none;
+  }
 }
 
 .legendLabel {
@@ -9165,7 +9253,7 @@ textarea:focus-visible,
   border-radius: var(--r-circle);
   background-color: #fff;
   transform-origin: 50%;
-  animation: bounceCircleMotion 0.5s alternate infinite ease;
+  animation: loadingDotPulse 1.05s ease-in-out infinite;
 }
 
 @keyframes bounceCircleMotion {
@@ -9204,10 +9292,12 @@ textarea:focus-visible,
   left: 15%;
   z-index: -1;
   border-radius: var(--r-circle);
-  background-color: rgba(0, 0, 0, 0.9);
-  filter: blur(1px);
-  transform-origin: 50%;
-  animation: bounceShadowMotion 0.5s alternate infinite ease;
+  display: none;
+}
+
+@keyframes loadingDotPulse {
+  0%, 100% { opacity: 0.34; transform: scale(0.82); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
 @keyframes bounceShadowMotion {
@@ -14593,8 +14683,30 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   gap: 8px;
 }
 
+/* 실제 체크박스(input)는 기능·스크린리더용으로 남겨두되, 화면에는 안 보이게 합니다.
+   예전엔 이 input이 그대로 보여서 브라우저 기본 체크 표시 옆에 커스텀 체크 아이콘이
+   하나 더 붙어, 체크할 때마다 체크 표시가 두 개로 겹쳐 보였습니다. */
 .checklistItem input[type="checkbox"] {
-  margin: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.checklistItem label {
+  position: relative;
+}
+
+.checklistItem input[type="checkbox"]:focus-visible + .checklistItemCheckIcon,
+.checklistItem input[type="checkbox"]:focus-visible + .checklistItemCheckIconEmpty {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .checklistItemCheckIcon {
@@ -14980,6 +15092,17 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   box-shadow: var(--shadow-soft);
 }
 
+/* 수신자 전달 안내·AI 참고 배너는 둘 다 '검토 시작 전 알아두는 부가 정보'라 같은 묶음으로
+   가깝게 붙이고, 실제 검토 내용(첫 hitlSection)이 시작되는 지점 앞에는 넉넉하게 띄워
+   "여기부터 본문"이라는 경계를 줍니다. 예전엔 반대로 — 배너 사이는 32px로 멀고, 배너와
+   본문 사이는 2px로 거의 붙어 있어 그룹 경계가 뒤바뀌어 보였습니다. */
+.hitlReviewPage .reviewRecipientBox {
+  margin-bottom: 8px !important;
+}
+.hitlReviewPage .hitlBanner {
+  margin: 8px 0 22px !important;
+}
+
 /* 섹션마다 번호 배지 + 왼쪽 여백을 두던 방식은 "번호와 막대가 같이 있는 느낌이라 별로"라는
    피드백을 받아 걷어냅니다. 아이콘 + 제목만으로 각 섹션을 구분합니다.
    본문 흐름(.hitlReviewMain)의 섹션은 이제 개별 흰 카드가 아니라, 하나의 큰 카드
@@ -15025,11 +15148,34 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   gap: 10px !important;
 }
 .hitlReviewPage .hitlDecisionGridBottom {
-  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 10px !important;
 }
-.hitlReviewPage .hitlDecisionCard.tone-success {
-  grid-column: auto;
+/* 승인·반려·보류·수정요청·추가자료요청 다섯 장이 전부 같은 크기로 나란히 있으면 어느 게
+   더 자주/우선 고를 결정인지 알 수 없어 다섯 장 모두를 같은 무게로 훑어야 합니다. 유일한
+   긍정 결정인 '승인'만 위쪽에 전체 폭 한 장으로 올려 다른 네 장(보완·거절 계열)과 무게를
+   분리합니다 — 카드 순서·동작·문구는 그대로, 배치와 크기만 바꿉니다. */
+.hitlReviewPage .hitlDecisionGridBottom .hitlDecisionCard.tone-success {
+  grid-column: 1 / -1 !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  min-height: auto !important;
+  padding: 16px 20px !important;
+}
+.hitlReviewPage .hitlDecisionGridBottom .hitlDecisionCard.tone-success .hitlDecisionCardMeta {
+  flex-direction: row !important;
+  align-items: center !important;
+  width: auto !important;
+}
+/* 승인 외 네 장은 '검토를 마쳤을 때 고를 수 있는 보조 선택지'라 승인보다 한 단계 조용하게
+   — 세로 공간을 줄이고, 항상 보이던 설명(hint)은 선택 전엔 톤을 낮춰 카드 제목만 먼저 읽히게 합니다. */
+.hitlReviewPage .hitlDecisionGridBottom .hitlDecisionCard:not(.tone-success) {
+  min-height: 92px !important;
+  padding: 12px 14px !important;
+}
+.hitlReviewPage .hitlDecisionGridBottom .hitlDecisionCard:not(.tone-success):not(.selected) .hitlDecisionCardMeta small {
+  opacity: .78;
 }
 .hitlReviewPage .hitlDecisionCard {
   min-height: 132px;
@@ -15083,6 +15229,22 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 .hitlReviewPage .hitlDecisionCard.tone-success .hitlDecisionCardIcon { color: var(--success-solid); }
 .hitlReviewPage .hitlDecisionCard.tone-danger .hitlDecisionCardIcon { color: var(--danger-solid); }
 .hitlReviewPage .hitlDecisionCard.tone-warn .hitlDecisionCardIcon { color: var(--warn-solid); }
+
+/* 아코디언 섹션 끝의 "확인하고 다음으로" 버튼. 결정 카드와 헷갈리지 않도록 오른쪽 끝에
+   작게 두고, 기존 "취소" 버튼과 같은 스타일(.smallButton.light)을 그대로 씁니다.
+   변호사 검토(.hitlReviewPage)와 상담원 AI 분석(.analysisPanel) 왼쪽 컬럼이 같이 씁니다. */
+.hitlReviewPage .hitlSectionNextRow,
+.analysisPanel .hitlSectionNextRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.hitlReviewPage .hitlSectionNextButton,
+.analysisPanel .hitlSectionNextButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .hitlDecisionSelectedBadge {
   border-radius: var(--r-pill);
@@ -15981,6 +16143,10 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 }
 
 .collapsibleSectionHeader h3 {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
 }
 
@@ -16109,9 +16275,8 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 .loginHeroPanel {
   position: relative;
   overflow: hidden;
-  /* 그러데이션은 동영상이 아직 로드되기 전이나 재생이 안 되는 환경(느린 네트워크, 데이터 절약
-     모드 등)에서 보이는 배경색으로 남겨둡니다 — 동영상이 background-color 위에 얹히는 구조. */
-  background: linear-gradient(160deg, #e5f0ff 0%, #cfe3ff 46%, #bfe9ec 100%) !important;
+  /* 영상이 보이지 않는 환경에서도 기관 포털의 차분한 단색 면을 유지합니다. */
+  background: var(--accent-tint) !important;
   box-shadow: none;
 }
 
@@ -16134,10 +16299,7 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
   position: absolute;
   inset: 0;
   z-index: 0;
-  background:
-    radial-gradient(circle at 14% 8%, rgba(255, 255, 255, 0.6), transparent 40%),
-    radial-gradient(circle at 88% 92%, rgba(0, 102, 255, 0.20), transparent 46%),
-    linear-gradient(160deg, rgba(229, 240, 255, 0.72) 0%, rgba(207, 227, 255, 0.6) 46%, rgba(191, 233, 236, 0.68) 100%);
+  background: rgba(238, 246, 255, 0.82);
 }
 
 /* 히어로 안의 실제 콘텐츠(문구·배지·카드)는 영상/오버레이보다 위 레이어에 그려야 합니다. */
@@ -16264,14 +16426,14 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 
 /* 역할 카드 · 버튼에 눌리는 느낌(탄성감)을 줘 정적인 화면이라는 인상을 줄입니다. */
 .roleCard {
-  transition: transform .18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .18s ease, background .18s ease !important;
+  transition: transform .18s var(--ease-out), box-shadow .18s ease, background .18s ease !important;
 }
 @media (hover: hover) and (pointer: fine) {
   .roleCard:hover {
     transform: translateY(-2px);
   }
   .roleCard:hover svg {
-    transform: scale(1.08);
+    transform: none;
   }
 }
 .roleCard:active {
@@ -16436,6 +16598,94 @@ section.notificationPanel.workPanel > .notificationContentCard { margin: 0 !impo
 
 .workflowPanel.analysisPanel > .workPageHeader .flowStageText small {
   font-size: var(--fs-caption);
+}
+
+/* 실시간 상담 업무 단계: 같은 형태의 작은 카드 두 장이 아니라,
+ * 완료 → 현재 단계가 이어지는 하나의 짧은 타임라인으로 읽히게 합니다. */
+.workflowPanel.analysisPanel > .workPageHeader .flowStageSteps {
+  position: relative;
+  gap: 2px;
+  padding: 3px 0;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageSteps::before {
+  position: absolute;
+  top: 27px;
+  bottom: 27px;
+  left: 21px;
+  width: 1px;
+  background: var(--border-strong);
+  content: '';
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep {
+  position: relative;
+  min-height: 64px;
+  padding: 10px 12px 10px 48px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: transparent;
+  box-shadow: none;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep.active {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageIndex {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 8px;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-sub);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep.complete .flowStageIndex,
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep.active .flowStageIndex {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageText {
+  gap: 2px;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep:not(.active) .flowStageText strong {
+  color: var(--text-sub);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageHereBadge {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--accent-hover);
+  font-size: var(--fs-caption);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageGo {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep.linkable:hover,
+.workflowPanel.analysisPanel > .workPageHeader .flowStageStep.linkable:focus-visible {
+  border-color: var(--accent-border);
+  background: var(--surface-subtle);
+  box-shadow: none;
 }
 
 @media (max-width: 900px) {
@@ -17104,6 +17354,210 @@ body:has(.analysisPanel) {
   font-size: var(--fs-md);
 }
 
+/* ---------------------------------------------------------------------
+ * 업무 화면 가독성 정리: 검토하기 · 실시간 상담
+ * ------------------------------------------------------------------
+ * 두 화면은 정보량이 많지만, 모든 블록을 같은 무게의 카드로 보이면 사용자는 무엇부터
+ * 읽고 행동해야 하는지 판단하기 어렵습니다. 안내/상태/입력 영역을 충분한 여백으로
+ * 분리하고, 실제 입력과 결정에만 시선이 모이도록 표면의 톤을 낮춥니다. */
+
+/* 검토하기: 상단 안내는 한 묶음으로, 본문 검토 항목은 서로 숨 쉴 간격을 둡니다. */
+.hitlReviewPage .hitlReviewMain {
+  display: grid;
+  gap: 0;
+}
+
+.hitlReviewPage .reviewToolbarSticky {
+  min-height: 76px;
+  padding: 18px 0 !important;
+}
+
+.hitlReviewPage .reviewRecipientSummary {
+  min-height: 88px;
+  padding: 18px 20px;
+}
+
+.hitlReviewPage .reviewRecipientCopy {
+  display: grid;
+  gap: 5px;
+}
+
+.hitlReviewPage .reviewRecipientCopy span,
+.hitlReviewPage .reviewRecipientAssignee small {
+  line-height: 1.55;
+}
+
+.hitlReviewPage .hitlBanner {
+  padding: 16px 18px;
+}
+
+.hitlReviewPage .hitlReviewMain .hitlSection,
+.hitlReviewPage .hitlDecisionSection {
+  padding-top: 26px !important;
+  margin-bottom: 26px !important;
+}
+
+.hitlReviewPage .hitlReviewMain .hitlSection .collapsibleSectionHeader {
+  min-height: 36px;
+}
+
+.hitlReviewPage .hitlReviewMain .hitlSection .resultCard {
+  margin-top: 12px;
+}
+
+.hitlReviewPage .lawyerReviewBrief {
+  gap: 16px;
+}
+
+.hitlReviewPage .lawyerReviewBrief article {
+  padding: 20px;
+}
+
+.hitlReviewPage .hitlSectionNextRow {
+  margin-top: 14px;
+}
+
+/* 실시간 상담: 사건 기본정보는 읽기 쉬운 메타 영역으로, 통화 제어와 메모는 명확히
+ * 나뉜 두 작업면으로 표현합니다. */
+.analysisPanel .analysisCaseMeta {
+  gap: 12px;
+  margin: 20px 0 24px;
+}
+
+.analysisPanel .analysisCaseMeta > span,
+.analysisPanel .analysisCaseMetaEdit {
+  min-height: 84px;
+  padding: 15px 16px;
+  border-radius: var(--r-surface);
+}
+
+.analysisPanel .analysisCaseMetaEdit {
+  gap: 7px;
+}
+
+.analysisPanel .analysisCaseMetaEdit > input {
+  min-height: 38px;
+}
+
+.analysisPanel .realtimeWorkbenchPanel {
+  margin-top: 8px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  box-shadow: 0 10px 26px rgba(24, 39, 65, 0.055);
+}
+
+.analysisPanel .realtimeWorkbenchHeader {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: none !important;
+}
+
+.analysisPanel .realtimeHeaderTags {
+  gap: 8px;
+}
+
+.analysisPanel .realtimeSplitRow {
+  align-items: start;
+  gap: 28px;
+}
+
+.analysisPanel .realtimeSplitColumn {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-surface);
+  background: var(--surface-subtle);
+}
+
+.analysisPanel .realtimeSplitColumn > p {
+  margin: -5px 0 2px;
+  line-height: 1.65;
+}
+
+.analysisPanel .realtimeStatusChips {
+  gap: 0;
+  padding: 18px;
+  background: var(--surface);
+}
+
+.analysisPanel .realtimeStatusChips .callControlButton {
+  min-height: 42px;
+  margin-bottom: 8px;
+}
+
+.analysisPanel .realtimeTranscriptCard {
+  min-height: 100%;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-surface);
+  box-shadow: none;
+}
+
+.analysisPanel .realtimeMemoTextarea {
+  min-height: 210px;
+  margin: 10px 0 12px;
+  line-height: 1.65;
+}
+
+.analysisPanel .realtimeMemoComposer {
+  gap: 10px;
+}
+
+.analysisPanel .realtimeQuestionsCard {
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 1080px) {
+  .hitlReviewPage .reviewRecipientSummary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .hitlReviewPage .reviewRecipientAssignee {
+    grid-column: 2;
+    min-width: 0;
+    padding: 10px 0 0;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .analysisPanel .analysisCaseMeta {
+    gap: 10px;
+    margin: 16px 0 20px;
+  }
+
+  .analysisPanel .analysisCaseMeta > span,
+  .analysisPanel .analysisCaseMetaEdit {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .analysisPanel .realtimeWorkbenchPanel {
+    padding: 16px;
+  }
+
+  .analysisPanel .realtimeSplitRow {
+    gap: 16px;
+  }
+
+  .analysisPanel .realtimeSplitColumn,
+  .analysisPanel .realtimeTranscriptCard {
+    padding: 16px;
+  }
+
+  .analysisPanel .realtimeMemoTextarea {
+    min-height: 170px;
+  }
+}
+
 .adoptedReferenceCaseHead span {
   color: var(--text-sub);
   font-size: var(--fs-sm);
@@ -17214,13 +17668,400 @@ body:has(.analysisPanel) {
 }
 
 .fullTextModalClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
   border: 0;
   background: none;
   color: var(--text-sub);
   cursor: pointer;
-  padding: 4px;
   line-height: 0;
   border-radius: var(--r-chip);
+}
+
+/* ---------------------------------------------------------------------
+ * 역할별 업무 화면 정돈
+ * ------------------------------------------------------------------
+ * 공통 원칙: 한 화면에는 하나의 주 작업을 선명하게 두고, 상태·보조 정보는 여백과
+ * 구분선으로 낮춥니다. 기능이나 데이터는 감추지 않으며, 긴 목록은 표/목록 자체에서
+ * 읽히게 하고 불필요한 카드 중첩만 줄입니다. */
+
+.dashboard-counselor,
+.dashboard-lawyer,
+.workflowPanel.searchPanel,
+.workflowPanel.uploadPanel,
+.workflowPanel.draftPanel,
+.workflowPanel.analysisPanel,
+.workspacePage:has(.adoptedReferenceList) .workflowPanel {
+  --work-surface-gap: 28px;
+}
+
+.dashboard-counselor,
+.dashboard-lawyer {
+  gap: var(--work-surface-gap);
+  padding-bottom: 56px;
+}
+
+.dashboard-counselor .dashboardLeft,
+.dashboard-counselor .dashboardRight,
+.dashboard-lawyer .dashboardLeft,
+.dashboard-lawyer .dashboardRight {
+  display: grid;
+  align-content: start;
+  gap: var(--work-surface-gap);
+}
+
+/* 표와 보완 요청은 같은 중요도가 아니므로, 제목과 결과 목록의 간격을 한 박자 더 띄웁니다. */
+.dashboard-counselor .panel,
+.dashboard-lawyer .panel {
+  border-color: var(--border);
+  border-radius: var(--r-surface);
+  box-shadow: 0 8px 22px rgba(24, 39, 65, 0.055);
+}
+
+.dashboard-counselor .panelTitleRow,
+.dashboard-lawyer .panelTitleRow,
+.workflowPanel .panelTitleRow {
+  min-height: 48px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.dashboard-counselor .dataTable tbody tr,
+.dashboard-lawyer .dataTable tbody tr {
+  transition: background-color 160ms ease;
+}
+
+.dashboard-counselor .reworkList,
+.dashboard-lawyer .reworkList {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-counselor .reworkItem,
+.dashboard-lawyer .reworkItem {
+  padding: 16px;
+  border-radius: var(--r-control);
+  background: var(--surface-subtle);
+}
+
+/* 업무 화면의 상단 헤더는 페이지 제목과 설명을 먼저 읽고, 다음 행동은 우측에서 찾도록 합니다. */
+.dashboardIntroWrap {
+  margin-bottom: 28px;
+}
+
+.dashboardIntroRow {
+  gap: 24px;
+}
+
+.dashboardIntro h1,
+.workflowPanel > .workPageHeader h1 {
+  letter-spacing: -0.025em;
+}
+
+.dashboardIntro p,
+.workflowPanel > .workPageHeader p {
+  max-width: 68ch;
+  line-height: 1.6;
+}
+
+/* 법령·판례와 담은 자료: 검색, 선택, 저장 결과가 서로 섞이지 않도록 세 구역을
+ * 중립 표면으로 통일합니다. 선택 상태만 파란색으로 보여 현재 작업을 즉시 알 수 있습니다. */
+.searchPanel .referenceActionBar,
+.searchPanel .referenceList,
+.searchPanel .referenceSelectedPanel,
+.workspacePage:has(.adoptedReferenceList) .workflowPanel {
+  border-color: var(--border);
+  border-radius: var(--r-surface);
+  box-shadow: none;
+}
+
+.searchPanel .referenceActionBar {
+  margin: 22px 0;
+  padding: 16px 18px;
+}
+
+.searchPanel .referenceCard,
+.searchPanel .referenceSelectedPanel button,
+.adoptedReferenceCase {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.searchPanel .referenceCard {
+  padding-block: 18px;
+}
+
+.adoptedReferenceList {
+  gap: 20px;
+}
+
+.adoptedReferenceCase {
+  padding: 20px;
+  border-radius: var(--r-surface);
+  background: var(--surface);
+}
+
+.adoptedReferenceCase + .adoptedReferenceCase {
+  border-top: 1px solid var(--border);
+}
+
+/* 실시간 상담·자료 업로드·서식 생성: 입력 요소는 한 작업 단위 안에서 촘촘히 묶고,
+ * 다음 단계와는 충분히 띄워 스크롤을 내려도 현재 문맥을 잃지 않게 합니다. */
+.workflowPanel.uploadPanel,
+.workflowPanel.draftPanel,
+.workflowPanel.analysisPanel,
+.workflowPanel.searchPanel {
+  padding-bottom: 44px;
+}
+
+.uploadPanel .workflowColumns,
+.draftPanel .workflowColumns,
+.analysisPanel .workflowColumns {
+  gap: 28px;
+}
+
+.uploadPanel .field,
+.draftPanel .field,
+.analysisPanel .field {
+  gap: 8px;
+}
+
+.uploadPanel .uploadActionRow,
+.draftPanel .draftFinalActions,
+.analysisPanel .analysisFinalActions {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.uploadPanel .uploadActionRow {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.draftPanel .draftCaseSummary,
+.uploadPanel .uploadCaseSummary,
+.analysisPanel .analysisCaseMeta {
+  margin-top: 20px;
+  margin-bottom: 28px;
+}
+
+.draftPanel .documentReviewPanel,
+.draftPanel .draftSelectCard,
+.uploadPanel .evidenceBox,
+.analysisPanel .analysisResultsWorkspace {
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+.draftPanel .documentReviewRow + .documentReviewRow {
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.analysisPanel .analysisResultsWorkspace {
+  margin-top: 32px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border);
+}
+
+.analysisPanel .analysisActionRail {
+  border-radius: var(--r-surface);
+}
+
+/* 전 업무 화면에 같은 키보드 포커스·눌림 피드백을 적용해 조작 가능 여부를 분명히 합니다. */
+.dashboard-counselor :is(button, a, input, select, textarea):focus-visible,
+.dashboard-lawyer :is(button, a, input, select, textarea):focus-visible,
+.workflowPanel :is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--accent-tint);
+  outline-offset: 2px;
+}
+
+.dashboard-counselor button:active:not(:disabled),
+.dashboard-lawyer button:active:not(:disabled),
+.workflowPanel button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+@media (max-width: 900px) {
+  .dashboard-counselor,
+  .dashboard-lawyer {
+    gap: 20px;
+    padding-bottom: 36px;
+  }
+
+  .dashboardIntroWrap {
+    margin-bottom: 20px;
+  }
+
+  .uploadPanel .workflowColumns,
+  .draftPanel .workflowColumns,
+  .analysisPanel .workflowColumns {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboardIntroRow {
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .dashboardIntroRow .addConsultationButton {
+    width: 100%;
+  }
+
+  .dashboard-counselor .panel,
+  .dashboard-lawyer .panel,
+  .adoptedReferenceCase {
+    border-radius: var(--r-card);
+  }
+
+  .workflowPanel.uploadPanel,
+  .workflowPanel.draftPanel,
+  .workflowPanel.analysisPanel,
+  .workflowPanel.searchPanel {
+    padding-bottom: 28px;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * 포털 전반 마감 정리
+ * ------------------------------------------------------------------
+ * 로그인 화면은 신뢰감을 주는 첫 진입면, 로그인 이후는 빠르게 처리하는 업무면으로
+ * 분리합니다. 두 영역 모두 같은 색 토큰·모서리·포커스 규칙을 사용해 화면 전환에도
+ * 서비스가 달라 보이지 않게 합니다. */
+
+::selection {
+  background: var(--accent-tint);
+  color: var(--text-main);
+}
+
+:is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--accent-tint);
+  outline-offset: 2px;
+}
+
+.loginHeroCopy h1 {
+  max-width: 18ch;
+  margin-bottom: 14px;
+  letter-spacing: -0.03em !important;
+}
+
+.loginHeroCopy > p {
+  max-width: 48ch;
+}
+
+.loginHeroContentPanel {
+  gap: 22px;
+}
+
+.loginFormPanel {
+  padding-block: clamp(32px, 5vw, 64px);
+}
+
+.loginFormPanel .loginIntro {
+  margin-bottom: 24px;
+}
+
+.loginFormPanel .loginCard + .loginCard {
+  margin-top: 20px;
+}
+
+.quickLoginCard .roleGrid {
+  gap: 10px;
+}
+
+/* 헤더에서는 현재 위치와 실행 버튼의 대비만 남기고, 나머지 메뉴는 조용한 텍스트 탐색으로
+ * 낮춥니다. 긴 메뉴도 한 줄에서 읽히고 작은 화면에서는 각 버튼이 충분한 높이를 갖습니다. */
+.dashboardHeader {
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(24, 39, 65, 0.045);
+}
+
+.dashboardHeader .navText {
+  min-height: 40px;
+  border-radius: var(--r-control);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.dashboardHeader .navText:hover:not(.active) {
+  background: var(--surface-subtle);
+}
+
+.dashboardHeader .navText.active {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.workspacePage,
+.dashboard {
+  padding-bottom: 56px;
+}
+
+.workflowPanel > .workPageHeader,
+.workPanel > .workPageHeader {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 입력·표·결과 목록은 같은 8px 리듬을 유지하고, 실제 클릭 가능한 행만 hover를 갖습니다. */
+.field input,
+.field select,
+.field textarea,
+.inlineControls input,
+.inlineControls select {
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.dataTable tbody tr,
+.referenceCard,
+.documentReviewRow,
+.notificationItem {
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.dataTable tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent-tint) 32%, var(--surface));
+}
+
+@media (max-width: 900px) {
+  .workspacePage,
+  .dashboard {
+    padding-bottom: 36px;
+  }
+
+  .dashboardHeader .navText {
+    min-height: 38px;
+  }
+}
+
+@media (max-width: 640px) {
+  .loginHeroCopy h1 {
+    max-width: none;
+  }
+
+  .loginHeroContentPanel {
+    gap: 18px;
+  }
+
+  .loginFormPanel {
+    padding-block: 28px;
+  }
+
+  .dashboardHeader .navText {
+    min-height: 44px;
+  }
+
+  .workflowPanel > .workPageHeader,
+  .workPanel > .workPageHeader {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+  }
 }
 
 .fullTextModalClose:hover {
@@ -17328,4 +18169,763 @@ body:has(.analysisPanel) {
     grid-column: 1 / -1;
     margin: 0;
   }
+}
+
+/* 최종 우선순위: 전 화면에서 같은 접근성 포커스와 작업 단위 간 여백을 유지합니다. */
+:is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--accent-tint);
+  outline-offset: 2px;
+}
+
+.dashboardHeader {
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(24, 39, 65, 0.045);
+}
+
+.dashboardHeader .navText {
+  min-height: 40px;
+  border-radius: var(--r-control);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.dashboardHeader .navText:hover:not(.active) {
+  background: var(--surface-subtle);
+}
+
+.dashboardHeader .navText.active {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.workspacePage,
+.dashboard {
+  padding-bottom: 56px;
+}
+
+.workflowPanel > .workPageHeader,
+.workPanel > .workPageHeader {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dataTable tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent-tint) 32%, var(--surface));
+}
+
+@media (max-width: 900px) {
+  .workspacePage,
+  .dashboard { padding-bottom: 36px; }
+  .dashboardHeader .navText { min-height: 38px; }
+}
+
+@media (max-width: 640px) {
+  .dashboardHeader .navText { min-height: 44px; }
+  .workflowPanel > .workPageHeader,
+  .workPanel > .workPageHeader {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+  }
+}
+
+/* 운영 관리: 표와 서비스 점검을 각각 하나의 작업면으로 분리합니다. 점검 항목은
+ * 카드·버튼 쌍을 반복하지 않고, 상태와 실행을 같은 행에서 빠르게 훑을 수 있게 둡니다. */
+.adminOperationsLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  align-items: start;
+  gap: 28px;
+}
+
+.adminAuditPanel,
+.adminServicePanel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-surface);
+  background: var(--surface);
+  padding: 22px;
+}
+
+.adminPanelHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.adminPanelHeading h3,
+.adminServiceContent h4 {
+  margin: 0;
+  color: var(--text-main);
+}
+
+.adminPanelHeading h3 {
+  font-size: var(--fs-lg);
+}
+
+.adminPanelHeading p,
+.adminServiceContent > p {
+  margin: 5px 0 0;
+  color: var(--text-sub);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.adminPanelCount {
+  flex: none;
+  padding: 5px 9px;
+  border-radius: var(--r-chip);
+  background: var(--surface-subtle);
+  color: var(--text-sub);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.adminAuditPanel .adminTableScroll {
+  max-height: 560px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+
+.adminAuditPanel .auditTable {
+  margin: 0;
+}
+
+.adminAuditPanel .auditTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.adminServicePanel {
+  padding-bottom: 8px;
+}
+
+.adminServiceList {
+  display: grid;
+}
+
+.adminServiceCheck {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+
+.adminServiceContent {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.adminServiceContent h4 {
+  font-size: var(--fs-md);
+}
+
+.adminServiceContent > p {
+  margin: -2px 0 0;
+  max-width: 48ch;
+}
+
+.adminServiceContent > strong {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+  color: var(--text-main);
+  font-size: var(--fs-sm);
+}
+
+.adminServiceActions {
+  display: grid;
+  gap: 8px;
+  align-self: center;
+}
+
+.adminServiceAction {
+  min-width: 116px;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-control);
+  background: var(--accent);
+  color: var(--surface);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, opacity 180ms ease;
+}
+
+.adminServiceAction:hover:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.adminServiceAction.secondary {
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.adminServiceAction.secondary:hover:not(:disabled) {
+  background: var(--accent-tint);
+}
+
+.adminServiceAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.adminServiceCheck .apiMetricGrid {
+  width: min(100%, 300px);
+  margin-top: 2px;
+}
+
+.adminServiceCheck .formRevisionChanges {
+  margin-top: 4px;
+}
+
+@media (max-width: 1080px) {
+  .adminOperationsLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .adminAuditPanel .adminTableScroll {
+    max-height: 420px;
+  }
+}
+
+@media (max-width: 640px) {
+  .adminAuditPanel,
+  .adminServicePanel {
+    padding: 16px;
+  }
+
+  .adminPanelHeading {
+    margin-bottom: 14px;
+  }
+
+  .adminServiceCheck {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .adminServiceActions,
+  .adminServiceAction {
+    width: 100%;
+  }
+
+  .adminServiceAction {
+    min-height: 44px;
+  }
+}
+
+/* 감사 로그는 '언제, 누가, 무엇을 했는지'를 읽는 표입니다. 대상·상세를 작업의
+ * 보조 줄로 합쳐 좁은 패널에서도 가로 스크롤 없이 한 행의 의미가 완성되게 합니다. */
+.adminAuditPanel .auditTable {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.adminAuditPanel .auditTimeColumn {
+  width: 30%;
+}
+
+.adminAuditPanel .auditActorColumn {
+  width: 35%;
+}
+
+.adminAuditPanel .auditTable th,
+.adminAuditPanel .auditTable td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.adminAuditPanel .auditTable th {
+  color: var(--text-sub);
+  font-size: var(--fs-caption);
+  font-weight: 700;
+}
+
+.auditTimestamp,
+.auditActivity {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.auditTimestamp span,
+.auditActivity span {
+  overflow: hidden;
+  color: var(--text-sub);
+  font-size: var(--fs-caption);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auditTimestamp strong,
+.auditActivity strong {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auditActor {
+  display: block;
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .adminAuditPanel .adminTableScroll {
+    max-height: 380px;
+  }
+
+  .adminAuditPanel .auditTable {
+    min-width: 0 !important;
+  }
+
+  .adminAuditPanel .auditTable th,
+  .adminAuditPanel .auditTable td {
+    padding: 11px 12px;
+  }
+
+  .adminAuditPanel .auditTimeColumn {
+    width: 31%;
+  }
+
+  .adminAuditPanel .auditActorColumn {
+    width: 30%;
+  }
+
+  .auditActivity span {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+/* 감사 로그는 정보가 세 열뿐이므로 가로 스크롤을 남겨둘 이유가 없습니다. 기존 공통
+ * 감사표의 최소 너비 규칙보다 우선해, 항상 패널 폭에 맞춰 읽히게 합니다. */
+.adminAuditPanel .adminTableScroll {
+  overflow-x: hidden !important;
+  overflow-y: auto;
+}
+
+.workflowPanel .adminAuditPanel .auditTable,
+.adminAuditPanel .auditTable.auditTable {
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed !important;
+}
+
+/* ---------------------------------------------------------------------
+ * 전 화면 상호작용 UI 마감
+ * ------------------------------------------------------------------
+ * 화면 안에서 바로 보이지 않는 선택 목록·모달·접힌 섹션도 같은 작업 규칙을 따릅니다.
+ * 업무를 멈추게 하는 요소는 내용보다 작아지지 않고, 버튼은 항상 눌릴 수 있는 크기를
+ * 유지하며, 작은 화면에서는 가로로 밀리지 않습니다. */
+.modalBackdrop {
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: 24px;
+  background: color-mix(in srgb, var(--text-main) 42%, transparent);
+}
+
+.modalBackdrop .modal {
+  width: min(100%, 640px);
+  max-height: min(86dvh, 820px);
+  overflow: hidden;
+  border-color: var(--border);
+  box-shadow: 0 18px 48px rgba(24, 39, 65, 0.2);
+}
+
+.modalBackdrop .modalHeader,
+.modalBackdrop .fullTextModalHead {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modalBackdrop .modalHeader h2,
+.modalBackdrop .fullTextModalHead h2 {
+  letter-spacing: -0.02em;
+}
+
+.casePicker,
+.choicePicker {
+  min-width: 0;
+}
+
+.casePickerButton,
+.choicePickerButton {
+  min-height: 48px;
+  padding: 11px 14px;
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.casePickerButton:hover:not(:disabled),
+.choicePickerButton:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+}
+
+.casePickerPopover,
+.choicePickerPopover {
+  box-sizing: border-box;
+  width: min(100%, 540px);
+  max-height: min(62dvh, 480px);
+  overflow: auto;
+  border-color: var(--border);
+  box-shadow: 0 12px 28px rgba(24, 39, 65, 0.14);
+}
+
+.casePickerSearch,
+.choicePickerSearch {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+.casePickerItem,
+.choicePickerItem {
+  min-height: 48px;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.casePickerItem:focus-visible,
+.choicePickerItem:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+.collapsibleSectionHeader {
+  min-height: 48px;
+  padding-block: 12px;
+}
+
+.collapsibleSectionBodyInner {
+  padding-top: 16px;
+}
+
+.notificationItem {
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.notificationItem:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-tint);
+}
+
+.notificationActions :is(button, .notificationState),
+.draftFinalActions > button,
+.uploadActionRow > button,
+.analysisFinalActions > button,
+.documentReviewActions > button {
+  min-height: 42px;
+}
+
+.draftFinalActions,
+.uploadActionRow,
+.analysisFinalActions,
+.documentReviewActions {
+  gap: 10px;
+}
+
+.categoryTabs,
+.modeTabs,
+.consultationChannelTabs {
+  gap: 8px;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.categoryTab,
+.modeTabs > button,
+.consultationChannelTabs > button {
+  min-height: 40px;
+}
+
+@media (max-width: 640px) {
+  .modalBackdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .modalBackdrop .modal {
+    width: 100%;
+    max-height: min(90dvh, 760px);
+  }
+
+  .modalBackdrop .fullTextModalHead,
+  .modalBackdrop .fullTextModalFoot {
+    gap: 10px;
+  }
+
+  .modalBackdrop .fullTextModalFoot {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .casePickerPopover,
+  .choicePickerPopover {
+    width: 100%;
+    max-height: min(58dvh, 440px);
+  }
+
+  .draftFinalActions,
+  .uploadActionRow,
+  .analysisFinalActions,
+  .documentReviewActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .draftFinalActions > button,
+  .uploadActionRow > button,
+  .analysisFinalActions > button,
+  .documentReviewActions > button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .casePickerButton,
+  .choicePickerButton,
+  .notificationItem {
+    transition: none;
+  }
+}
+
+/* 실시간 상담의 결과·제어 UI는 같은 업무 화면 안에서 상태와 행동이 섞이지 않도록
+ * 중립 표면으로 유지하고, 실제로 누를 수 있는 항목에만 짧은 피드백을 둡니다. */
+.analysisPanel .analysisProgressPanel {
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.analysisPanel .analysisProgressPanel .statusChip {
+  min-height: 30px;
+}
+
+.analysisPanel .analysisControlBar {
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.analysisPanel .analysisActions .aiActionCard {
+  transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.analysisPanel .analysisActions .aiActionCard:focus-visible {
+  outline: 3px solid var(--accent-tint);
+  outline-offset: 3px;
+}
+
+.analysisPanel .analysisActionRail .railSection h3 {
+  letter-spacing: -0.01em;
+}
+
+.analysisPanel .analysisActionRail .scrollBox button:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+.analysisPanel .realtimeMemoComposer input,
+.analysisPanel .realtimeMemoComposer .callAnalyzeButton {
+  min-height: 44px;
+}
+
+.analysisPanel .realtimeMemoComposer .callAnalyzeButton {
+  transition: background-color 180ms ease, border-color 180ms ease, opacity 180ms ease;
+}
+
+@media (max-width: 640px) {
+  .analysisPanel .analysisProgressPanel {
+    align-items: flex-start;
+  }
+
+  .analysisPanel .analysisActions .aiActionCard {
+    min-height: 72px;
+  }
+}
+
+/* 법령·판례의 빈 목록도 내용 영역의 상태입니다. 결과가 없거나 아직 자료를 담지 않은
+ * 경우에는 문구를 패널 중앙에 두어, 화면이 비어 보이는 대신 현재 상태가 분명히 읽히게 합니다. */
+.searchPanel .referenceList:has(> .templateEmpty),
+.searchPanel .referenceSelectedPanel.compactList:has(> p) {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
+  place-items: center;
+  align-content: stretch;
+}
+
+.searchPanel .referenceList > .templateEmpty,
+.searchPanel .referenceSelectedPanel.compactList > p {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+  align-self: center;
+  justify-self: center;
+}
+
+/* '담은 자료'의 빈 상태는 공통 빈 상태의 큰 카드 규칙을 물려받지 않습니다.
+ * 아이콘과 문구를 하나의 짧은 행으로 유지해 왼쪽 결과 없음 상태와 같은 리듬으로 보여 줍니다. */
+.searchPanel .referenceSelectedPanel.compactList > .templateEmpty {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px;
+  min-height: 0;
+  width: auto;
+}
+
+/* 담은 자료의 사건 요약은 네 개의 독립 카드 대신 하나의 정보 스트립으로 읽습니다.
+ * 사건 유형은 맥락, 나머지 세 값은 저장된 자료의 건수이므로 같은 기준선에서 훑을 수 있습니다. */
+.adoptedReferencePanel .referenceCaseSummary {
+  grid-template-columns: minmax(0, 1.35fr) repeat(3, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface-subtle);
+}
+
+.adoptedReferencePanel .referenceCaseSummary span {
+  min-height: 76px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.adoptedReferencePanel .referenceCaseSummary span + span {
+  border-left: 1px solid var(--border);
+}
+
+@media (max-width: 760px) {
+  .adoptedReferencePanel .referenceCaseSummary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adoptedReferencePanel .referenceCaseSummary span:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .adoptedReferencePanel .referenceCaseSummary span:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* 상담 자료 올리기도 실시간 상담과 같은 두 단계 업무 흐름입니다.
+ * 화면 위치만 다를 뿐, 완료·현재·다음 상태를 읽는 방식은 한 가지로 고정합니다. */
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageSteps {
+  position: relative;
+  gap: 2px;
+  padding: 3px 0;
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageSteps::before {
+  position: absolute;
+  top: 27px;
+  bottom: 27px;
+  left: 21px;
+  width: 1px;
+  background: var(--border-strong);
+  content: '';
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep {
+  position: relative;
+  min-height: 64px;
+  padding: 10px 12px 10px 48px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: transparent;
+  box-shadow: none;
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep.active {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageIndex {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 8px;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-sub);
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep.complete .flowStageIndex,
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep.active .flowStageIndex {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageText {
+  gap: 2px;
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep:not(.active) .flowStageText strong {
+  color: var(--text-sub);
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageHereBadge {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--accent-hover);
+  font-size: var(--fs-caption);
+  font-style: normal;
+  font-weight: 800;
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageGo {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep.linkable:hover,
+.workspacePage > .workflowIntro.uploadWorkflowIntro .flowStageStep.linkable:focus-visible {
+  border-color: var(--accent-border);
+  background: var(--surface-subtle);
+  box-shadow: none;
 }

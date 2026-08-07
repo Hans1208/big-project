@@ -90,7 +90,7 @@ export function AdoptedReferencePanel({ consultations = [] }) {
 
   return (
     <main className="workspacePage">
-      <section className="workflowPanel">
+      <section className="workflowPanel adoptedReferencePanel">
         <WorkPageHeader
           title="담은 자료"
           description="상담에 담아둔 법령·판례를 확인합니다. 담고 빼는 것은 '법령·판례' 화면에서 합니다."
