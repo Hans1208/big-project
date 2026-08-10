@@ -234,18 +234,37 @@ function authHeader(token) {
 
 // privacyAgreed(개인정보 수집·이용 동의)를 함께 보냅니다. 서버가 이 값을 확인하고
 // 동의 시각을 users.privacy_agreed_at에 남깁니다 — 화면에서만 받으면 증빙이 남지 않습니다.
-export function registerCoreUser({ name, role, email, password, privacyAgreed }) {
+// organization·branch·phone도 함께 보냅니다. 예전에는 가입 화면이 이 셋을 필수로 받고
+// 동의표에도 수집 항목으로 적어 두면서 정작 서버로는 보내지 않아, 브라우저 localStorage에만
+// 남았습니다 — 다른 PC에서 승인 심사를 하면 소속이 '-'로 비었고, 동의받은 항목을 보관조차
+// 하지 않는 상태였습니다.
+export function registerCoreUser({ name, role, email, password, privacyAgreed, organization, branch, phone }) {
   return requestCoreJson('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ name, role: toCoreRole(role), email, password, privacyAgreed: Boolean(privacyAgreed) }),
+    body: JSON.stringify({
+      name, role: toCoreRole(role), email, password, privacyAgreed: Boolean(privacyAgreed),
+      organization: organization || '', branch: branch || '', phone: phone || '',
+    }),
   });
 }
 
-export function loginCoreUser({ email, password }) {
+// captchaId·captchaAnswer는 로그인 실패가 3회 쌓인 뒤부터만 필요합니다
+// (보호조치 기준 제4조 접근통제 — 캡챠 적용). 평소에는 빈 값으로 나갑니다.
+export function loginCoreUser({ email, password, captchaId, captchaAnswer }) {
   return requestCoreJson('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, captchaId: captchaId || '', captchaAnswer: captchaAnswer || '' }),
   });
+}
+
+// 자동 입력 방지 문자 발급. 답은 서버가 들고 있고 여기로는 그림(data URL)만 옵니다.
+export function fetchCoreCaptcha() {
+  return requestCoreJson('/api/auth/captcha');
+}
+
+// 이 이메일로 로그인하려면 캡차가 필요한지 미리 확인합니다.
+export function fetchCoreCaptchaRequired(email) {
+  return requestCoreJson(`/api/auth/captcha-required?email=${encodeURIComponent(email)}`);
 }
 
 // 로그인한 본인의 비밀번호 변경. 대상 계정은 서버가 토큰에서 꺼내므로 여기서 보내지 않습니다
@@ -282,6 +301,9 @@ export function normalizeAuthResponse(response) {
     name: response.name || '',
     role: toFrontendRole(response.role),
     email: response.email || '',
+    // 비밀번호 유효기간(90일)이 지났다는 서버 신호. 로그인 자체는 되고, 화면이 변경을 안내합니다
+    // (보호조치 기준 제4조 — 비밀번호 유효기간 설정).
+    passwordExpired: Boolean(response.passwordExpired),
   };
 }
 
@@ -553,6 +575,11 @@ export function mapCoreUserToLocal(row = {}) {
     name: row.name || '',
     role: toFrontendRole(row.role),
     email: row.email || '',
+    // 관리자 화면(활성 사용자·승인 대기)이 소속·연락처 칸을 그립니다. 서버가 이 셋을
+    // 내려주기 시작했으므로 여기서 옮겨 담지 않으면 화면은 계속 '-'만 보여줍니다.
+    organization: row.organization || '',
+    branch: row.branch || '',
+    phone: row.phone || '',
     status: toLocalApprovalStatus(row.approvalStatus),
     requestedAt: (row.createdAt || '').slice(0, 10) || '',
   };
