@@ -77,7 +77,14 @@ app:
     secret: ${JWT_SECRET:dev-only-secret-key-please-change-in-production-32bytes-min}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   s3:
-    bucket: ${AWS_S3_BUCKET:aivle-test-ai-34178924}
+    # 기본값을 두지 않는다. 예전에는 실제로 존재하는 다른 버킷 이름이 기본값이었는데,
+    # AWS_S3_BUCKET을 안 넣으면 core-api는 첨부파일을 그 버킷에 올리고 ai-api는
+    # 자기 버킷(S3_BUCKET_NAME)에서 찾는다. 예외가 안 나고 "분석 결과가 비어 있음"으로만
+    # 보여서 원인을 찾기 어렵다. 로컬은 .env로 맞춰져 있어 드러나지도 않는다.
+    #
+    # 값이 없으면 기동할 때 "Could not resolve placeholder 'AWS_S3_BUCKET'"로 바로 죽는다.
+    # 잘못된 버킷에 조용히 쓰는 것보다 안 뜨는 게 낫다.
+    bucket: ${AWS_S3_BUCKET}
     region: ${AWS_S3_REGION:ap-northeast-2}
     access-key: ${AWS_ACCESS_KEY_ID:}
     secret-key: ${AWS_SECRET_ACCESS_KEY:}

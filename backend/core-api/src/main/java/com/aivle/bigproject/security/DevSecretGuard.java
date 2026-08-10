@@ -66,6 +66,8 @@ public class DevSecretGuard implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() {
+        rejectLegacyPiiMigrationOutsideDev();
+
         List<String> unchanged = findUnchangedSecrets();
         if (unchanged.isEmpty()) {
             return;
@@ -80,6 +82,26 @@ public class DevSecretGuard implements InitializingBean {
         throw new IllegalStateException(
                 "개발용 기본 시크릿이 남아 있어 기동을 중단합니다: %s. 각 항목을 환경변수로 교체하거나, 로컬 개발이라면 SPRING_PROFILES_ACTIVE=local로 실행하세요."
                         .formatted(String.join(", ", unchanged)));
+    }
+
+    // 평문 시절 데이터를 암호문으로 올리는 부팅 마이그레이션(ConsultationPiiEncryption)이
+    // 켜진 채로 운영에 올라가는 것을 막는다.
+    //
+    // 그 마이그레이션은 "이미 암호문인 값"을 '지금 키로 복호화되는가'로 판단한다. 그래서
+    // PII_ENCRYPTION_KEY를 잘못 넣으면 기존 암호문이 평문으로 분류되어 새 키로 한 번 더
+    // 암호화되고, 원본은 복구할 수 없다. 상담 원문과 상대방 이름이 통째로 날아간다.
+    //
+    // 옛 로컬 DB를 올릴 때만 필요한 기능이라 새로 만든 운영 DB에서는 얻을 것이 없다.
+    // 얻을 것이 없고 잃을 것만 있는 스위치는 그 환경에서 아예 못 켜게 한다.
+    private void rejectLegacyPiiMigrationOutsideDev() {
+        boolean enabled = environment.getProperty(
+                "app.pii.encrypt-legacy-on-startup", Boolean.class, false);
+        if (enabled && !isDevProfile()) {
+            throw new IllegalStateException(
+                    "app.pii.encrypt-legacy-on-startup은 로컬 전용입니다. 운영에서 켜면 "
+                    + "PII_ENCRYPTION_KEY가 다를 때 기존 암호문을 이중 암호화해 복구할 수 없습니다. "
+                    + "끄고 다시 실행하세요.");
+        }
     }
 
     private boolean isDevProfile() {
