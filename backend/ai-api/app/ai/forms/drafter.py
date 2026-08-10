@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from hwpx import HwpxDocument
 
+from app.ai.forms.draft_storage import upload_draft
 from app.ai.forms.verifier import llm_judge
 
 load_dotenv()
@@ -2917,7 +2918,7 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="",
     법령 근거를 요구해서 저장 자체를 하지 않고, 그 칸은 '직접 기재' 표시만 붙인다."""
     src = find_hwpx(form_name)
     if src is None:
-        return {"file": None, "error": f"서식 파일 없음: {form_name}",
+        return {"file": None, "s3_key": None, "error": f"서식 파일 없음: {form_name}",
                 "applied": 0, "missed": [], "unfilled": [],
                 "rewritten_count": 0, "rewrite_rejected": []}
 
@@ -3146,7 +3147,13 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="",
     # 초안 전체를 GPT에게 다시 보여줘 문맥적으로 한 번 더 점검한다.
     judge = llm_judge(str(out), extracted, summary)
 
-    return {"file": str(out), "error": None,
+    # 초안을 S3에도 올린다. core-api가 이 파일을 내려줄 때 지금은 ai-api의 output/을
+    # 로컬 파일로 직접 읽는데(GeneratedDocumentService), 그러면 두 서비스를 나눌 수 없고
+    # 재배포하면 output/이 사라진다. 실패해도 초안 생성을 무르지 않는다 —
+    # s3_key가 None이면 core-api가 예전처럼 로컬 경로로 폴백한다.
+    s3_key = upload_draft(str(out))
+
+    return {"file": str(out), "s3_key": s3_key, "error": None,
             "applied": applied, "missed": missed, "unfilled": unfilled,
             "rewritten_count": rewritten_count, "rewrite_rejected": rewrite_rejected,
             # 재서술이 안 돼 원본을 지우고 "상담원 작성" 자리로 바꾼 문단 수.
