@@ -18,6 +18,15 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
+  servlet:
+    multipart:
+      # 기본값은 파일 1MB다. 상담 자료 첨부는 브라우저가 presigned URL로 S3에 직접 올려서
+      # 여기를 지나가지 않지만, 음성 변환(POST /api/stt/transcribe)은 파일이 core-api를
+      # 통과한다 — 기본값이면 20분짜리 녹취가 전부 413으로 막힌다.
+      # UploadFilePolicy.MAX_SIZE_BYTES(200MB)와 같은 값으로 맞춘다. 여기가 더 작으면
+      # 스프링이 먼저 끊어서 우리가 만든 안내문 대신 톰캣 오류 페이지가 나간다.
+      max-file-size: 200MB
+      max-request-size: 210MB
 
 # 오류 응답에 내부 사정을 싣지 않는다.
 #

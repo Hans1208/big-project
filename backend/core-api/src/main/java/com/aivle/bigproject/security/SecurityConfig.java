@@ -67,6 +67,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/users/*/reject").hasRole("ADMIN")
                         // 관리자 대시보드 통계도 관리자 전용.
                         .requestMatchers(HttpMethod.GET, "/api/admin/stats").hasRole("ADMIN")
+                        // 서식 개정 점검은 helplaw24 목록 22페이지를 훑는 3분짜리 작업이고,
+                        // acknowledge는 기준 스냅샷을 갈아엎는다. 둘 다 관리자 화면에만 있다
+                        // (dashboards.jsx runTemplateCheck / runTemplateAcknowledge).
+                        .requestMatchers("/api/ai/forms/**").hasRole("ADMIN")
                         // 감사 로그 조회/검증도 관리자 전용.
                         .requestMatchers(HttpMethod.GET, "/api/admin/audit-logs/**").hasRole("ADMIN")
                         // 서식 초안 승인/반려는 변호사 권한 로직의 핵심이라 실제로 막아둔다.
