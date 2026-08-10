@@ -40,6 +40,17 @@ public class SecurityConfig {
                         // 가입 승인/거절/대기목록은 관리자 권한 로직의 핵심이라 실제로 막아둔다.
                         // 토큰 없이 호출하면 인증 자체가 안 잡혀 401, LAWYER/CONSULTANT 토큰으로
                         // 호출하면 권한 부족으로 403이 난다.
+                        // 계정 목록 전체 조회는 관리자 기능이다. 예전에는 로그인만 하면
+                        // 누구나 전 직원의 이름·이메일을 받아 갈 수 있었고, 응답에 연락처·소속이
+                        // 추가되면서 그대로 같이 나갔다(UserResponse 참고).
+                        //
+                        // 프론트는 이 목록을 관리자 화면에서만 쓴다. 상담원·변호사가 403을 받으면
+                        // 조용히 로컬 목록으로 되돌아가도록 이미 되어 있다
+                        // (App.jsx의 fetchCoreUsers().catch, dashboards.jsx의 setServerUsers(null)).
+                        .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
+                        // 계정을 임의 역할로 만들 수 있는 경로다. 비밀번호 없이 만들어져 로그인은
+                        // 안 되지만, 승인 대기 목록을 아무나 채울 수 있을 이유가 없다.
+                        .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/users/pending").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/users/*/approve").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/users/*/reject").hasRole("ADMIN")
