@@ -526,19 +526,23 @@ function normalizeCoreConsultation(row = {}) {
   };
 }
 
+// 상담을 만들 때 넣을 userId를 얻습니다.
+//
+// 예전에는 전체 목록(GET /api/users)을 받아 이메일로 자기를 찾고, 없으면 POST /api/users로
+// 계정을 새로 만들었습니다. 프론트에만 사용자가 있던 시절의 잔재입니다. 지금은 로그인이
+// core-api를 거치므로 서버가 이미 내가 누구인지 압니다.
+//
+// 그 두 경로는 이제 관리자 전용입니다. 목록은 전 직원의 연락처·소속을 담고 있고, 생성은
+// 아무나 승인 대기 계정을 만들 수 있는 자리였기 때문입니다. 그래서 상담원·변호사는
+// 첫 요청에서 403을 맞고 상담을 아예 만들지 못했습니다 — 지금은 본인 조회만 씁니다.
 export async function ensureCoreUser(user) {
-  const users = await requestCoreJson('/api/users');
-  const existing = users.find((item) => item.email === user.email);
-  if (existing) return existing;
-
-  return requestCoreJson('/api/users', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: user.name || user.email || '상담원',
-      role: toCoreRole(user.role),
-      email: user.email || `local-${Date.now()}@example.local`,
-    }),
-  });
+  const me = await requestCoreJson('/api/users/me');
+  // 로그인한 계정과 화면이 들고 있는 계정이 다르면(예: 로컬 계정으로 빠른 로그인) 그대로
+  // 진행합니다. 상담의 주인은 어차피 토큰의 주인이어야 맞습니다.
+  if (me?.email && user?.email && me.email !== user.email) {
+    console.warn('[core-api] 로그인 계정과 화면 계정이 다릅니다. 토큰의 계정으로 진행합니다.');
+  }
+  return me;
 }
 
 export async function createCoreConsultation({ currentUser, consultation }) {

@@ -47,11 +47,22 @@ public class SecurityConfig {
                         // 프론트는 이 목록을 관리자 화면에서만 쓴다. 상담원·변호사가 403을 받으면
                         // 조용히 로컬 목록으로 되돌아가도록 이미 되어 있다
                         // (App.jsx의 fetchCoreUsers().catch, dashboards.jsx의 setServerUsers(null)).
+                        //
+                        // 대신 본인 조회(GET /api/users/me)를 열어 둔다. 목록을 막으면서
+                        // 상담 생성이 함께 죽었기 때문이다 — 프론트가 상담에 넣을 userId를
+                        // 알아내려고 전체 목록을 받아 이메일로 찾고 있었고, 상담원·변호사는
+                        // 그 첫 요청에서 403을 맞아 상담을 만들 수 없었다.
+                        // 이 규칙은 아래 목록/단건 규칙보다 먼저 와야 한다.
+                        .requestMatchers(HttpMethod.GET, "/api/users/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/users").hasRole("ADMIN")
                         // 계정을 임의 역할로 만들 수 있는 경로다. 비밀번호 없이 만들어져 로그인은
                         // 안 되지만, 승인 대기 목록을 아무나 채울 수 있을 이유가 없다.
                         .requestMatchers(HttpMethod.POST, "/api/users").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/users/pending").hasRole("ADMIN")
+                        // 단건 조회도 목록과 같은 이유로 막는다. id만 바꿔 가며 부르면
+                        // 목록을 막은 의미가 없다 — 응답에 연락처·소속이 들어 있다.
+                        // 화면은 이 경로를 쓰지 않는다(본인은 /api/users/me로 본다).
+                        .requestMatchers(HttpMethod.GET, "/api/users/*").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/users/*/approve").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/users/*/reject").hasRole("ADMIN")
                         // 관리자 대시보드 통계도 관리자 전용.
