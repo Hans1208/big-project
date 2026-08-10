@@ -1545,7 +1545,16 @@ OPPONENT_KEY_RE = re.compile(r"상대방|피신청인|피고")
 UNKNOWN_NAME_MARKS = ("미상", "불명", "확인불가", "확인 불가", "알 수 없음", "없음",
                       # 프론트가 빈 값 자리에 넣는 화면 표시 문구. 상담 등록 때
                       # clientName으로 저장돼 서식까지 넘어온다.
-                      "미입력")
+                      "미입력",
+                      # 이름 없이 접수한 상담의 clientName에 프론트가 넣던 값.
+                      # 지금은 빈 값을 그대로 보내지만, 그 전에 저장된 상담이 남아 있다.
+                      #
+                      # 이건 앞의 표시 문구들과 성격이 다르다. "미입력"은 봐서 아는데
+                      # "아무개"는 한글 세 글자 사람 이름 모양이라 어떤 형태 검사에도
+                      # 안 걸린다 — 실제로 출생신고서의 부·모 칸에 그대로 인쇄됐다.
+                      # 이름 하나를 통째로 예약어로 막는 셈이라 마음에 드는 방법은
+                      # 아니지만, 이미 저장된 상담을 막을 다른 수단이 없다.
+                      "아무개")
 
 # 이름을 모를 때 분석 층이 이름 자리에 대신 적어 넣는 지칭어들. 이름이 아니므로
 # 서식에 그대로 들어가면 안 된다 — 실측에서 상속재산포기 심판청구서의 청구인 2번 칸이
@@ -2176,9 +2185,24 @@ def _seed_role_names(applicant_name: str = "", opponent_name: str = "",
         if len(names) == 1:      # 여럿이면 누가 그 칸의 주인인지 알 수 없다
             seeded[role] = names.pop()
     # 접수 때 적어둔 값이 있으면 그게 우선이다.
-    if applicant_name and applicant_name.strip():
+    #
+    # 다만 '이름인 값'이어야 한다. 이 우선순위는 사람이 확인했다는 전제 위에 서 있는데,
+    # 아무도 입력한 적 없는 값이 그 자리에 앉으면 우선순위가 그대로 흉기가 된다 —
+    # 분석이 제대로 뽑아낸 이름을 밀어내기 때문이다.
+    #
+    # 실측된 사고가 두 번이다. 프론트가 clientName을 비워 보낼 수 없어서(백엔드가
+    # 필수로 막고 있었다) 대신 채워 넣은 값들이다.
+    #   '이름 미입력' → 서식에 "청구인(상속인) 이름 미입력"이 인쇄됨
+    #   '아무개'      → 분석이 찾아낸 "임수정"을 밀어내고 출생신고서의 부·모 칸에 인쇄됨
+    #
+    # 두 번째가 특히 나빴다. 한글 세 글자 사람 이름 모양이라 상담원 눈에도 진짜 이름처럼
+    # 보이고, 원래 이름이 있었다는 사실 자체가 사라진다.
+    #
+    # _apply_confirmed_names_to_extracted에는 같은 검사가 이미 있었는데 여기엔 없었다.
+    # 두 함수가 같은 값을 받아 하나는 거르고 하나는 통과시키고 있었던 셈이다.
+    if _is_person_name(applicant_name):
         seeded["청구인"] = applicant_name.strip()
-    if opponent_name and opponent_name.strip():
+    if _is_person_name(opponent_name):
         seeded["상대방"] = opponent_name.strip()
     return seeded
 
@@ -2959,8 +2983,11 @@ def draft(form_name, extracted, summary="", applicant_name="", opponent_name="",
     # 서류를 내는 사람을 사망자 자리에 넣는 치환은 버린다(청구인=피상속인 모순).
     # 상담기록의 확정 청구인 이름과 추출정보의 청구인도 함께 넘긴다 — GPT 치환에만
     # 기대면 그 이름이 치환에 안 잡힌 경우 필터가 통째로 꺼진다.
+    # applicant_name이 이름이 아닐 때(빈 값이거나 프론트가 채워 넣은 자리표시자)
+    # 그대로 넣으면 비교 집합에 쓰레기가 섞인다. _seed_role_names와 같은 기준을 쓴다.
     reps, dropped_contra = _drop_self_contradicting_fills(
-        reps, _known_names_by_role(extracted, LIVING_KEY_RE) | {applicant_name})
+        reps, _known_names_by_role(extracted, LIVING_KEY_RE)
+        | ({applicant_name.strip()} if _is_person_name(applicant_name) else set()))
     unfilled.extend(dropped_contra)
 
     # 사망자 이름은 추출정보에 명시됐을 때만 채운다. 관계만 적힌 상담("부친이

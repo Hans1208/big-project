@@ -321,13 +321,24 @@ function toCoreConsultationPayload({ userId, consultation }) {
   return {
     userId,
     title: consultation.title || consultation.caseNo || '상담 제목 미입력',
-    // 이름이 없으면 빈 문자열 대신 '아무개'를 기본값으로 보냅니다. 예전에는 화면
-    // 표시용 문구('이름 미입력')를 그대로 보내서 DB에 이름으로 저장됐고, 그 값이
-    // 서식 초안까지 흘러가 "청구인(상속인) 이름 미입력"이 인쇄됐습니다(표시용 문구는
-    // 읽는 쪽에서 붙이는 것이지 저장할 값이 아니라는 교훈). 그렇다고 빈 문자열을
-    // 보내면 백엔드 Bean Validation(clientName @NotBlank)에 막혀 상담 생성 자체가
-    // 400으로 실패하므로, 사람 이름 자리에 흔히 쓰는 placeholder인 '아무개'를 씁니다.
-    clientName: (consultation.name || consultation.clientName || '').trim() || '아무개',
+    // 이름을 모르면 빈 값을 그대로 보냅니다. 대신 채워 넣지 않습니다.
+    //
+    // 같은 자리에서 두 번 사고가 났습니다. 처음에는 화면 표시용 문구('이름 미입력')를
+    // 보내서 서식에 "청구인(상속인) 이름 미입력"이 인쇄됐고, 그다음에는 백엔드
+    // 검증(@NotBlank)을 통과시키려고 '아무개'를 넣었더니 출생신고서의 부·모 칸에
+    // "아무개"가 찍혔습니다. 문제는 어떤 문구를 고르느냐가 아니라 지어낸다는 것입니다.
+    //
+    // '아무개'가 특히 나빴던 이유: ai-api에는 가짜 이름을 걸러내는 필터가 있는데
+    // (drafter.py의 UNKNOWN_NAME_MARKS·NON_NAME_PERSON_RE) '아무개'는 한글 세 글자
+    // 사람 이름 모양이라 어디에도 안 걸립니다. 진짜 이름과 구별할 방법이 없습니다.
+    // 게다가 빈칸이면 상담원이 "채워야 하는구나"를 알지만, 그럴듯한 이름이 찍혀 있으면
+    // 확인하지 않고 넘깁니다.
+    //
+    // 통화 중 접수처럼 이름을 아직 모르는 상담은 정상입니다. 그때는 비워 두면
+    // ai-api가 추출정보의 당사자 목록에서 이름을 찾고(drafter._seed_role_names),
+    // 그것도 없으면 칸을 비운 채 누락자료로 올립니다. 화면 표시용 '이름 미입력'은
+    // 읽는 쪽에서 붙입니다(App.jsx, common.jsx).
+    clientName: (consultation.name || consultation.clientName || '').trim(),
     inputText: consultation.memo || consultation.title || '',
     opponentName: consultation.opponentName || '',
     category: consultation.category || '',
